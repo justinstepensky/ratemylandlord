@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RateMyLandlord (Prototype)</title>
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --shadow: 0 10px 30px rgba(17,24,39,.08);
+      --accent:#6d28d9;
+      --accent2:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --chip:#f3f4f6;
+      --focus: 0 0 0 4px rgba(109,40,217,.18);
+      --radius: 18px;
+      --radius2: 14px;
+      --max: 1120px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:var(--font); color:var(--text); background:var(--bg); }
+    a{ color:inherit; text-decoration:none; }
+    button{ font-family:var(--font); }
+    .wrap{ max-width:var(--max); margin:0 auto; padding:24px 18px 80px; }
+
+    /* Top nav */
+    .nav{
+      position:sticky; top:0; z-index:50;
+      background:rgba(246,247,251,.82);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid rgba(229,231,235,.7);
+    }
+    .nav .wrap{ padding:16px 18px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.02em; }
+    .logo{
+      width:38px; height:38px; border-radius:12px;
+      background:linear-gradient(135deg, var(--accent), #0ea5e9);
+      box-shadow: var(--shadow);
+    }
+    .brand span{ font-size:18px; }
+    .nav-actions{ display:flex; gap:10px; align-items:center; }
+    .btn{
+      border:1px solid var(--border);
+      background:var(--card);
+      border-radius:999px;
+      padding:10px 14px;
+      font-weight:650;
+      cursor:pointer;
+      transition:.15s transform, .15s box-shadow, .15s background;
+    }
+    .btn:hover{ transform: translateY(-1px); box-shadow: 0 8px 22px rgba(17,24,39,.08); }
+    .btn.primary{
+      background:var(--accent);
+      border-color:transparent;
+      color:white;
+    }
+    .btn.primary:hover{ box-shadow: 0 14px 28px rgba(109,40,217,.25); }
+
+    /* Hero / search */
+    .hero{ padding:28px 0 14px; }
+    .hero h1{ margin:0; font-size:42px; line-height:1.05; letter-spacing:-.04em; }
+    .hero p{ margin:10px 0 0; color:var(--muted); font-size:16px; max-width:65ch; }
+    .searchRow{
+      margin-top:18px;
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .search{
+      flex:1;
+      min-width:260px;
+      display:flex; gap:10px; align-items:center;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:10px 12px;
+      box-shadow: var(--shadow);
+    }
+    .search input{
+      border:none; outline:none; background:transparent;
+      width:100%;
+      font-size:15px;
+    }
+    .search input:focus{ outline:none; }
+    .search:has(input:focus){ box-shadow: var(--shadow), var(--focus); border-color: rgba(109,40,217,.25); }
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding:10px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:var(--card);
+      font-weight:650;
+      cursor:pointer;
+    }
+    .pill .dot{ width:8px; height:8px; border-radius:99px; background:var(--accent2); }
+    .pill.secondary .dot{ background:#0ea5e9; }
+    .pill.ghost{ background:transparent; box-shadow:none; }
+    .chipRow{ margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; }
+    .chip{
+      font-size:13px;
+      padding:8px 10px;
+      border-radius:999px;
+      background:var(--chip);
+      border:1px solid var(--border);
+      color:#374151;
+      cursor:pointer;
+      user-select:none;
+    }
+    .chip.active{
+      background:rgba(109,40,217,.10);
+      border-color: rgba(109,40,217,.25);
+      color:#3b2a83;
+      font-weight:700;
+    }
+
+    /* Layout */
+    .grid{
+      margin-top:18px;
+      display:grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap:16px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    /* Cards */
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card .hd{ padding:16px 16px 10px; display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .card .bd{ padding:0 16px 16px; }
+    .card h2, .card h3{ margin:0; letter-spacing:-.02em; }
+    .muted{ color:var(--muted); }
+    .tiny{ font-size:12.5px; color:var(--muted); }
+
+    /* Landlord list cards */
+    .llCard{
+      padding:14px;
+      border-radius: var(--radius);
+      background:var(--card);
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      display:flex;
+      gap:14px;
+      align-items:stretch;
+      cursor:pointer;
+      transition: .15s transform, .15s box-shadow;
+    }
+    .llCard:hover{ transform: translateY(-1px); box-shadow: 0 14px 30px rgba(17,24,39,.10); }
+    .scoreBox{
+      width:92px;
+      min-width:92px;
+      border-radius:16px;
+      background: linear-gradient(135deg, rgba(34,197,94,.16), rgba(109,40,217,.08));
+      border:1px solid rgba(34,197,94,.25);
+      display:flex; flex-direction:column; justify-content:center; align-items:center;
+      padding:10px;
+      text-align:center;
+    }
+    .scoreBox .score{ font-size:28px; font-weight:900; letter-spacing:-.03em; }
+    .scoreBox .label{ font-size:12px; color:#065f46; font-weight:800; }
+    .scoreBox.bad{
+      background: linear-gradient(135deg, rgba(239,68,68,.15), rgba(245,158,11,.08));
+      border-color: rgba(239,68,68,.25);
+    }
+    .scoreBox.bad .label{ color:#7f1d1d; }
+    .llMeta{ flex:1; display:flex; flex-direction:column; gap:6px; }
+    .llName{ font-size:18px; font-weight:900; letter-spacing:-.02em; }
+    .llSub{ font-size:13px; color:var(--muted); }
+    .tagRow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+    .tag{
+      font-size:12px; padding:6px 9px; border-radius:999px;
+      border:1px solid var(--border); background: #fff;
+    }
+    .tag.good{ border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.08); }
+    .tag.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.10); }
+    .tag.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
+
+    /* Sidebar */
+    .side{ padding:14px; }
+    .side h3{ font-size:16px; }
+    .side .box{
+      border:1px dashed rgba(109,40,217,.35);
+      background: rgba(109,40,217,.06);
+      border-radius: 16px;
+      padding:12px;
+      margin-top:10px;
+    }
+    .side ul{ margin:10px 0 0; padding-left:18px; color:#374151; }
+    .side li{ margin:6px 0; }
+
+    /* Profile view */
+    .profileTop{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;
+    }
+    .profileTop h2{ font-size:26px; }
+    .profileActions{ display:flex; gap:10px; flex-wrap:wrap; }
+    .statsRow{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: .7fr 1.3fr;
+      gap:14px;
+    }
+    @media (max-width: 740px){
+      .statsRow{ grid-template-columns: 1fr; }
+    }
+    .bigScore{
+      padding:14px;
+      border-radius: 18px;
+      border:1px solid rgba(109,40,217,.20);
+      background: linear-gradient(135deg, rgba(109,40,217,.10), rgba(14,165,233,.06));
+    }
+    .bigScore .num{ font-size:52px; font-weight:950; line-height:1; letter-spacing:-.05em; }
+    .bigScore .sub{ margin-top:6px; color:var(--muted); font-weight:650; }
+    .barGrid{ display:grid; gap:10px; }
+    .bar{ display:grid; grid-template-columns: 140px 1fr 60px; gap:10px; align-items:center; }
+    .bar .k{ font-weight:750; color:#374151; font-size:13px; }
+    .bar .v{ text-align:right; font-weight:850; font-size:13px; }
+    .track{ width:100%; height:10px; border-radius:999px; background:#eef2ff; border:1px solid rgba(109,40,217,.16); overflow:hidden; }
+    .fill{ height:100%; width:0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius:999px; }
+
+    /* Reviews */
+    .review{
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius: 18px;
+      padding:14px;
+      background:#fff;
+    }
+    .reviewTop{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:flex-start; }
+    .reviewTitle{ font-weight:900; }
+    .reviewMeta{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+    .reviewText{ margin:10px 0 0; color:#111827; line-height:1.45; }
+    .reviewBadges{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .badge{
+      font-size:12px; padding:6px 9px; border-radius:999px; background:var(--chip); border:1px solid var(--border);
+    }
+    .badge strong{ font-weight:900; }
+    .reportLink{ color:var(--bad); font-weight:800; font-size:13px; cursor:pointer; }
+
+    /* Modal */
+    .modalBackdrop{
+      position:fixed; inset:0; z-index:100;
+      background: rgba(17,24,39,.52);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:18px;
+    }
+    .modal{
+      width:min(720px, 100%);
+      background:var(--card);
+      border-radius: 22px;
+      border:1px solid rgba(229,231,235,.8);
+      box-shadow: 0 28px 70px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .modalHd{
+      padding:16px 16px 12px;
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      border-bottom:1px solid var(--border);
+      background: linear-gradient(135deg, rgba(109,40,217,.08), rgba(14,165,233,.04));
+    }
+    .modalHd h3{ margin:0; font-size:16px; }
+    .x{
+      width:38px; height:38px; border-radius:12px;
+      border:1px solid var(--border);
+      background:#fff;
+      cursor:pointer;
+      font-size:18px;
+    }
+    .modalBd{ padding:14px 16px 16px; }
+    .formGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 720px){ .formGrid{ grid-template-columns: 1fr; } }
+    .field label{ font-size:13px; font-weight:750; color:#374151; }
+    .field input, .field select, .field textarea{
+      margin-top:6px;
+      width:100%;
+      padding:10px 12px;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      outline:none;
+      background:#fff;
+      font-size:14px;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus{
+      box-shadow: var(--focus);
+      border-color: rgba(109,40,217,.28);
+    }
+    .modalFt{
+      padding:14px 16px;
+      border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+      background:#fff;
+    }
+    .note{ font-size:12.5px; color:var(--muted); max-width:70ch; }
+    .emptyState{
+      padding:18px;
+      border-radius: 18px;
+      border:1px dashed rgba(107,114,128,.35);
+      background: rgba(243,244,246,.6);
+      color:#374151;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="nav">
+    <div class="wrap">
+      <a class="brand" href="#" onclick="goHome(); return false;">
+        <div class="logo"></div>
+        <span>RateMyLandlord</span>
+      </a>
+      <div class="nav-actions">
+        <button class="btn" onclick="openModal('addLandlord')">Add Landlord</button>
+        <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- HOME VIEW -->
+    <section id="homeView">
+      <div class="hero">
+        <h1>Find a landlord. Read reviews. Rent smarter.</h1>
+        <p>
+          Search landlords or management companies, then browse ratings for repairs, responsiveness, deposits, conditions, and communication.
+        </p>
+
+        <div class="searchRow">
+          <div class="search">
+            <span class="tiny">🔎</span>
+            <input id="searchInput" placeholder="Search by landlord / management company / address..." oninput="renderHome()" />
+          </div>
+          <button class="pill" onclick="toggleChip('hasManyReviews')"><span class="dot"></span> Many reviews</button>
+          <button class="pill secondary" onclick="toggleChip('topRated')"><span class="dot"></span> 4.0+ overall</button>
+          <button class="pill ghost" onclick="resetFilters()">Reset</button>
+        </div>
+
+        <div class="chipRow">
+          <div class="chip" data-chip="repairs" onclick="toggleSort('repairs')">Sort: Repairs</div>
+          <div class="chip" data-chip="responsiveness" onclick="toggleSort('responsiveness')">Sort: Responsive</div>
+          <div class="chip" data-chip="deposits" onclick="toggleSort('deposits')">Sort: Deposits</div>
+          <div class="chip" data-chip="conditions" onclick="toggleSort('conditions')">Sort: Conditions</div>
+          <div class="chip" data-chip="communication" onclick="toggleSort('communication')">Sort: Comms</div>
+          <div class="chip active" data-chip="overall" onclick="toggleSort('overall')">Sort: Overall</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <div class="card">
+            <div class="hd">
+              <div>
+                <h3>Top results</h3>
+                <div class="tiny">Click a card to view details.</div>
+              </div>
+              <div class="tiny" id="resultCount"></div>
+            </div>
+            <div class="bd" id="landlordList"></div>
+          </div>
+        </div>
+
+        <aside class="card side">
+          <h3>Posting guidelines</h3>
+          <div class="box">
+            <div class="tiny">
+              Keep it factual. Avoid personal info and harassment. This prototype doesn’t verify tenancy yet.
+            </div>
+          </div>
+          <ul>
+            <li>Use dates (“work order 5/3, fixed 5/20”).</li>
+            <li>No phone numbers/emails/SSNs.</li>
+            <li>No threats or discriminatory content.</li>
+            <li>Landlords can respond later (recommended).</li>
+          </ul>
+          <div style="margin-top:12px;">
+            <button class="btn" style="width:100%;" onclick="openModal('addReview')">Write a review</button>
+            <button class="btn" style="width:100%; margin-top:10px;" onclick="openDataSources()">NYC Data Sources</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- PROFILE VIEW -->
+    <section id="profileView" style="display:none;">
+      <div class="card">
+        <div class="hd">
+          <div class="profileTop" style="width:100%;">
+            <div>
+              <h2 id="profileName">—</h2>
+              <div class="muted" id="profileSub">—</div>
+            </div>
+            <div class="profileActions">
+              <button class="btn" onclick="goHome()">← Back</button>
+              <button class="btn" onclick="openModal('addProperty')">Add Property</button>
+              <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+            </div>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="statsRow">
+            <div class="bigScore">
+              <div class="num" id="profileOverall">—</div>
+              <div class="sub"><span id="profileReviewCount">0</span> reviews • Overall</div>
+              <div style="margin-top:10px;" class="reviewBadges" id="profileTags"></div>
+            </div>
+
+            <div class="barGrid" id="profileBars"></div>
+          </div>
+
+          <div style="margin-top:18px;">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <h3 style="margin:0;">Reviews</h3>
+              <div class="tiny muted" id="profileReviewHint"></div>
+            </div>
+            <div id="profileReviews" style="margin-top:10px;"></div>
+          </div>
+
+          <div style="margin-top:18px;">
+            <h3 style="margin:0;">Properties</h3>
+            <div class="tiny muted">Addresses reported by reviewers or added by users.</div>
+            <div id="profileProperties" style="margin-top:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL BACKDROP -->
+  <div class="modalBackdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modalHd">
+        <h3 id="modalTitle">—</h3>
+        <button class="x" onclick="closeModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="modalBd" id="modalBody"></div>
+      <div class="modalFt">
+        <div class="note" id="modalNote">
+          Tip: Keep reviews factual. Don’t include personal info (phone/email/SSN), threats, or harassment.
+        </div>
+        <div class="row">
+          <button class="btn" onclick="closeModal()">Cancel</button>
+          <button class="btn primary" id="modalSubmitBtn" onclick="handleModalSubmit()">Submit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+/* =========================
+   NYC Open Data sources (fallback)
+   ========================= */
+const NYC_SOURCES_FALLBACK = {
+  domain: "data.cityofnewyork.us",
+  datasets: {
+    "hpd_multiple_dwelling_registrations": "tesw-yqqr",
+    "hpd_registration_contacts": "feu5-w2e2",
+    "nyc_311_service_requests": "erm2-nwe9"
+  }
+};
+
+function sodaEndpoint(domain, datasetId){
+  return `https://${domain}/resource/${datasetId}.json`;
+}
+
+async function openDataSources(){
+  // If you're running the FastAPI backend, this will pull live from /api/meta.
+  // If not, we show a built-in fallback list so the button still works when opened locally.
+  let sources = null;
+  try{
+    const r = await fetch("/api/meta", { headers: { "Accept":"application/json" } });
+    if(r.ok){
+      const j = await r.json();
+      sources = (j && j.sources) ? j.sources : null;
+    }
+  }catch(e){ /* ignore and use fallback */ }
+
+  if(!sources){
+    sources = {
+      domain: NYC_SOURCES_FALLBACK.domain,
+      datasets: NYC_SOURCES_FALLBACK.datasets,
+      api_endpoints: Object.fromEntries(
+        Object.entries(NYC_SOURCES_FALLBACK.datasets).map(([k,v]) => [k, sodaEndpoint(NYC_SOURCES_FALLBACK.domain, v)])
+      ),
+      notes: [
+        "Fallback list (static HTML). Run the backend to fetch /api/meta dynamically.",
+        "These are NYC Open Data (Socrata/SODA) datasets."
+      ]
+    };
+  }
+
+  const ds = sources.datasets || {};
+  const eps = sources.api_endpoints || {};
+  const domain = sources.domain || "data.cityofnewyork.us";
+  const notes = (sources.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("");
+
+  const rows = Object.keys(ds).map(k => {
+    const id = ds[k];
+    const ep = eps[k] || sodaEndpoint(domain, id);
+    return `
+      <div class="review" style="margin-top:10px;">
+        <div style="font-weight:900;">${escapeHtml(k)}</div>
+        <div class="tiny muted">Dataset ID: <code>${escapeHtml(id)}</code></div>
+        <div class="tiny muted">API endpoint: <code>${escapeHtml(ep)}</code></div>
+      </div>
+    `;
+  }).join("");
+
+  // Reuse modal shell, but hide submit button.
+  openModal("info");
+  document.getElementById("modalTitle").textContent = "NYC Data Sources";
+  document.getElementById("modalBody").innerHTML = `
+    <div class="note">
+      These are the NYC Open Data datasets used to seed/augment landlord data in NYC.
+      <div style="margin-top:8px;">
+        <ul style="margin:8px 0 0; padding-left:18px;">${notes}</ul>
+      </div>
+    </div>
+    ${rows || '<div class="emptyState"><b>No sources found.</b></div>'}
+  `;
+  document.getElementById("modalSubmitBtn").style.display = "none";
+  document.getElementById("modalNote").textContent =
+    "Tip: If you run the backend, this will pull /api/meta dynamically.";
+}
+
+    /* =========================================================
+       Data model (in-memory demo). Replace with API calls later.
+       ========================================================= */
+    const db = {
+      landlords: [
+        {
+          id: "l1",
+          name: "Northside Property Management",
+          city: "New York, NY",
+          properties: ["123 Main St, Apt 4B", "88 Riverside Dr"],
+          reviews: [
+            { id:"r1", date:"2025-10-18", title:"Fast repairs, decent communication",
+              text:"Submitted a work order for a leaking sink. Fixed within 48 hours. Super responsive by email. Deposit returned on time.",
+              ratings:{ overall:5, repairs:5, responsiveness:5, deposits:4, conditions:4, communication:5 },
+              meta:{ rentBucket:"2500-4000", unitType:"1BR" }
+            },
+            { id:"r2", date:"2025-07-02", title:"Solid but building could be cleaner",
+              text:"Management is responsive, but common areas sometimes neglected. Heat was inconsistent for a week; eventually fixed.",
+              ratings:{ overall:4, repairs:4, responsiveness:4, deposits:4, conditions:3, communication:4 },
+              meta:{ rentBucket:"1500-2500", unitType:"Studio" }
+            },
+          ]
+        },
+        {
+          id: "l2",
+          name: "Sunset Holdings LLC",
+          city: "Brooklyn, NY",
+          properties: ["12 Flatbush Ave"],
+          reviews: [
+            { id:"r3", date:"2025-08-11", title:"Deposit drama",
+              text:"Move-out inspection was rushed and they tried to withhold for normal wear. Took multiple follow-ups and documentation to resolve.",
+              ratings:{ overall:2, repairs:3, responsiveness:2, deposits:1, conditions:3, communication:2 },
+              meta:{ rentBucket:"1500-2500", unitType:"2BR" }
+            }
+          ]
+        },
+        {
+          id: "l3",
+          name: "Lakeshore Realty Group",
+          city: "Queens, NY",
+          properties: ["44-10 30th Ave"],
+          reviews: [
+            { id:"r4", date:"2025-09-21", title:"Quiet building, slow repairs",
+              text:"Building is quiet and safe. Repairs happen, but timelines are slow unless you escalate. Communication is polite.",
+              ratings:{ overall:3, repairs:2, responsiveness:3, deposits:4, conditions:4, communication:3 },
+              meta:{ rentBucket:"1500-2500", unitType:"1BR" }
+            }
+          ]
+        }
+      ],
+      reports: []
+    };
+
+    const state = {
+      view: "home",        // home | profile
+      selectedLandlordId: null,
+      filters: {
+        hasManyReviews: false,
+        topRated: false,
+      },
+      sortKey: "overall",
+      sortDir: "desc"
+    };
+
+    /* =========================
+       Helpers / computed values
+       ========================= */
+    function avg(nums){
+      if(!nums.length) return null;
+      return nums.reduce((a,b)=>a+b,0) / nums.length;
+    }
+    function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+    function fmtScore(x){
+      if(x === null || x === undefined) return "—";
+      return (Math.round(x*10)/10).toFixed(1);
+    }
+    function landlordStats(l){
+      const rs = l.reviews || [];
+      const keys = ["overall","repairs","responsiveness","deposits","conditions","communication"];
+      const out = { count: rs.length };
+      for(const k of keys){
+        out[k] = avg(rs.map(r => r.ratings[k]));
+      }
+      return out;
+    }
+    function scoreLabel(score){
+      if(score >= 4.0) return { text:"Excellent", cls:"good" };
+      if(score >= 3.0) return { text:"Okay", cls:"warn" };
+      return { text:"Avoid", cls:"bad" };
+    }
+    function tagsFromStats(stats){
+      const tags = [];
+      if(stats.repairs >= 4.2) tags.push({ t:"Fast Repairs", cls:"good" });
+      if(stats.responsiveness >= 4.2) tags.push({ t:"Very Responsive", cls:"good" });
+      if(stats.deposits <= 2.5 && stats.count >= 1) tags.push({ t:"Deposit Issues", cls:"bad" });
+      if(stats.conditions <= 2.8 && stats.count >= 1) tags.push({ t:"Poor Conditions", cls:"bad" });
+      if(stats.communication >= 4.0) tags.push({ t:"Good Communication", cls:"good" });
+      if(!tags.length && stats.count) tags.push({ t:"Mixed Reviews", cls:"warn" });
+      if(!stats.count) tags.push({ t:"No Reviews Yet", cls:"warn" });
+      return tags.slice(0, 4);
+    }
+    function matchesQuery(l, q){
+      if(!q) return true;
+      q = q.toLowerCase();
+      const hay = [
+        l.name,
+        l.city,
+        ...(l.properties || [])
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    }
+
+    /* =========================
+       Rendering: Home
+       ========================= */
+    function renderHome(){
+      const q = document.getElementById("searchInput")?.value?.trim() || "";
+      const list = document.getElementById("landlordList");
+      const resultCount = document.getElementById("resultCount");
+
+      let landlords = db.landlords
+        .filter(l => matchesQuery(l, q))
+        .map(l => ({ l, s: landlordStats(l) }));
+
+      if(state.filters.hasManyReviews){
+        landlords = landlords.filter(x => x.s.count >= 2);
+      }
+      if(state.filters.topRated){
+        landlords = landlords.filter(x => (x.s.overall || 0) >= 4.0);
+      }
+
+      landlords.sort((a,b)=>{
+        const ka = a.s[state.sortKey] ?? -1;
+        const kb = b.s[state.sortKey] ?? -1;
+        return state.sortDir === "desc" ? (kb - ka) : (ka - kb);
+      });
+
+      resultCount.textContent = `${landlords.length} shown`;
+
+      if(!landlords.length){
+        list.innerHTML = `
+          <div class="emptyState">
+            <b>No matches.</b>
+            <div class="muted" style="margin-top:6px;">Try a broader search or add a landlord.</div>
+            <div style="margin-top:12px;">
+              <button class="btn primary" onclick="openModal('addLandlord')">Add Landlord</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = landlords.map(({l,s})=>{
+        const overall = s.overall ?? 0;
+        const label = scoreLabel(overall);
+        const boxCls = label.cls === "bad" ? "scoreBox bad" : "scoreBox";
+        const tags = tagsFromStats(s).map(t => `<span class="tag ${t.cls}">${t.t}</span>`).join("");
+
+        return `
+          <div class="llCard" onclick="openProfile('${l.id}')">
+            <div class="${boxCls}">
+              <div class="score">${s.count ? fmtScore(s.overall) : "—"}</div>
+              <div class="label">${s.count ? label.text : "No Reviews"}</div>
+            </div>
+            <div class="llMeta">
+              <div class="llName">${escapeHtml(l.name)}</div>
+              <div class="llSub">${escapeHtml(l.city || "—")} • <b>${s.count}</b> review${s.count===1?"":"s"}</div>
+              <div class="tagRow">${tags}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function toggleChip(key){
+      state.filters[key] = !state.filters[key];
+      renderHome();
+    }
+    function toggleSort(key){
+      if(state.sortKey === key){
+        state.sortDir = state.sortDir === "desc" ? "asc" : "desc";
+      } else {
+        state.sortKey = key;
+        state.sortDir = "desc";
+      }
+      document.querySelectorAll(".chipRow .chip").forEach(el=>{
+        el.classList.toggle("active", el.dataset.chip === state.sortKey);
+      });
+      renderHome();
+    }
+    function resetFilters(){
+      state.filters.hasManyReviews = false;
+      state.filters.topRated = false;
+      state.sortKey = "overall";
+      state.sortDir = "desc";
+      document.querySelectorAll(".chipRow .chip").forEach(el=>{
+        el.classList.toggle("active", el.dataset.chip === "overall");
+      });
+      document.getElementById("searchInput").value = "";
+      renderHome();
+    }
+
+    /* =========================
+       Profile view
+       ========================= */
+    function openProfile(id){
+      state.view = "profile";
+      state.selectedLandlordId = id;
+
+      document.getElementById("homeView").style.display = "none";
+      document.getElementById("profileView").style.display = "block";
+
+      const l = db.landlords.find(x => x.id === id);
+      if(!l) return;
+
+      const s = landlordStats(l);
+      const tags = tagsFromStats(s);
+
+      document.getElementById("profileName").textContent = l.name;
+      document.getElementById("profileSub").textContent = `${l.city || "—"} • ${s.count} review${s.count===1?"":"s"}`;
+      document.getElementById("profileReviewCount").textContent = s.count;
+
+      document.getElementById("profileOverall").textContent = s.count ? fmtScore(s.overall) : "—";
+
+      document.getElementById("profileTags").innerHTML = tags.map(t =>
+        `<span class="tag ${t.cls}">${t.t}</span>`
+      ).join("");
+
+      // bars
+      const keys = [
+        ["repairs", "Repairs"],
+        ["responsiveness", "Responsiveness"],
+        ["deposits", "Deposits"],
+        ["conditions", "Conditions"],
+        ["communication", "Communication"],
+      ];
+      document.getElementById("profileBars").innerHTML = keys.map(([k,label])=>{
+        const v = s[k];
+        const pct = v ? clamp((v/5)*100, 0, 100) : 0;
+        return `
+          <div class="bar">
+            <div class="k">${label}</div>
+            <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+            <div class="v">${s.count ? fmtScore(v) : "—"}</div>
+          </div>
+        `;
+      }).join("");
+
+      // reviews
+      const reviewBox = document.getElementById("profileReviews");
+      if(!l.reviews.length){
+        reviewBox.innerHTML = `
+          <div class="emptyState">
+            <b>No reviews yet.</b>
+            <div class="muted" style="margin-top:6px;">Be the first to review this landlord.</div>
+            <div style="margin-top:12px;">
+              <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+            </div>
+          </div>
+        `;
+      } else {
+        reviewBox.innerHTML = l.reviews
+          .slice()
+          .sort((a,b)=> (b.date || "").localeCompare(a.date || ""))
+          .map(r=>{
+            const badges = [
+              ["Overall", r.ratings.overall],
+              ["Repairs", r.ratings.repairs],
+              ["Responsive", r.ratings.responsiveness],
+              ["Deposits", r.ratings.deposits],
+              ["Conditions", r.ratings.conditions],
+              ["Comms", r.ratings.communication],
+            ].map(([k,v])=> `<span class="badge"><strong>${k}:</strong> ${v}/5</span>`).join("");
+
+            const meta = [];
+            if(r.meta?.rentBucket) meta.push(`Rent ${r.meta.rentBucket}`);
+            if(r.meta?.unitType) meta.push(`Unit ${r.meta.unitType}`);
+            const metaBadges = meta.map(m=> `<span class="badge">${escapeHtml(m)}</span>`).join("");
+
+            return `
+              <div class="review">
+                <div class="reviewTop">
+                  <div>
+                    <div class="reviewTitle">${escapeHtml(r.title)}</div>
+                    <div class="reviewMeta">${escapeHtml(r.date || "—")}</div>
+                  </div>
+                  <div class="pill"><span class="dot"></span> ${r.ratings.overall}/5 overall</div>
+                </div>
+                <div class="reviewText">${escapeHtml(r.text)}</div>
+                <div class="reviewBadges">${badges}${metaBadges}</div>
+                <div style="margin-top:10px;">
+                  <span class="reportLink" onclick="openModal('report', '${r.id}')">Report</span>
+                </div>
+              </div>
+            `;
+          }).join("");
+      }
+
+      // properties
+      const props = Array.from(new Set(l.properties || []));
+      const propBox = document.getElementById("profileProperties");
+      propBox.innerHTML = props.length
+        ? props.map(p => `<div class="review"><b>${escapeHtml(p)}</b><div class="muted tiny">Unverified address</div></div>`).join("")
+        : `<div class="emptyState"><b>No properties listed.</b><div class="muted" style="margin-top:6px;">Add one to help others search.</div></div>`;
+
+      document.getElementById("profileReviewHint").textContent =
+        `Sorted newest first • ${new Date().toLocaleDateString()}`;
+    }
+
+    function goHome(){
+      state.view = "home";
+      state.selectedLandlordId = null;
+      document.getElementById("profileView").style.display = "none";
+      document.getElementById("homeView").style.display = "block";
+      renderHome();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    /* =========================
+       Modal system
+       ========================= */
+    let currentModal = { type:null, payload:null };
+
+    function openModal(type, payload=null){
+      currentModal = { type, payload };
+
+      const back = document.getElementById("modalBackdrop");
+      const title = document.getElementById("modalTitle");
+      const body = document.getElementById("modalBody");
+      const submit = document.getElementById("modalSubmitBtn");
+      submit.style.display = "inline-block";
+
+      back.style.display = "flex";
+
+      if(type === "info"){
+        title.textContent = "Info";
+        submit.textContent = "OK";
+        body.innerHTML = `<div class="note">Loading…</div>`;
+        // submit is hidden by openDataSources(); keep it visible for other info uses
+      }
+
+      if(type === "addLandlord"){
+        title.textContent = "Add a landlord";
+        submit.textContent = "Create";
+        body.innerHTML = `
+          <div class="formGrid">
+            <div class="field" style="grid-column:1/-1;">
+              <label>Landlord / management company name</label>
+              <input id="m_landlord_name" placeholder="e.g., ABC Property Management LLC" />
+            </div>
+            <div class="field">
+              <label>City</label>
+              <input id="m_landlord_city" placeholder="e.g., New York, NY" />
+            </div>
+          </div>
+        `;
+      }
+
+      if(type === "addProperty"){
+        title.textContent = "Add a property address";
+        submit.textContent = "Add";
+        const l = selectedLandlord();
+        body.innerHTML = `
+          <div class="field">
+            <label>Landlord</label>
+            <input value="${escapeAttr(l?.name || "")}" disabled />
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Address</label>
+            <input id="m_property_address" placeholder="123 Main St, Apt 4B" />
+          </div>
+          <div class="tiny muted" style="margin-top:8px;">
+            Addresses are unverified in this prototype.
+          </div>
+        `;
+      }
+
+      if(type === "addReview"){
+        title.textContent = "Write a review";
+        submit.textContent = "Post";
+        const landlordOptions = db.landlords.map(x =>
+          `<option value="${x.id}" ${x.id===state.selectedLandlordId ? "selected":""}>${escapeHtml(x.name)}</option>`
+        ).join("");
+
+        body.innerHTML = `
+          <div class="formGrid">
+            <div class="field" style="grid-column:1/-1;">
+              <label>Landlord</label>
+              <select id="m_review_landlord">${landlordOptions}</select>
+            </div>
+
+            ${ratingField("Overall", "m_overall", 5)}
+            ${ratingField("Repairs", "m_repairs", 5)}
+            ${ratingField("Responsiveness", "m_responsive", 5)}
+            ${ratingField("Deposits", "m_deposits", 5)}
+            ${ratingField("Conditions", "m_conditions", 5)}
+            ${ratingField("Communication", "m_comms", 5)}
+
+            <div class="field" style="grid-column:1/-1;">
+              <label>Title</label>
+              <input id="m_review_title" placeholder="Short summary" />
+            </div>
+
+            <div class="field" style="grid-column:1/-1;">
+              <label>Review</label>
+              <textarea id="m_review_text" rows="6" placeholder="Stick to facts (dates, repair requests, timelines). No personal info."></textarea>
+            </div>
+
+            <div class="field">
+              <label>Rent bucket (optional)</label>
+              <select id="m_rent">
+                <option value="">—</option>
+                <option value="<1500">&lt;1500</option>
+                <option value="1500-2500">1500-2500</option>
+                <option value="2500-4000">2500-4000</option>
+                <option value="4000+">4000+</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Unit type (optional)</label>
+              <select id="m_unit">
+                <option value="">—</option>
+                <option value="Studio">Studio</option>
+                <option value="1BR">1BR</option>
+                <option value="2BR">2BR</option>
+                <option value="3BR+">3BR+</option>
+              </select>
+            </div>
+          </div>
+        `;
+      }
+
+      if(type === "report"){
+        title.textContent = "Report a review";
+        submit.textContent = "Submit report";
+        body.innerHTML = `
+          <div class="field">
+            <label>Reason</label>
+            <select id="m_report_reason">
+              <option>Doxxing / personal info</option>
+              <option>Threats / harassment</option>
+              <option>Spam / fake review</option>
+              <option>Hate / discrimination</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Details (optional)</label>
+            <textarea id="m_report_details" rows="5" placeholder="What specifically is wrong?"></textarea>
+          </div>
+          <div class="tiny muted" style="margin-top:8px;">
+            Reports go into a queue (in-memory in this prototype).
+          </div>
+        `;
+      }
+
+      setTimeout(()=>{
+        const first = body.querySelector("input,select,textarea");
+        if(first) first.focus();
+      }, 50);
+    }
+
+    function closeModal(){
+      document.getElementById("modalBackdrop").style.display = "none";
+      currentModal = { type:null, payload:null };
+      const btn = document.getElementById("modalSubmitBtn");
+      if(btn) btn.style.display = "inline-block";
+    }
+
+    function handleModalSubmit(){
+      const t = currentModal.type;
+
+      if(t === "info"){
+        closeModal();
+        return;
+      }
+
+      if(t === "addLandlord"){
+        const name = (document.getElementById("m_landlord_name").value || "").trim();
+        const city = (document.getElementById("m_landlord_city").value || "").trim();
+        if(name.length < 2) return alert("Please enter a landlord name.");
+        const id = "l" + Math.random().toString(16).slice(2);
+        db.landlords.unshift({ id, name, city, properties:[], reviews:[] });
+        closeModal();
+        renderHome();
+        openProfile(id);
+        return;
+      }
+
+      if(t === "addProperty"){
+        const addr = (document.getElementById("m_property_address").value || "").trim();
+        if(addr.length < 5) return alert("Please enter a valid address.");
+        const l = selectedLandlord();
+        if(!l) return alert("Select a landlord first.");
+        l.properties = Array.from(new Set([...(l.properties||[]), addr]));
+        closeModal();
+        openProfile(l.id);
+        return;
+      }
+
+      if(t === "addReview"){
+        const landlordId = document.getElementById("m_review_landlord").value;
+        const l = db.landlords.find(x => x.id === landlordId);
+        if(!l) return alert("Pick a landlord.");
+
+        const title = (document.getElementById("m_review_title").value || "").trim();
+        const text  = (document.getElementById("m_review_text").value || "").trim();
+        if(title.length < 3) return alert("Add a title (3+ chars).");
+        if(text.length < 20) return alert("Add more detail (20+ chars).");
+
+        const ratings = {
+          overall: +document.getElementById("m_overall").value,
+          repairs: +document.getElementById("m_repairs").value,
+          responsiveness: +document.getElementById("m_responsive").value,
+          deposits: +document.getElementById("m_deposits").value,
+          conditions: +document.getElementById("m_conditions").value,
+          communication: +document.getElementById("m_comms").value,
+        };
+
+        const meta = {
+          rentBucket: document.getElementById("m_rent").value || null,
+          unitType: document.getElementById("m_unit").value || null,
+        };
+
+        const id = "r" + Math.random().toString(16).slice(2);
+        l.reviews.push({
+          id,
+          date: new Date().toISOString().slice(0,10),
+          title,
+          text,
+          ratings,
+          meta
+        });
+
+        closeModal();
+        openProfile(l.id);
+        renderHome();
+        return;
+      }
+
+      if(t === "report"){
+        const reason = document.getElementById("m_report_reason").value;
+        const details = (document.getElementById("m_report_details").value || "").trim();
+        const reviewId = currentModal.payload;
+        db.reports.push({
+          id: "rep" + Math.random().toString(16).slice(2),
+          reviewId,
+          reason,
+          details,
+          createdAt: new Date().toISOString()
+        });
+        closeModal();
+        alert("Report submitted (prototype).");
+        return;
+      }
+    }
+
+    function ratingField(label, id, def=5){
+      return `
+        <div class="field">
+          <label>${label} (1–5)</label>
+          <select id="${id}">
+            ${[1,2,3,4,5].map(v => `<option ${v===def ? "selected":""}>${v}</option>`).join("")}
+          </select>
+        </div>
+      `;
+    }
+
+    function selectedLandlord(){
+      return db.landlords.find(x => x.id === state.selectedLandlordId) || null;
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function escapeAttr(s){ return escapeHtml(s); }
+
+    document.getElementById("modalBackdrop").addEventListener("click", (e)=>{
+      if(e.target.id === "modalBackdrop") closeModal();
+    });
+    document.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape") closeModal();
+    });
+
+    renderHome();
+  </script>
+</body>
+</html>
