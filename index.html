@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RateMyLandlord</title>
+
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --panel:#ffffff;
+      --panel2:#f7f7fb;
+      --border:#e7e7ef;
+      --text:#0f172a;
+      --muted:#667085;
+      --muted2:#98a2b3;
+      --accent:#6d28d9;
+      --accent2:#7c3aed;
+      --good:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --shadow: 0 18px 45px rgba(17, 24, 39, .10);
+      --radius:18px;
+      --focus: 0 0 0 4px rgba(124,58,237,.18);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 800px at 10% 0%, rgba(124,58,237,.10), transparent 55%),
+        radial-gradient(1000px 700px at 90% 10%, rgba(99,102,241,.12), transparent 60%),
+        var(--bg);
+    }
+    a{ color:inherit; text-decoration:none; }
+    .wrap{ max-width: 1060px; margin: 0 auto; padding: 0 18px; }
+
+    .nav{
+      position: sticky;
+      top:0;
+      z-index:10;
+      backdrop-filter: blur(10px);
+      background: rgba(246,247,251,.75);
+      border-bottom:1px solid rgba(231,231,239,.7);
+    }
+    .nav .wrap{
+      height:68px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .brand{ display:flex; align-items:center; gap:12px; font-weight:900; letter-spacing:.2px; }
+    .logo{
+      width:34px; height:34px; border-radius:12px;
+      background: linear-gradient(135deg, #4f46e5, #9333ea);
+      box-shadow: 0 10px 25px rgba(79,70,229,.25);
+    }
+    .nav-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .pill{
+      padding: 8px 12px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.9);
+      font-weight: 900;
+      font-size: 12.5px;
+      color:#111827;
+    }
+    .pill.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
+    .pill.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
+    .pill.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
+
+    .btn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:#111827;
+      padding:10px 14px;
+      border-radius: 999px;
+      font-weight:800;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .btn:hover{ box-shadow: 0 10px 22px rgba(17,24,39,.08); }
+    .btn.primary{
+      border:none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color:#fff;
+    }
+    .btn.danger{
+      border:1px solid rgba(239,68,68,.35);
+      background: rgba(239,68,68,.08);
+      color:#7f1d1d;
+    }
+
+    .hero{ padding: 40px 0 16px; }
+    h1{ margin: 0 0 8px; font-size: 46px; line-height: 1.03; letter-spacing: -1px; }
+    .hero p{ margin: 0 0 18px; color: var(--muted); max-width: 80ch; font-weight: 600; }
+
+    .searchRow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .search{
+      flex: 1 1 520px; display:flex; align-items:center; gap:10px;
+      background:#fff; border:1px solid var(--border); border-radius: 999px;
+      padding: 12px 14px; box-shadow: 0 10px 30px rgba(17,24,39,.06);
+    }
+    .search input{ border:none; outline:none; width:100%; font-size: 14.5px; color:#111827; }
+    .tiny{ font-size: 12.5px; color: var(--muted2); font-weight: 700; }
+    .muted{ color: var(--muted); }
+
+    .chipRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .chip{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.8);
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 13px;
+      color:#374151;
+      cursor:pointer;
+    }
+    .chip.active{ border-color: rgba(124,58,237,.35); background: rgba(124,58,237,.12); color: #4c1d95; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.3fr .7fr;
+      gap: 18px;
+      margin: 18px 0 40px;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+      h1{ font-size: 38px; }
+    }
+
+    .card{
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hd{ padding: 18px 18px 10px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .bd{ padding: 10px 18px 18px; }
+
+    .rowCard{
+      display:flex;
+      gap:14px;
+      align-items:stretch;
+      padding: 14px;
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+      cursor:pointer;
+      margin-top: 12px;
+    }
+    .rowCard:hover{ outline: 3px solid rgba(124,58,237,.12); }
+
+    .scoreBox{
+      width: 88px; min-width: 88px;
+      border-radius: 16px;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      font-weight: 1000; gap:2px;
+      border:1px solid rgba(22,163,74,.25);
+      background: rgba(22,163,74,.10);
+    }
+    .scoreBox.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
+    .scoreBox.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
+    .scoreNum{ font-size: 32px; line-height: 1; }
+    .scoreText{ font-size: 12px; font-weight: 900; }
+
+    .rowMain{ flex:1; }
+    .rowTitle{ font-size: 18px; font-weight: 1000; margin: 2px 0 2px; }
+    .rowSub{ color: var(--muted); font-weight: 800; font-size: 13px; margin-bottom: 10px; }
+    .badgeRow{ display:flex; flex-wrap:wrap; gap:8px; }
+    .badge{
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      border:1px solid var(--border);
+      background: #fff;
+    }
+    .badge.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
+    .badge.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
+    .badge.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
+    .badge.purple{ border-color: rgba(124,58,237,.25); background: rgba(124,58,237,.10); color:#4c1d95; }
+
+    .side{ padding: 18px; }
+    .box{
+      border:1px dashed rgba(124,58,237,.35);
+      background: rgba(124,58,237,.06);
+      padding: 12px;
+      border-radius: 14px;
+    }
+    ul{ margin: 12px 0 0 18px; padding:0; }
+    li{ margin: 8px 0; color:#344054; font-weight: 700; }
+
+    #profileView{ display:none; padding: 18px 0 40px; }
+    .profileTop{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      width:100%;
+    }
+    .profileActions{ display:flex; gap:10px; flex-wrap:wrap; }
+    h2{ margin: 0 0 6px; font-size: 30px; letter-spacing: -.5px; }
+    .statsRow{
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+      align-items:start;
+    }
+    @media (max-width: 980px){ .statsRow{ grid-template-columns: 1fr; } }
+    .bigScore{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      padding: 16px;
+      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+    }
+    .bigScore .num{ font-size: 54px; font-weight: 1000; line-height: 1; }
+    .bigScore .sub{ margin-top:6px; color: var(--muted); font-weight: 900; font-size: 13px; }
+    .barGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 720px){ .barGrid{ grid-template-columns: 1fr; } }
+    .bar{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+    }
+    .barTop{
+      display:flex; justify-content:space-between; align-items:center;
+      font-weight: 1000;
+      font-size: 13px;
+      color:#344054;
+      margin-bottom: 8px;
+    }
+    .track{
+      height: 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      overflow:hidden;
+      border:1px solid rgba(79,70,229,.12);
+    }
+    .fill{
+      height:100%;
+      width:0%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+    }
+
+    .ownerResp{
+      margin-top:12px;
+      padding:12px;
+      border:1px solid rgba(124,58,237,.35);
+      background: rgba(124,58,237,.06);
+      border-radius: 14px;
+    }
+    .ownerRespTitle{
+      font-weight: 1000;
+      font-size: 12px;
+      color: #5b3fd7;
+      margin-bottom: 6px;
+    }
+    .ownerRespDate{ font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 800; }
+
+    #modalBackdrop{
+      display:none;
+      position:fixed;
+      inset:0;
+      background: rgba(15, 23, 42, .55);
+      z-index: 999;
+      padding: 22px;
+    }
+    .modal{
+      max-width: 620px;
+      margin: 0 auto;
+      background:#fff;
+      border-radius: 20px;
+      overflow:hidden;
+      border:1px solid var(--border);
+      box-shadow: 0 30px 80px rgba(0,0,0,.25);
+    }
+    .modalHd{ padding: 16px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .modalBd{ padding: 16px 18px; }
+    .modalFt{ padding: 14px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+
+    .field label{ font-size: 13px; font-weight: 1000; color:#344054; }
+    .field input, .field textarea, .field select{
+      margin-top:6px;
+      width:100%;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      outline:none;
+      font-size: 14px;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus{ box-shadow: var(--focus); border-color: rgba(124,58,237,.35); }
+    textarea{ resize: vertical; min-height: 90px; }
+    .hr{ height:1px; background: var(--border); margin: 12px 0; }
+  </style>
+</head>
+
+<body>
+  <div class="nav">
+    <div class="wrap">
+      <a class="brand" href="#" onclick="goHome(); return false;">
+        <div class="logo"></div>
+        <span>RateMyLandlord</span>
+      </a>
+      <div class="nav-actions">
+        <span id="userPill" class="pill" style="display:none;"></span>
+        <button class="btn" id="authBtn" onclick="openModal('auth')">Log in</button>
+        <button class="btn" id="logoutBtn" style="display:none;" onclick="logout()">Log out</button>
+
+        <button class="btn" id="historyBtn" style="display:none;" onclick="openModal('history')">My Rental History</button>
+        <button class="btn" id="moveOutBtn" style="display:none;" onclick="openModal('moveOutLink')">Move-Out Link</button>
+
+        <button class="btn" onclick="openModal('addLandlord')">Add Landlord</button>
+        <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+        <button class="btn" onclick="syncNow()">Sync</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- HOME VIEW -->
+    <section id="homeView">
+      <div class="hero">
+        <h1>Look up a landlord. Add reviews. Share your experience.</h1>
+        <p>
+          This demo supports both normal reviews and <b>Verified Move-Out Reviews</b> that only publish after the deposit is settled (plus a delay).
+        </p>
+
+        <div class="searchRow">
+          <div class="search">
+            <span class="tiny">🔎</span>
+            <input id="searchInput" placeholder="Search by landlord / neighborhood / city..." oninput="renderHome()" />
+          </div>
+          <button class="btn" onclick="exportData()">Export</button>
+          <button class="btn" onclick="openModal('importData')">Import</button>
+        </div>
+
+        <div class="chipRow">
+          <div class="chip active" data-chip="overall" onclick="toggleSort('overall')">Sort: Overall</div>
+          <div class="chip" data-chip="repairs" onclick="toggleSort('repairs')">Sort: Repairs</div>
+          <div class="chip" data-chip="responsiveness" onclick="toggleSort('responsiveness')">Sort: Responsive</div>
+          <div class="chip" data-chip="deposits" onclick="toggleSort('deposits')">Sort: Deposits</div>
+          <div class="chip" data-chip="conditions" onclick="toggleSort('conditions')">Sort: Conditions</div>
+          <div class="chip" data-chip="communication" onclick="toggleSort('communication')">Sort: Comms</div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <div class="card">
+            <div class="hd">
+              <div>
+                <h3 style="margin:0;">Results</h3>
+                <div class="tiny">Click a card to view details.</div>
+              </div>
+              <div class="tiny" id="resultCount"></div>
+            </div>
+            <div class="bd" id="landlordList"></div>
+          </div>
+        </div>
+
+        <aside class="card side">
+          <h3 style="margin-top:0;">Posting guidelines</h3>
+          <div class="box">
+            <div class="tiny">Keep it factual. Avoid personal info. No threats/harassment.</div>
+          </div>
+          <ul>
+            <li>Use dates (“work order 5/3, fixed 5/20”).</li>
+            <li>No phone numbers/emails/SSNs.</li>
+            <li>No threats, harassment, or discriminatory content.</li>
+            <li>If you mention an address, keep it general (street + neighborhood is safest).</li>
+          </ul>
+          <div style="margin-top:12px;">
+            <button class="btn primary" style="width:100%; justify-content:center;" onclick="openModal('addLandlord')">Add a landlord</button>
+          </div>
+          <div style="margin-top:10px;">
+            <button class="btn" style="width:100%; justify-content:center;" onclick="resetAllData()">Reset all local data</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- PROFILE VIEW -->
+    <section id="profileView">
+      <div class="card">
+        <div class="hd">
+          <div class="profileTop">
+            <div>
+              <h2 id="profileName">—</h2>
+              <div class="muted" id="profileSub">—</div>
+            </div>
+            <div class="profileActions">
+              <button class="btn" onclick="goHome()">← Back</button>
+              <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+              <button class="btn" onclick="openModal('claimLandlord')">Claim</button>
+              <button class="btn" id="depositBtn" style="display:none;" onclick="openModal('settleDeposit')">Set Deposit Settled</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bd">
+          <div class="statsRow">
+            <div class="bigScore">
+              <div class="num" id="profileOverall">—</div>
+              <div class="sub"><span id="profileReviewCount">0</span> reviews • Overall</div>
+              <div style="margin-top:10px;" class="badgeRow" id="profileTags"></div>
+              <div id="tokenHint" class="tiny muted" style="margin-top:12px; display:none;"></div>
+            </div>
+
+            <div class="barGrid" id="profileBars"></div>
+          </div>
+
+          <div style="margin-top:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h3 style="margin:0;">Reviews</h3>
+              <div class="tiny muted" id="profileReviewHint"></div>
+            </div>
+            <div id="profileReviews" style="margin-top:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modalHd">
+        <div style="font-weight:1000;" id="modalTitle">—</div>
+        <button class="btn" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modalBd" id="modalBody"></div>
+      <div class="modalFt">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn primary" id="modalSubmitBtn" onclick="handleModalSubmit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = "http://localhost:8787";
+  const API_DB = `${API_BASE}/db`;
+
+  let db = { version: 1, landlords: [], reports: [] };
+  let currentUser = null;
+  let myClaims = [];
+  let tokenContext = null; // {token, tenancy:{...}}
+
+  const state = {
+    view: "home",
+    selectedLandlordId: null,
+    sortKey: "overall",
+    sortDir: "desc"
+  };
+
+  let currentModal = { type: null };
+
+  // ---------- Backend ----------
+  async function loadDB(){
+    const res = await fetch(API_DB, { credentials: "include" });
+    if(!res.ok) throw new Error("Backend not reachable. Is node server.js running?");
+    db = await res.json();
+    db.version = db.version || 1;
+    db.landlords = db.landlords || [];
+    db.reports = db.reports || [];
+  }
+
+  async function saveDB(){
+    await fetch(API_DB, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(db)
+    });
+  }
+
+  async function loadMe(){
+    const r = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+    const data = await r.json().catch(()=> ({}));
+    currentUser = data.user || null;
+    renderAuthPill();
+  }
+
+  async function loadMyClaims(){
+    myClaims = [];
+    if(!currentUser) return;
+    const r = await fetch(`${API_BASE}/claims/mine`, { credentials: "include" });
+    const data = await r.json().catch(()=> ({}));
+    if(r.ok && Array.isArray(data.claims)) myClaims = data.claims;
+  }
+
+  async function syncNow(){
+    await loadMe().catch(()=>{});
+    await loadMyClaims().catch(()=>{});
+    await loadDB();
+    if(state.view === "profile" && state.selectedLandlordId){
+      openProfile(state.selectedLandlordId);
+    }else{
+      renderHome();
+    }
+  }
+
+  function renderAuthPill(){
+    const pill = document.getElementById("userPill");
+    const authBtn = document.getElementById("authBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const historyBtn = document.getElementById("historyBtn");
+    const moveOutBtn = document.getElementById("moveOutBtn");
+
+    if(!currentUser){
+      pill.style.display = "none";
+      authBtn.style.display = "inline-flex";
+      logoutBtn.style.display = "none";
+      historyBtn.style.display = "none";
+      moveOutBtn.style.display = "none";
+      return;
+    }
+
+    pill.style.display = "inline-flex";
+    pill.textContent = `${currentUser.email} • ${currentUser.role}`;
+    authBtn.style.display = "none";
+    logoutBtn.style.display = "inline-flex";
+
+    historyBtn.style.display = (currentUser.role === "tenant" || currentUser.role === "admin") ? "inline-flex" : "none";
+    moveOutBtn.style.display = (currentUser.role === "landlord" || currentUser.role === "admin") ? "inline-flex" : "none";
+  }
+
+  // ---------- Helpers ----------
+  function avg(nums){ if(!nums.length) return null; return nums.reduce((a,b)=>a+b,0) / nums.length; }
+  function fmtScore(x){ if(x === null || x === undefined) return "—"; return (Math.round(x*10)/10).toFixed(1); }
+  function landlordStats(l){
+    const rs = l.reviews || [];
+    const keys = ["overall","repairs","responsiveness","deposits","conditions","communication"];
+    const out = { count: rs.length };
+    for(const k of keys){
+      out[k] = avg(rs.map(r => (r.ratings && r.ratings[k]) ? Number(r.ratings[k]) : null).filter(v => v !== null));
+    }
+    return out;
+  }
+  function scoreLabel(score){
+    if(score === null) return { text:"No Reviews", cls:"warn" };
+    if(score >= 4.0) return { text:"Excellent", cls:"good" };
+    if(score >= 3.0) return { text:"Okay", cls:"warn" };
+    return { text:"Avoid", cls:"bad" };
+  }
+  function tagsFromStats(stats){
+    const tags = [];
+    if(!stats.count) return [{ t:"No Reviews Yet", cls:"warn" }];
+    if(stats.repairs >= 4.2) tags.push({ t:"Fast Repairs", cls:"good" });
+    if(stats.responsiveness >= 4.2) tags.push({ t:"Very Responsive", cls:"good" });
+    if(stats.deposits <= 2.5) tags.push({ t:"Deposit Issues", cls:"bad" });
+    if(stats.conditions <= 2.8) tags.push({ t:"Poor Conditions", cls:"bad" });
+    if(stats.communication >= 4.0) tags.push({ t:"Good Communication", cls:"good" });
+    if(!tags.length) tags.push({ t:"Mixed Reviews", cls:"warn" });
+    return tags.slice(0, 3);
+  }
+  function matchesQuery(l, q){
+    if(!q) return true;
+    q = q.toLowerCase();
+    const hay = [l.name, l.neighborhood, l.city].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  }
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function myClaimForLandlord(landlordId){
+    if(!currentUser) return null;
+    return myClaims.find(c => String(c.landlord_id) === String(landlordId)) || null;
+  }
+
+  // ---------- Home render ----------
+  function renderHome(){
+    const q = (document.getElementById("searchInput").value || "").trim();
+    const list = document.getElementById("landlordList");
+    const resultCount = document.getElementById("resultCount");
+
+    const landlords = (db.landlords || [])
+      .filter(l => matchesQuery(l, q))
+      .map(l => ({ l, stats: landlordStats(l) }));
+
+    landlords.sort((a,b) => {
+      const ka = a.stats[state.sortKey];
+      const kb = b.stats[state.sortKey];
+      if(ka === null && kb === null) return 0;
+      if(ka === null) return 1;
+      if(kb === null) return -1;
+      return state.sortDir === "desc" ? (kb - ka) : (ka - kb);
+    });
+
+    resultCount.textContent = `${landlords.length} shown`;
+    list.innerHTML = "";
+
+    landlords.forEach(({l, stats}) => {
+      const score = stats.overall;
+      const lbl = scoreLabel(score);
+      const tags = tagsFromStats(stats);
+      const reviewCount = stats.count;
+
+      const card = document.createElement("div");
+      card.className = "rowCard";
+      card.onclick = () => openProfile(l.id);
+
+      card.innerHTML = `
+        <div class="scoreBox ${lbl.cls}">
+          <div class="scoreNum">${fmtScore(score)}</div>
+          <div class="scoreText">${lbl.text}</div>
+        </div>
+        <div class="rowMain">
+          <div class="rowTitle">${escapeHtml(l.name)}</div>
+          <div class="rowSub">
+            ${escapeHtml([l.neighborhood, l.city].filter(Boolean).join(" • ") || "—")}
+            • ${reviewCount} review${reviewCount===1?"":"s"}
+          </div>
+          <div class="badgeRow">
+            ${tags.map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("")}
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function toggleSort(key){
+    if(state.sortKey === key){
+      state.sortDir = state.sortDir === "desc" ? "asc" : "desc";
+    }else{
+      state.sortKey = key;
+      state.sortDir = "desc";
+    }
+    document.querySelectorAll(".chipRow .chip").forEach(el=>{
+      el.classList.toggle("active", el.dataset.chip === state.sortKey);
+    });
+    renderHome();
+  }
+
+  // ---------- Profile ----------
+  function openProfile(id){
+    state.view = "profile";
+    state.selectedLandlordId = id;
+
+    document.getElementById("homeView").style.display = "none";
+    document.getElementById("profileView").style.display = "block";
+
+    const l = db.landlords.find(x => x.id === id);
+    if(!l){ alert("Landlord not found."); return; }
+    const stats = landlordStats(l);
+
+    document.getElementById("profileName").textContent = l.name || "—";
+    document.getElementById("profileSub").textContent = [l.neighborhood, l.city].filter(Boolean).join(" • ") || "—";
+    document.getElementById("profileOverall").textContent = fmtScore(stats.overall);
+    document.getElementById("profileReviewCount").textContent = stats.count;
+
+    document.getElementById("profileTags").innerHTML =
+      tagsFromStats(stats).map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("");
+
+    const barKeys = [
+      ["repairs","Repairs"],
+      ["responsiveness","Responsiveness"],
+      ["deposits","Deposits"],
+      ["conditions","Conditions"],
+      ["communication","Communication"]
+    ];
+    document.getElementById("profileBars").innerHTML = barKeys.map(([k,label]) => {
+      const v = stats[k];
+      const pct = (v === null) ? 0 : Math.max(0, Math.min(100, (v/5)*100));
+      return `
+        <div class="bar">
+          <div class="barTop"><span>${label}</span><span>${fmtScore(v)}</span></div>
+          <div class="track"><div class="fill" style="width:${pct}%;"></div></div>
+        </div>
+      `;
+    }).join("");
+
+    // Deposit settled button only for verified landlord/admin
+    const claim = myClaimForLandlord(id);
+    const depositBtn = document.getElementById("depositBtn");
+    const canLandlordActions = currentUser && (currentUser.role === "admin" || (currentUser.role === "landlord" && claim && claim.status === "approved"));
+    depositBtn.style.display = canLandlordActions ? "inline-flex" : "none";
+
+    // Token hint if user came through move-out link
+    const tokenHint = document.getElementById("tokenHint");
+    if(tokenContext && tokenContext.tenancy && String(tokenContext.tenancy.landlordId) === String(id)) {
+      tokenHint.style.display = "block";
+      tokenHint.innerHTML = `You opened a <b>Move-Out Review Link</b> for <b>${escapeHtml(tokenContext.tenancy.landlordName)}</b>. Use “Write Review” → “Exit Review (Move-Out)” to submit.`;
+    } else {
+      tokenHint.style.display = "none";
+      tokenHint.innerHTML = "";
+    }
+
+    // Reviews
+    const reviewHint = document.getElementById("profileReviewHint");
+    reviewHint.textContent = stats.count ? "" : "No reviews yet. Be the first.";
+
+    const reviewBox = document.getElementById("profileReviews");
+    reviewBox.innerHTML = "";
+
+    const reviews = (l.reviews || []).slice().reverse();
+    reviews.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "rowCard";
+
+      const createdRaw = r.createdAt || r.created_at || "";
+      const created = createdRaw ? new Date(createdRaw).toLocaleDateString() : "";
+
+      const resp = r.response || null;
+      const respCreated = resp?.createdAt || resp?.created_at || "";
+
+      const verifiedBadge = r.isExitReview
+        ? `<span class="badge purple">Verified Move-Out</span>`
+        : "";
+
+      const respHtml = resp ? `
+        <div class="ownerResp">
+          <div class="ownerRespTitle">Landlord response</div>
+          <div style="white-space:pre-wrap; font-weight:750; color:#344054;">${escapeHtml(resp.text || "")}</div>
+          <div class="ownerRespDate">${respCreated ? new Date(respCreated).toLocaleString() : ""}</div>
+        </div>
+      ` : "";
+
+      d.innerHTML = `
+        <div class="scoreBox ${scoreLabel(r.ratings?.overall ?? null).cls}">
+          <div class="scoreNum">${fmtScore(r.ratings?.overall ?? null)}</div>
+          <div class="scoreText">Overall</div>
+        </div>
+        <div class="rowMain">
+          <div class="rowTitle">
+            ${escapeHtml(r.title || "Review")}
+            <span style="margin-left:8px;">${verifiedBadge}</span>
+          </div>
+          <div class="rowSub">${created}</div>
+          <div style="font-weight:750; color:#344054; white-space:pre-wrap;">${escapeHtml(r.text || "")}</div>
+          ${respHtml}
+        </div>
+      `;
+      reviewBox.appendChild(d);
+    });
+  }
+
+  function goHome(){
+    state.view = "home";
+    state.selectedLandlordId = null;
+    document.getElementById("profileView").style.display = "none";
+    document.getElementById("homeView").style.display = "block";
+    renderHome();
+  }
+
+  // ---------- Modals ----------
+  function openModal(type){
+    currentModal.type = type;
+    const title = document.getElementById("modalTitle");
+    const body = document.getElementById("modalBody");
+    const submitBtn = document.getElementById("modalSubmitBtn");
+    submitBtn.style.display = "inline-flex";
+
+    if(type === "auth"){
+      title.textContent = "Log in / Sign up";
+      body.innerHTML = `
+        <div class="field"><label>Email</label><input id="m_auth_email" placeholder="you@email.com" /></div>
+        <div class="field" style="margin-top:10px;"><label>Password</label><input id="m_auth_pw" type="password" placeholder="••••••••" /></div>
+        <div class="field" style="margin-top:10px;">
+          <label>I am a...</label>
+          <select id="m_auth_role">
+            <option value="tenant">Tenant</option>
+            <option value="landlord">Landlord</option>
+          </select>
+        </div>
+        <div class="tiny muted" style="margin-top:10px;">
+          If login fails, we auto-create your account (signup). First ever user becomes admin.
+        </div>
+      `;
+    }
+
+    if(type === "history"){
+      title.textContent = "My Rental History";
+      if(!currentUser){
+        body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
+        submitBtn.style.display = "none";
+      } else {
+        body.innerHTML = `
+          <div class="tiny muted">Download your rental history JSON (for customer discovery / proof-of-renting concept).</div>
+          <div style="margin-top:12px;">
+            <button class="btn primary" onclick="downloadRentalHistory()">Download JSON</button>
+          </div>
+          <div class="tiny muted" style="margin-top:10px;">
+            (This is a demo. Later: “verified rental history” you can reuse for applications.)
+          </div>
+        `;
+        submitBtn.style.display = "none";
+      }
+    }
+
+    if(type === "moveOutLink"){
+      title.textContent = "Create Move-Out Review Link (Landlord/Admin)";
+      if(!currentUser){
+        body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
+        submitBtn.style.display = "none";
+      } else if(!(currentUser.role === "landlord" || currentUser.role === "admin")){
+        body.innerHTML = `<div class="tiny muted">Landlord/admin only.</div>`;
+        submitBtn.style.display = "none";
+      } else {
+        body.innerHTML = `
+          <div class="field">
+            <label>Landlord listing</label>
+            <select id="m_mo_landlord">
+              ${(db.landlords||[]).map(l=>`<option value="${escapeHtml(l.id)}">${escapeHtml(l.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Tenant email</label>
+            <input id="m_mo_email" placeholder="tenant@email.com" />
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Unit label (optional)</label>
+            <input id="m_mo_unit" placeholder="e.g., Apt 4B" />
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Move-out date (optional)</label>
+            <input id="m_mo_end" placeholder="2026-01-31" />
+          </div>
+          <div class="tiny muted" style="margin-top:10px;">
+            You’ll get a link you can send to the tenant to complete a Move-Out Review.
+          </div>
+        `;
+      }
+    }
+
+    if(type === "addLandlord"){
+      title.textContent = "Add a landlord";
+      body.innerHTML = `
+        <div class="field"><label>Landlord / company name</label><input id="m_landlord_name" placeholder="e.g., Northside Property Management" /></div>
+        <div class="field" style="margin-top:10px;"><label>Neighborhood (optional)</label><input id="m_landlord_neighborhood" placeholder="e.g., Brooklyn" /></div>
+        <div class="field" style="margin-top:10px;"><label>City (optional)</label><input id="m_landlord_city" placeholder="e.g., New York, NY" /></div>
+      `;
+    }
+
+    if(type === "addReview"){
+      title.textContent = "Write a review";
+      if(!state.selectedLandlordId){
+        body.innerHTML = `<div class="tiny muted">First, click a landlord from Results. Then hit “Write Review.”</div>`;
+        submitBtn.style.display = "none";
+      }else{
+        const exitAllowed = !!(tokenContext && tokenContext.tenancy && String(tokenContext.tenancy.landlordId) === String(state.selectedLandlordId));
+
+        body.innerHTML = `
+          ${exitAllowed ? `
+            <div class="box" style="margin-bottom:12px;">
+              <div class="tiny"><b>Move-Out Link detected.</b> You can submit a <b>Verified Move-Out Review</b> that only publishes after deposit settlement + delay.</div>
+              <button class="btn primary" style="margin-top:10px;" onclick="openModal('exitReview')">Exit Review (Move-Out)</button>
+            </div>
+            <div class="hr"></div>
+          ` : `
+            <div class="tiny muted" style="margin-bottom:10px;">Normal review (legacy)</div>
+          `}
+          <div class="field"><label>Title (optional)</label><input id="m_review_title" placeholder="e.g., Great communication" /></div>
+          <div class="field" style="margin-top:10px;"><label>Your review</label><textarea id="m_review_text" rows="5" placeholder="Keep it factual..."></textarea></div>
+          <div class="field" style="margin-top:10px;"><label>Overall (1–5)</label>
+            <select id="m_overall">${[1,2,3,4,5].map(v=>`<option>${v}</option>`).join("")}</select>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px;">
+            ${ratingField("Repairs","m_repairs")}
+            ${ratingField("Responsiveness","m_responsiveness")}
+            ${ratingField("Deposits","m_deposits")}
+            ${ratingField("Conditions","m_conditions")}
+            ${ratingField("Communication","m_communication")}
+          </div>
+        `;
+      }
+    }
+
+    if(type === "exitReview"){
+      title.textContent = "Verified Move-Out Review";
+      if(!tokenContext || !tokenContext.token){
+        body.innerHTML = `<div class="tiny muted">No move-out token found. Use a Move-Out Link first.</div>`;
+        submitBtn.style.display = "none";
+      } else {
+        body.innerHTML = `
+          <div class="tiny muted">This review will not publish until the deposit is marked “settled,” then it publishes after a delay.</div>
+          <div class="field" style="margin-top:10px;"><label>Title (optional)</label><input id="m_exit_title" placeholder="Move-out experience" /></div>
+          <div class="field" style="margin-top:10px;"><label>Your review</label><textarea id="m_exit_text" rows="5" placeholder="Keep it factual..."></textarea></div>
+          <div class="field" style="margin-top:10px;"><label>Overall (1–5)</label>
+            <select id="m_exit_overall">${[1,2,3,4,5].map(v=>`<option>${v}</option>`).join("")}</select>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px;">
+            ${ratingField("Repairs","m_exit_repairs")}
+            ${ratingField("Responsiveness","m_exit_responsiveness")}
+            ${ratingField("Deposits","m_exit_deposits")}
+            ${ratingField("Conditions","m_exit_conditions")}
+            ${ratingField("Communication","m_exit_communication")}
+          </div>
+          <div class="tiny muted" style="margin-top:10px;">
+            Token: ${escapeHtml(tokenContext.token).slice(0,10)}… (demo)
+          </div>
+        `;
+      }
+    }
+
+    if(type === "importData"){
+      title.textContent = "Import data";
+      body.innerHTML = `
+        <div class="field">
+          <label>Paste JSON export</label>
+          <textarea id="m_import_json" rows="10" placeholder='{"version":1,"landlords":[...]}'></textarea>
+        </div>
+        <div class="tiny muted" style="margin-top:8px;">This will overwrite your current data.</div>
+      `;
+    }
+
+    if(type === "claimLandlord"){
+      title.textContent = "Request verification (claim listing)";
+      if(!currentUser){
+        body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
+        submitBtn.style.display = "none";
+      }else if(!state.selectedLandlordId){
+        body.innerHTML = `<div class="tiny muted">Open a landlord profile first.</div>`;
+        submitBtn.style.display = "none";
+      }else{
+        const l = db.landlords.find(x => x.id === state.selectedLandlordId);
+        const claim = myClaimForLandlord(state.selectedLandlordId);
+        const statusLine = claim ? `<div class="tiny muted">Current claim status: <b>${escapeHtml(claim.status)}</b></div>` : "";
+
+        body.innerHTML = `
+          <div class="tiny muted">Request permission to respond as verified owner/manager for:</div>
+          <div style="font-weight:1000; margin-top:6px;">${escapeHtml(l?.name || "—")}</div>
+          <div class="tiny muted" style="margin-top:10px;">${statusLine}</div>
+
+          <div class="field" style="margin-top:12px;">
+            <label>Proof</label>
+            <textarea id="m_claim_proof" placeholder="Link to site / business email domain / context for admin"></textarea>
+          </div>
+        `;
+      }
+    }
+
+    if(type === "settleDeposit"){
+      title.textContent = "Set Deposit Settled (Landlord/Admin)";
+      if(!currentUser){
+        body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
+        submitBtn.style.display = "none";
+      } else if(!state.selectedLandlordId){
+        body.innerHTML = `<div class="tiny muted">Open a landlord profile first.</div>`;
+        submitBtn.style.display = "none";
+      } else {
+        body.innerHTML = `
+          <div class="tiny muted">This schedules any pending Verified Move-Out Reviews for publishing after the delay.</div>
+          <div class="field" style="margin-top:12px;">
+            <label>Tenancy ID (from Move-Out Link creation)</label>
+            <input id="m_settle_tenancyId" placeholder="e.g., 1" />
+          </div>
+          <div class="tiny muted" style="margin-top:10px;">
+            In a real product, you’d see a list of tenancies here. For the demo, paste the tenancy id returned in the move-out link flow.
+          </div>
+        `;
+      }
+    }
+
+    document.getElementById("modalBackdrop").style.display = "block";
+    setTimeout(()=>{
+      const first = body.querySelector("input,select,textarea");
+      if(first) first.focus();
+    }, 30);
+  }
+
+  function ratingField(label, id, def=5){
+    return `
+      <div class="field">
+        <label>${label} (1–5)</label>
+        <select id="${id}">
+          ${[1,2,3,4,5].map(v => `<option ${v===def ? "selected":""}>${v}</option>`).join("")}
+        </select>
+      </div>
+    `;
+  }
+
+  function closeModal(){
+    document.getElementById("modalBackdrop").style.display = "none";
+    document.getElementById("modalSubmitBtn").style.display = "inline-flex";
+    currentModal.type = null;
+  }
+
+  async function handleModalSubmit(){
+    const t = currentModal.type;
+
+    if(t === "auth"){
+      const email = (document.getElementById("m_auth_email").value || "").trim();
+      const password = (document.getElementById("m_auth_pw").value || "").trim();
+      const role = document.getElementById("m_auth_role").value;
+      if(!email || !password) return alert("Enter email + password.");
+
+      let r = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      if(!r.ok){
+        r = await fetch(`${API_BASE}/auth/signup`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, role })
+        });
+      }
+
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Auth failed");
+
+      currentUser = data.user || null;
+      await loadMyClaims().catch(()=>{});
+      renderAuthPill();
+      closeModal();
+      alert(`Logged in as ${currentUser.email} (${currentUser.role})`);
+      await syncNow();
+      return;
+    }
+
+    if(t === "moveOutLink"){
+      const landlordId = (document.getElementById("m_mo_landlord").value || "").trim();
+      const tenantEmail = (document.getElementById("m_mo_email").value || "").trim();
+      const unitLabel = (document.getElementById("m_mo_unit").value || "").trim();
+      const endAt = (document.getElementById("m_mo_end").value || "").trim();
+      if(!landlordId || !tenantEmail) return alert("Pick landlord + enter tenant email.");
+
+      const r = await fetch(`${API_BASE}/review-request/create`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ landlordId, tenantEmail, unitLabel, endAt })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Failed to create link");
+
+      closeModal();
+      alert(`Move-Out Link created.\n\nCopy this link and send it to tenant:\n${data.link}\n\n(Backend token: ${data.token})`);
+      return;
+    }
+
+    if(t === "addLandlord"){
+      const name = (document.getElementById("m_landlord_name").value || "").trim();
+      const neighborhood = (document.getElementById("m_landlord_neighborhood").value || "").trim();
+      const city = (document.getElementById("m_landlord_city").value || "").trim();
+      if(name.length < 2) return alert("Please enter a landlord name.");
+
+      db.landlords.unshift({
+        id: crypto.randomUUID(),
+        name,
+        neighborhood: neighborhood || null,
+        city: city || null,
+        created_at: new Date().toISOString(),
+        reviews: []
+      });
+
+      await saveDB();
+      closeModal();
+      renderHome();
+      openProfile(db.landlords[0].id);
+      return;
+    }
+
+    if(t === "addReview"){
+      if(!state.selectedLandlordId) return;
+
+      const l = db.landlords.find(x => x.id === state.selectedLandlordId);
+      if(!l) return alert("Landlord not found.");
+
+      const title = (document.getElementById("m_review_title").value || "").trim();
+      const text = (document.getElementById("m_review_text").value || "").trim();
+      if(text.length < 10) return alert("Please write a bit more detail (10+ chars).");
+
+      const ratings = {
+        overall: Number(document.getElementById("m_overall").value),
+        repairs: Number(document.getElementById("m_repairs").value),
+        responsiveness: Number(document.getElementById("m_responsiveness").value),
+        deposits: Number(document.getElementById("m_deposits").value),
+        conditions: Number(document.getElementById("m_conditions").value),
+        communication: Number(document.getElementById("m_communication").value),
+      };
+
+      l.reviews = l.reviews || [];
+      l.reviews.push({ id: crypto.randomUUID(), title, text, ratings, createdAt: new Date().toISOString() });
+
+      await saveDB();
+      closeModal();
+      openProfile(l.id);
+      return;
+    }
+
+    if(t === "exitReview"){
+      const title = (document.getElementById("m_exit_title").value || "").trim();
+      const text = (document.getElementById("m_exit_text").value || "").trim();
+      if(text.length < 10) return alert("Please write a bit more detail (10+ chars).");
+
+      const ratings = {
+        overall: Number(document.getElementById("m_exit_overall").value),
+        repairs: Number(document.getElementById("m_exit_repairs").value),
+        responsiveness: Number(document.getElementById("m_exit_responsiveness").value),
+        deposits: Number(document.getElementById("m_exit_deposits").value),
+        conditions: Number(document.getElementById("m_exit_conditions").value),
+        communication: Number(document.getElementById("m_exit_communication").value),
+      };
+
+      const r = await fetch(`${API_BASE}/reviews/exit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenContext.token, title, text, ratings })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Exit review failed");
+
+      closeModal();
+      alert(`Exit review submitted.\nStatus: ${data.status}\nPublish at: ${data.publishAt || "after deposit settled"}`);
+      await syncNow();
+      return;
+    }
+
+    if(t === "importData"){
+      const raw = (document.getElementById("m_import_json").value || "").trim();
+      if(!raw) return alert("Paste your JSON export.");
+      try{
+        const parsed = JSON.parse(raw);
+        if(!parsed || !Array.isArray(parsed.landlords)) throw new Error("Invalid format.");
+        db = parsed;
+        db.version = db.version || 1;
+        db.landlords = db.landlords || [];
+        db.reports = db.reports || [];
+        await saveDB();
+        closeModal();
+        goHome();
+        alert("Imported successfully.");
+      }catch(e){
+        alert("Import failed: " + e.message);
+      }
+      return;
+    }
+
+    if(t === "claimLandlord"){
+      if(!currentUser) return;
+      if(!state.selectedLandlordId) return;
+
+      const proofText = (document.getElementById("m_claim_proof").value || "").trim();
+
+      const r = await fetch(`${API_BASE}/claims/request`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ landlordId: state.selectedLandlordId, proofText })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Claim request failed");
+
+      await loadMyClaims().catch(()=>{});
+      closeModal();
+      alert("Claim submitted! Waiting for admin approval.");
+      openProfile(state.selectedLandlordId);
+      return;
+    }
+
+    if(t === "settleDeposit"){
+      const tenancyId = (document.getElementById("m_settle_tenancyId").value || "").trim();
+      if(!tenancyId) return alert("Enter tenancy id.");
+
+      const r = await fetch(`${API_BASE}/tenancies/settle-deposit`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenancyId })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Failed to set deposit settled");
+
+      closeModal();
+      alert(`Deposit settled recorded.\nPublish scheduled for: ${data.publishAt}`);
+      await syncNow();
+      return;
+    }
+  }
+
+  async function downloadRentalHistory(){
+    const r = await fetch(`${API_BASE}/me/rental-history`, { credentials:"include" });
+    const data = await r.json().catch(()=> ({}));
+    if(!r.ok) return alert(data.error || "Failed");
+
+    const payload = JSON.stringify(data, null, 2);
+    const blob = new Blob([payload], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my_rental_history.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function logout(){
+    await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
+    currentUser = null;
+    myClaims = [];
+    renderAuthPill();
+    alert("Logged out.");
+    await syncNow();
+  }
+
+  function exportData(){
+    const payload = JSON.stringify(db, null, 2);
+    const blob = new Blob([payload], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ratemylandlord_export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function resetAllData(){
+    if(!confirm("This will erase all landlords/reviews in your local backend. Continue?")) return;
+    db = { version: 1, landlords: [], reports: [] };
+    await saveDB();
+    goHome();
+  }
+
+  document.getElementById("modalBackdrop").addEventListener("click", (e)=>{
+    if(e.target.id === "modalBackdrop") closeModal();
+  });
+  document.addEventListener("keydown", (e)=>{
+    if(e.key === "Escape") closeModal();
+  });
+
+  // ---------- Token intake (?token=) ----------
+  async function tryLoadTokenFromURL(){
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if(!token) return;
+
+    const r = await fetch(`${API_BASE}/review-request/${encodeURIComponent(token)}`);
+    const data = await r.json().catch(()=> ({}));
+    if(!r.ok) {
+      alert(data.error || "Invalid move-out link");
+      return;
+    }
+    tokenContext = data; // store token + tenancy info
+
+    // Auto-open the landlord profile
+    await syncNow();
+    openProfile(data.tenancy.landlordId);
+
+    // Optional: open write review modal
+    setTimeout(()=> openModal("addReview"), 250);
+  }
+
+  // ---------- Init ----------
+  (async function init(){
+    try{
+      await loadMe().catch(()=>{});
+      await loadMyClaims().catch(()=>{});
+      await loadDB();
+      renderHome();
+      await tryLoadTokenFromURL();
+    }catch(err){
+      alert(err.message);
+    }
+  })();
+</script>
+</body>
+</html>
