@@ -4,17 +4,17 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#F6F0E6" />
-  <title>Casa</title>
+  <title>CASA</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
-  <!-- Top Nav -->
+  <!-- Real Navbar -->
   <header class="nav" role="banner">
     <div class="wrap nav__inner">
-      <a class="brand" href="#/" aria-label="Casa home">
+      <!-- Left: Logo/Wordmark -->
+      <a class="brand" href="#/" aria-label="CASA home">
         <div class="brand__mark" aria-hidden="true">
-          <!-- Logo inspired by stacked curved lines image -->
           <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 16 C 24 8, 40 8, 54 16" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
             <path d="M12 24 C 25 17, 39 17, 52 24" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
@@ -24,33 +24,44 @@
           </svg>
         </div>
         <div class="brand__text">
-          <div class="brand__name">Casa</div>
+          <div class="brand__name">CASA</div>
           <div class="brand__tag">calm landlord lookup + reviews</div>
         </div>
       </a>
 
-      <div class="nav__right">
-        <!-- Always-visible on navbar (not in menu) -->
-        <a class="btn btn--ghost nav__portal" href="#/landlord-portal">Landlord Portal</a>
+      <!-- Center Nav Links -->
+      <nav class="nav__center" aria-label="Primary navigation">
+        <a class="nav__link" href="#/search">Search</a>
+        <a class="nav__link" href="#/add-landlord">Add Landlord</a>
+        <a class="nav__link" href="#/how-it-works">How It Works</a>
+        <a class="nav__link" href="#/trust-safety">About / Trust & Safety</a>
+      </nav>
 
-        <div class="menu">
-          <button class="btn btn--ghost" id="menuBtn" aria-haspopup="true" aria-expanded="false">Menu</button>
-          <div class="menu__panel" id="menuPanel" role="menu" aria-label="Menu">
-            <button class="menu__item" data-route="#/guidelines" role="menuitem">Posting Guidelines</button>
-            <button class="menu__item" data-route="#/how" role="menuitem">How it works</button>
-            <button class="menu__item" data-route="#/about" role="menuitem">About</button>
-            <button class="menu__item" data-route="#/contact" role="menuitem">Contact</button>
-            <button class="menu__item" data-route="#/privacy" role="menuitem">Privacy / Terms</button>
-          </div>
-        </div>
+      <!-- Right side: outlined Landlord Portal + mobile menu -->
+      <div class="nav__right">
+        <a class="btn btn--outline nav__portal" href="#/landlord-portal">Landlord Portal</a>
+
+        <button class="btn btn--ghost nav__hamburger" id="navHamburger" aria-expanded="false" aria-controls="navDrawer">
+          Menu
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile drawer -->
+    <div class="navDrawer" id="navDrawer" aria-hidden="true">
+      <div class="navDrawer__inner">
+        <a class="navDrawer__link" href="#/search">Search</a>
+        <a class="navDrawer__link" href="#/add-landlord">Add Landlord</a>
+        <a class="navDrawer__link" href="#/how-it-works">How It Works</a>
+        <a class="navDrawer__link" href="#/trust-safety">About / Trust & Safety</a>
+        <div class="navDrawer__sep"></div>
+        <a class="btn btn--outline" href="#/landlord-portal">Landlord Portal</a>
       </div>
     </div>
   </header>
 
   <!-- Main -->
-  <main class="wrap" id="app" role="main">
-    <!-- Rendered by app.js -->
-  </main>
+  <main class="wrap" id="app" role="main"></main>
 
   <!-- Toast -->
   <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
