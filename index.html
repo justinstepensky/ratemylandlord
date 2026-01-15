@@ -2,18 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- iPhone-friendly viewport -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#6d28d9" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
   <title>RateMyLandlord</title>
+
   <style>
     :root{
-      --bg:#f6f7fb; --panel:#ffffff; --panel2:#f7f7fb; --border:#e7e7ef;
-      --text:#0f172a; --muted:#667085; --muted2:#98a2b3;
-      --accent:#6d28d9; --accent2:#7c3aed;
-      --good:#16a34a; --warn:#f59e0b; --bad:#ef4444;
+      --bg:#f6f7fb;
+      --panel:#ffffff;
+      --panel2:#f7f7fb;
+      --border:#e7e7ef;
+      --text:#0f172a;
+      --muted:#667085;
+      --muted2:#98a2b3;
+      --accent:#6d28d9;
+      --accent2:#7c3aed;
+      --good:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
       --shadow: 0 18px 45px rgba(17, 24, 39, .10);
-      --radius:18px; --focus: 0 0 0 4px rgba(124,58,237,.18);
+      --radius:18px;
+      --focus: 0 0 0 4px rgba(124,58,237,.18);
     }
     *{ box-sizing:border-box; }
+    html{ -webkit-text-size-adjust: 100%; }
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
@@ -22,87 +38,212 @@
         radial-gradient(1200px 800px at 10% 0%, rgba(124,58,237,.10), transparent 55%),
         radial-gradient(1000px 700px at 90% 10%, rgba(99,102,241,.12), transparent 60%),
         var(--bg);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
     a{ color:inherit; text-decoration:none; }
     .wrap{ max-width: 1060px; margin: 0 auto; padding: 0 18px; }
+
+    /* Top Nav */
     .nav{
-      position: sticky; top:0; z-index:10;
+      position: sticky;
+      top:0;
+      z-index:10;
       backdrop-filter: blur(10px);
-      background: rgba(246,247,251,.75);
+      background: rgba(246,247,251,.78);
       border-bottom:1px solid rgba(231,231,239,.7);
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
     }
     .nav .wrap{
-      height:68px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+      height:68px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
     }
-    .brand{ display:flex; align-items:center; gap:12px; font-weight:900; letter-spacing:.2px; }
+    .brand{
+      display:flex; align-items:center; gap:12px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
     .logo{
-      width:34px; height:34px; border-radius:12px;
+      width:34px; height:34px;
+      border-radius:12px;
       background: linear-gradient(135deg, #4f46e5, #9333ea);
       box-shadow: 0 10px 25px rgba(79,70,229,.25);
     }
     .nav-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .pill{
-      padding: 8px 12px; border-radius: 999px; border:1px solid var(--border);
-      background: rgba(255,255,255,.9); font-weight: 900; font-size: 12.5px; color:#111827;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.92);
+      font-weight: 900;
+      font-size: 12.5px;
+      color:#111827;
+      white-space:nowrap;
     }
     .pill.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
     .pill.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
     .pill.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
 
+    /* Buttons */
     .btn{
-      border:1px solid var(--border); background:#fff; color:#111827;
-      padding:10px 14px; border-radius: 999px; font-weight:800; cursor:pointer;
-      display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#111827;
+      padding:12px 16px;
+      border-radius: 999px;
+      font-weight:800;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+      min-height: 44px; /* iPhone tap target */
+      touch-action: manipulation;
     }
     .btn:hover{ box-shadow: 0 10px 22px rgba(17,24,39,.08); }
-    .btn.primary{ border:none; background: linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; }
+    .btn.primary{
+      border:none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color:#fff;
+    }
     .btn.danger{
       border:1px solid rgba(239,68,68,.35);
       background: rgba(239,68,68,.08);
       color:#7f1d1d;
     }
-
-    .hero{ padding: 40px 0 16px; }
-    h1{ margin: 0 0 8px; font-size: 46px; line-height: 1.03; letter-spacing: -1px; }
-    .hero p{ margin: 0 0 18px; color: var(--muted); max-width: 80ch; font-weight: 600; }
-
-    .searchRow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .search{
-      flex: 1 1 520px; display:flex; align-items:center; gap:10px;
-      background:#fff; border:1px solid var(--border); border-radius: 999px;
-      padding: 12px 14px; box-shadow: 0 10px 30px rgba(17,24,39,.06);
+    .btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      box-shadow:none;
     }
-    .search input{ border:none; outline:none; width:100%; font-size: 14.5px; color:#111827; }
+
+    /* Cards / Layout */
+    .hero{ padding: 40px 0 16px; }
+    h1{
+      margin: 0 0 8px;
+      font-size: 46px;
+      line-height: 1.03;
+      letter-spacing: -1px;
+    }
+    .hero p{
+      margin: 0 0 18px;
+      color: var(--muted);
+      max-width: 80ch;
+      font-weight: 600;
+    }
+
+    .searchRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .search{
+      flex: 1 1 520px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius: 999px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 30px rgba(17,24,39,.06);
+    }
+    .search input{
+      border:none;
+      outline:none;
+      width:100%;
+      font-size: 16px; /* prevents iOS zoom */
+      color:#111827;
+      touch-action: manipulation;
+    }
     .tiny{ font-size: 12.5px; color: var(--muted2); font-weight: 700; }
     .muted{ color: var(--muted); }
 
-    .chipRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
-    .chip{
-      border:1px solid var(--border); background: rgba(255,255,255,.8);
-      padding: 9px 12px; border-radius: 999px; font-weight: 900; font-size: 13px;
-      color:#374151; cursor:pointer;
+    .chipRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:14px;
     }
-    .chip.active{ border-color: rgba(124,58,237,.35); background: rgba(124,58,237,.12); color: #4c1d95; }
+    .chip{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.85);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 13px;
+      color:#374151;
+      cursor:pointer;
+      touch-action: manipulation;
+      min-height: 44px;
+      display:inline-flex;
+      align-items:center;
+    }
+    .chip.active{
+      border-color: rgba(124,58,237,.35);
+      background: rgba(124,58,237,.12);
+      color: #4c1d95;
+    }
 
-    .grid{ display:grid; grid-template-columns: 1.3fr .7fr; gap: 18px; margin: 18px 0 40px; }
-    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } h1{ font-size: 38px; } }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.3fr .7fr;
+      gap: 18px;
+      margin: 18px 0 40px;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+      h1{ font-size: 38px; }
+    }
 
-    .card{ background: var(--panel); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-    .hd{ padding: 18px 18px 10px; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .card{
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hd{
+      padding: 18px 18px 10px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
     .bd{ padding: 10px 18px 18px; }
 
+    /* List items */
     .rowCard{
-      display:flex; gap:14px; align-items:stretch; padding: 14px;
-      border:1px solid var(--border); border-radius: 16px; background: #fff;
+      display:flex;
+      gap:14px;
+      align-items:stretch;
+      padding: 14px;
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
       box-shadow: 0 10px 22px rgba(17,24,39,.06);
-      cursor:pointer; margin-top: 12px;
+      cursor:pointer;
+      margin-top: 12px;
+      touch-action: manipulation;
     }
     .rowCard:hover{ outline: 3px solid rgba(124,58,237,.12); }
 
     .scoreBox{
-      width: 88px; min-width: 88px; border-radius: 16px;
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      font-weight: 1000; gap:2px; border:1px solid rgba(22,163,74,.25); background: rgba(22,163,74,.10);
+      width: 88px;
+      min-width: 88px;
+      border-radius: 16px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      font-weight: 1000;
+      gap:2px;
+      border:1px solid rgba(22,163,74,.25);
+      background: rgba(22,163,74,.10);
     }
     .scoreBox.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
     .scoreBox.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
@@ -114,52 +255,161 @@
     .rowSub{ color: var(--muted); font-weight: 800; font-size: 13px; margin-bottom: 10px; }
     .badgeRow{ display:flex; flex-wrap:wrap; gap:8px; }
     .badge{
-      padding: 6px 10px; border-radius: 999px; font-weight: 900; font-size: 12px;
-      border:1px solid var(--border); background: #fff;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      border:1px solid var(--border);
+      background: #fff;
     }
     .badge.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
     .badge.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
     .badge.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
 
+    /* Sidebar */
     .side{ padding: 18px; }
-    .box{ border:1px dashed rgba(124,58,237,.35); background: rgba(124,58,237,.06); padding: 12px; border-radius: 14px; }
+    .box{
+      border:1px dashed rgba(124,58,237,.35);
+      background: rgba(124,58,237,.06);
+      padding: 12px;
+      border-radius: 14px;
+    }
     ul{ margin: 12px 0 0 18px; padding:0; }
     li{ margin: 8px 0; color:#344054; font-weight: 700; }
 
+    /* Profile view */
     #profileView{ display:none; padding: 18px 0 40px; }
-    .profileTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; width:100%; }
+    .profileTop{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      width:100%;
+    }
     .profileActions{ display:flex; gap:10px; flex-wrap:wrap; }
     h2{ margin: 0 0 6px; font-size: 30px; letter-spacing: -.5px; }
-
-    .statsRow{ display:grid; grid-template-columns: 360px 1fr; gap: 18px; align-items:start; }
-    @media (max-width: 980px){ .statsRow{ grid-template-columns: 1fr; } }
-
-    .bigScore{ border:1px solid var(--border); border-radius: 18px; background: #fff; padding: 16px; box-shadow: 0 10px 22px rgba(17,24,39,.06); }
-    .bigScore .num{ font-size: 54px; font-weight: 1000; line-height: 1; }
-    .bigScore .sub{ margin-top:6px; color: var(--muted); font-weight: 900; font-size: 13px; }
-
-    .barGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .statsRow{
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .statsRow{ grid-template-columns: 1fr; }
+    }
+    .bigScore{
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      padding: 16px;
+      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+    }
+    .bigScore .num{
+      font-size: 54px;
+      font-weight: 1000;
+      line-height: 1;
+    }
+    .bigScore .sub{
+      margin-top:6px;
+      color: var(--muted);
+      font-weight: 900;
+      font-size: 13px;
+    }
+    .barGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
     @media (max-width: 720px){ .barGrid{ grid-template-columns: 1fr; } }
-    .bar{ border:1px solid var(--border); border-radius: 16px; padding: 12px; background: #fff; box-shadow: 0 10px 22px rgba(17,24,39,.06); }
-    .barTop{ display:flex; justify-content:space-between; align-items:center; font-weight: 1000; font-size: 13px; color:#344054; margin-bottom: 8px; }
-    .track{ height: 10px; border-radius: 999px; background: #eef2ff; overflow:hidden; border:1px solid rgba(79,70,229,.12); }
-    .fill{ height:100%; width:0%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 999px; }
+    .bar{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+    }
+    .barTop{
+      display:flex; justify-content:space-between; align-items:center;
+      font-weight: 1000;
+      font-size: 13px;
+      color:#344054;
+      margin-bottom: 8px;
+    }
+    .track{
+      height: 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      overflow:hidden;
+      border:1px solid rgba(79,70,229,.12);
+    }
+    .fill{
+      height:100%;
+      width:0%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+    }
 
-    .ownerResp{ margin-top:12px; padding:12px; border:1px solid rgba(124,58,237,.35); background: rgba(124,58,237,.06); border-radius: 14px; }
-    .ownerRespTitle{ font-weight: 1000; font-size: 12px; color: #5b3fd7; margin-bottom: 6px; }
-    .ownerRespDate{ font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 800; }
+    /* Owner response box */
+    .ownerResp{
+      margin-top:12px;
+      padding:12px;
+      border:1px solid rgba(124,58,237,.35);
+      background: rgba(124,58,237,.06);
+      border-radius: 14px;
+    }
+    .ownerRespTitle{
+      font-weight: 1000;
+      font-size: 12px;
+      color: #5b3fd7;
+      margin-bottom: 6px;
+    }
+    .ownerRespDate{
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+      font-weight: 800;
+    }
 
-    .portalCard{ margin-top:14px; padding: 14px; border-radius: 16px; border:1px solid rgba(124,58,237,.20); background: rgba(124,58,237,.05); }
-    .portalTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
-    .portalTitle{ font-weight: 1000; font-size: 14px; color:#2e1065; }
+    /* Portal card */
+    .portalCard{
+      margin-top:14px;
+      padding: 14px;
+      border-radius: 16px;
+      border:1px solid rgba(124,58,237,.20);
+      background: rgba(124,58,237,.05);
+    }
+    .portalTop{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .portalTitle{
+      font-weight: 1000;
+      font-size: 14px;
+      color:#2e1065;
+    }
 
+    /* Modal */
     #modalBackdrop{
-      display:none; position:fixed; inset:0; background: rgba(15, 23, 42, .55);
-      z-index: 999; padding: 22px;
+      display:none;
+      position:fixed;
+      inset:0;
+      background: rgba(15, 23, 42, .55);
+      z-index: 999;
+      padding: 22px;
     }
     .modal{
-      max-width: 720px; margin: 0 auto; background:#fff; border-radius: 20px; overflow:hidden;
-      border:1px solid var(--border); box-shadow: 0 30px 80px rgba(0,0,0,.25);
+      max-width: 650px;
+      margin: 0 auto;
+      background:#fff;
+      border-radius: 20px;
+      overflow:hidden;
+      border:1px solid var(--border);
+      box-shadow: 0 30px 80px rgba(0,0,0,.25);
+      width: 100%;
     }
     .modalHd{ padding: 16px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
     .modalBd{ padding: 16px 18px; }
@@ -167,16 +417,105 @@
 
     .field label{ font-size: 13px; font-weight: 1000; color:#344054; }
     .field input, .field textarea, .field select{
-      margin-top:6px; width:100%; padding: 10px 12px; border-radius: 14px;
-      border:1px solid var(--border); outline:none; font-size: 14px;
+      margin-top:6px;
+      width:100%;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      outline:none;
+      font-size: 16px; /* prevents iOS zoom */
+      touch-action: manipulation;
     }
     .field input:focus, .field textarea:focus, .field select:focus{ box-shadow: var(--focus); border-color: rgba(124,58,237,.35); }
     textarea{ resize: vertical; min-height: 90px; }
+
     .hr{ height:1px; background: var(--border); margin: 12px 0; }
-    .note{
-      padding: 10px 12px; border-radius: 14px; border:1px solid rgba(245,158,11,.25);
-      background: rgba(245,158,11,.12); color:#7c4a00; font-weight:800; font-size: 13px;
-      margin-bottom: 10px;
+
+    /* Toast */
+    .toastWrap{
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 12px;
+      padding: 0 12px env(safe-area-inset-bottom);
+      z-index: 1001;
+      display:flex;
+      justify-content:center;
+      pointer-events:none;
+    }
+    .toast{
+      pointer-events:auto;
+      max-width: 720px;
+      width: fit-content;
+      background: rgba(17,24,39,.92);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 800;
+      font-size: 13px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      box-shadow: 0 18px 60px rgba(0,0,0,.25);
+    }
+    .toast .tag{
+      border-radius:999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 1000;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .toast button{
+      border: none;
+      background: rgba(255,255,255,.12);
+      color:#fff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-weight: 900;
+      cursor:pointer;
+      min-height: 36px;
+      touch-action: manipulation;
+    }
+
+    /* =========================
+       iPhone / Mobile polish
+       ========================= */
+    button, a, input, select, textarea { touch-action: manipulation; }
+
+    @media (max-width: 720px) {
+      .wrap{ padding: 0 14px; }
+      .nav .wrap{ height:auto; padding: 10px 14px; align-items:flex-start; }
+      .nav-actions{ width:100%; gap: 8px; }
+      .nav-actions .btn{ flex: 1 1 auto; justify-content:center; }
+      h1{ font-size: 34px; }
+      .hero{ padding: 26px 0 10px; }
+      .searchRow{ flex-direction:column; align-items:stretch; }
+      .searchRow .btn{ width:100%; justify-content:center; }
+      .grid{ grid-template-columns: 1fr; }
+      .statsRow{ grid-template-columns: 1fr; }
+      .barGrid{ grid-template-columns: 1fr; }
+      .rowCard{ padding: 12px; }
+      .scoreBox{ width: 78px; min-width: 78px; }
+    }
+
+    /* Mobile modal becomes a bottom sheet */
+    @media (max-width: 520px){
+      #modalBackdrop{ padding: 0; display:none; align-items: flex-end; }
+      #modalBackdrop[style*="display: block"]{ display:flex !important; }
+      .modal{
+        max-width: 100%;
+        border-radius: 18px 18px 0 0;
+        max-height: 92vh;
+      }
+      .modalBd{
+        max-height: calc(92vh - 120px);
+        overflow:auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+    @supports (height: 100dvh){
+      #modalBackdrop{ min-height: 100dvh; }
     }
   </style>
 </head>
@@ -189,24 +528,29 @@
         <span>RateMyLandlord</span>
       </a>
       <div class="nav-actions">
+        <span id="modePill" class="pill warn" style="display:none;"></span>
         <span id="userPill" class="pill" style="display:none;"></span>
+
         <button class="btn" id="authBtn" onclick="openModal('auth')">Log in</button>
         <button class="btn" id="logoutBtn" style="display:none;" onclick="logout()">Log out</button>
 
         <button class="btn" onclick="openModal('addLandlord')">Add Landlord</button>
         <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
         <button class="btn" onclick="syncNow()">Sync</button>
+
         <button class="btn" id="adminBtn" style="display:none;" onclick="openModal('adminClaims')">Admin</button>
       </div>
     </div>
   </div>
 
   <div class="wrap">
+    <!-- HOME VIEW -->
     <section id="homeView">
       <div class="hero">
         <h1>Look up a landlord. Add reviews. Share your experience.</h1>
         <p>
-          Local dev uses a real backend (SQLite). GitHub Pages runs in demo mode (LocalStorage) so buttons still work.
+          This runs in two modes:
+          <b>Local Dev</b> (full backend) and <b>GitHub Pages Demo</b> (stores data in your browser).
         </p>
 
         <div class="searchRow">
@@ -245,7 +589,9 @@
         <aside class="card side">
           <h3 style="margin-top:0;">Posting guidelines</h3>
           <div class="box">
-            <div class="tiny">Keep it factual. Avoid personal info. No threats/harassment.</div>
+            <div class="tiny">
+              Keep it factual. Avoid personal info. No threats/harassment.
+            </div>
           </div>
           <ul>
             <li>Use dates (“work order 5/3, fixed 5/20”).</li>
@@ -263,6 +609,7 @@
       </div>
     </section>
 
+    <!-- PROFILE VIEW -->
     <section id="profileView">
       <div class="card">
         <div class="hd">
@@ -285,8 +632,10 @@
               <div class="num" id="profileOverall">—</div>
               <div class="sub"><span id="profileReviewCount">0</span> reviews • Overall</div>
               <div style="margin-top:10px;" class="badgeRow" id="profileTags"></div>
+
               <div id="portalArea" class="portalCard" style="display:none;"></div>
             </div>
+
             <div class="barGrid" id="profileBars"></div>
           </div>
 
@@ -302,6 +651,7 @@
     </section>
   </div>
 
+  <!-- MODAL -->
   <div id="modalBackdrop">
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modalHd">
@@ -316,127 +666,255 @@
     </div>
   </div>
 
+  <!-- TOAST -->
+  <div class="toastWrap" id="toastWrap" style="display:none;">
+    <div class="toast" id="toast">
+      <span class="tag" id="toastTag">INFO</span>
+      <span id="toastMsg">—</span>
+      <button onclick="hideToast()">OK</button>
+    </div>
+  </div>
+
 <script>
-  // ===== Mode detection =====
+  /**********************
+   * MODE DETECTION
+   * - GitHub Pages cannot call localhost backend.
+   * - So on github.io we run DEMO mode using LocalStorage.
+   **********************/
   const IS_GH_PAGES = location.hostname.endsWith("github.io");
+  const DEMO = IS_GH_PAGES;
 
-  // Backend endpoints (dev)
-  const DEV_API_BASE = "http://localhost:8787";
-  const API_BASE = IS_GH_PAGES ? null : DEV_API_BASE;
-  const API_DB = IS_GH_PAGES ? null : `${DEV_API_BASE}/db`;
+  // Backend endpoints (used only when DEMO=false)
+  const API_BASE = "http://localhost:8787";
+  const API_DB   = `${API_BASE}/db`;
 
+  // LocalStorage keys (used when DEMO=true)
   const LS_DB_KEY = "rml_db_v1";
-  const LS_USER_KEY = "rml_user_v1";
+  const LS_AUTH_KEY = "rml_user_v1";
+  const LS_CLAIMS_KEY = "rml_claims_v1";
+  const LS_RESP_KEY = "rml_responses_v1"; // map key landlordId:reviewId => response
 
   // Data in memory
   let db = { version: 1, landlords: [], reports: [] };
-
-  // User session in memory
   let currentUser = null;
-  let myClaims = [];
+  let myClaims = []; // [{id, landlord_id, user_id/email, status, proof_text, created_at}]
 
   // UI state
-  const state = { view: "home", selectedLandlordId: null, sortKey: "overall", sortDir: "desc" };
+  const state = {
+    view: "home",
+    selectedLandlordId: null,
+    sortKey: "overall",
+    sortDir: "desc"
+  };
 
   // Modal state
   let currentModal = { type: null };
 
-  // ===== LocalStorage helpers =====
-  function readLocalDB(){
+  /**********************
+   * TOAST (no blocking alerts)
+   **********************/
+  function showToast(msg, tag="INFO"){
+    const wrap = document.getElementById("toastWrap");
+    const ttag = document.getElementById("toastTag");
+    const tmsg = document.getElementById("toastMsg");
+    ttag.textContent = tag;
+    tmsg.textContent = msg;
+    wrap.style.display = "flex";
+  }
+  function hideToast(){
+    document.getElementById("toastWrap").style.display = "none";
+  }
+
+  /**********************
+   * DEMO STORAGE HELPERS
+   **********************/
+  function lsGet(key, fallback){
     try{
-      const raw = localStorage.getItem(LS_DB_KEY);
-      if(!raw) return { version: 1, landlords: [], reports: [] };
-      const parsed = JSON.parse(raw);
-      parsed.version = parsed.version || 1;
-      parsed.landlords = parsed.landlords || [];
-      parsed.reports = parsed.reports || [];
-      return parsed;
+      const raw = localStorage.getItem(key);
+      if(!raw) return fallback;
+      return JSON.parse(raw);
     }catch{
-      return { version: 1, landlords: [], reports: [] };
+      return fallback;
     }
   }
-  function writeLocalDB(next){ localStorage.setItem(LS_DB_KEY, JSON.stringify(next)); }
+  function lsSet(key, val){
+    localStorage.setItem(key, JSON.stringify(val));
+  }
 
-  // ===== Backend I/O =====
-  async function loadDB(){
-    if(IS_GH_PAGES){ db = readLocalDB(); return; }
+  function demoEnsure(){
+    // DB
+    const existing = lsGet(LS_DB_KEY, null);
+    if(!existing){
+      lsSet(LS_DB_KEY, { version: 1, landlords: [], reports: [] });
+    }
+    // Claims
+    const c = lsGet(LS_CLAIMS_KEY, null);
+    if(!c) lsSet(LS_CLAIMS_KEY, []);
+    // Responses
+    const r = lsGet(LS_RESP_KEY, null);
+    if(!r) lsSet(LS_RESP_KEY, {});
+  }
+
+  /**********************
+   * BACKEND I/O (LOCAL DEV)
+   **********************/
+  async function loadDB_backend(){
     const res = await fetch(API_DB, { credentials: "include" });
-    if(!res.ok) throw new Error("Backend not reachable. Did you start it?");
+    if(!res.ok) throw new Error("Backend not reachable.");
     db = await res.json();
     db.version = db.version || 1;
     db.landlords = db.landlords || [];
     db.reports = db.reports || [];
   }
-
-  async function saveDB(){
-    if(IS_GH_PAGES){ writeLocalDB(db); return; }
+  async function saveDB_backend(){
     const res = await fetch(API_DB, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(db)
     });
-    if(!res.ok){
-      const data = await res.json().catch(()=> ({}));
-      throw new Error(data.error || "Save failed");
-    }
+    if(!res.ok) throw new Error("Save failed.");
   }
-
-  async function loadMe(){
-    if(IS_GH_PAGES){
-      try{ currentUser = JSON.parse(localStorage.getItem(LS_USER_KEY) || "null"); }
-      catch{ currentUser = null; }
-      renderAuthPill();
-      return;
-    }
+  async function loadMe_backend(){
     const r = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
     const data = await r.json().catch(()=> ({}));
     currentUser = data.user || null;
-    renderAuthPill();
   }
-
-  async function loadMyClaims(){
+  async function loadMyClaims_backend(){
     myClaims = [];
     if(!currentUser) return;
-    if(IS_GH_PAGES) return; // demo mode: no claims
     const r = await fetch(`${API_BASE}/claims/mine`, { credentials: "include" });
     const data = await r.json().catch(()=> ({}));
     if(r.ok && Array.isArray(data.claims)) myClaims = data.claims;
   }
 
+  /**********************
+   * DEMO I/O (GITHUB PAGES)
+   **********************/
+  async function loadDB_demo(){
+    demoEnsure();
+    db = lsGet(LS_DB_KEY, { version: 1, landlords: [], reports: [] });
+    // Attach responses into db reviews (same shape as backend)
+    const respMap = lsGet(LS_RESP_KEY, {});
+    for(const l of (db.landlords || [])){
+      l.reviews = l.reviews || [];
+      for(const rv of l.reviews){
+        const key = `${l.id}:${rv.id}`;
+        if(respMap[key]) rv.response = respMap[key];
+      }
+    }
+  }
+  async function saveDB_demo(){
+    // strip attached response objects before saving (we store responses separately)
+    const clean = structuredClone(db);
+    for(const l of (clean.landlords || [])){
+      l.reviews = l.reviews || [];
+      for(const rv of l.reviews){
+        if(rv.response) delete rv.response;
+      }
+    }
+    lsSet(LS_DB_KEY, clean);
+  }
+  async function loadMe_demo(){
+    currentUser = lsGet(LS_AUTH_KEY, null);
+  }
+  async function loadMyClaims_demo(){
+    myClaims = [];
+    if(!currentUser) return;
+    const all = lsGet(LS_CLAIMS_KEY, []);
+    myClaims = all.filter(c => c.user_id === currentUser.id);
+  }
+
+  /**********************
+   * UNIFIED I/O
+   **********************/
+  async function loadAll(){
+    if(DEMO){
+      await loadMe_demo();
+      await loadMyClaims_demo();
+      await loadDB_demo();
+    }else{
+      await loadMe_backend();
+      await loadMyClaims_backend();
+      await loadDB_backend();
+    }
+  }
+  async function saveDB(){
+    if(DEMO) return saveDB_demo();
+    return saveDB_backend();
+  }
+
   async function syncNow(){
-    await loadMe().catch(()=>{});
-    await loadMyClaims().catch(()=>{});
-    await loadDB();
-    if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-    else renderHome();
+    try{
+      await loadAll();
+      renderModePill();
+      renderAuthPill();
+      renderAdminBtn();
+      if(state.view === "profile" && state.selectedLandlordId){
+        openProfile(state.selectedLandlordId);
+      }else{
+        renderHome();
+      }
+      if(DEMO){
+        // no “fail to fetch” popups on GH pages
+      }
+    }catch(err){
+      showToast(err.message || "Sync failed.", "ERROR");
+    }
+  }
+
+  /**********************
+   * UI PILL RENDERING
+   **********************/
+  function renderModePill(){
+    const pill = document.getElementById("modePill");
+    if(!DEMO){
+      pill.style.display = "none";
+      return;
+    }
+    pill.style.display = "inline-flex";
+    pill.className = "pill warn";
+    pill.textContent = "Demo Mode (GitHub Pages)";
   }
 
   function renderAuthPill(){
     const pill = document.getElementById("userPill");
     const authBtn = document.getElementById("authBtn");
     const logoutBtn = document.getElementById("logoutBtn");
-    const adminBtn = document.getElementById("adminBtn");
 
     if(!currentUser){
       pill.style.display = "none";
       authBtn.style.display = "inline-flex";
       logoutBtn.style.display = "none";
-      adminBtn.style.display = "none";
       return;
     }
 
     pill.style.display = "inline-flex";
-    pill.textContent = `${currentUser.email} • ${currentUser.role}${IS_GH_PAGES ? " • demo" : ""}`;
+    pill.textContent = `${currentUser.email} • ${currentUser.role}`;
     authBtn.style.display = "none";
     logoutBtn.style.display = "inline-flex";
-    adminBtn.style.display = (!IS_GH_PAGES && currentUser.role === "admin") ? "inline-flex" : "none";
   }
 
-  // ===== Helpers =====
-  function avg(nums){ if(!nums.length) return null; return nums.reduce((a,b)=>a+b,0) / nums.length; }
-  function fmtScore(x){ if(x === null || x === undefined) return "—"; return (Math.round(x*10)/10).toFixed(1); }
+  function renderAdminBtn(){
+    const btn = document.getElementById("adminBtn");
+    if(currentUser && currentUser.role === "admin"){
+      btn.style.display = "inline-flex";
+    }else{
+      btn.style.display = "none";
+    }
+  }
 
+  /**********************
+   * HELPERS
+   **********************/
+  function avg(nums){
+    if(!nums.length) return null;
+    return nums.reduce((a,b)=>a+b,0) / nums.length;
+  }
+  function fmtScore(x){
+    if(x === null || x === undefined) return "—";
+    return (Math.round(x*10)/10).toFixed(1);
+  }
   function landlordStats(l){
     const rs = l.reviews || [];
     const keys = ["overall","repairs","responsiveness","deposits","conditions","communication"];
@@ -482,7 +960,9 @@
     return myClaims.find(c => String(c.landlord_id) === String(landlordId)) || null;
   }
 
-  // ===== Rendering: Home =====
+  /**********************
+   * HOME RENDER
+   **********************/
   function renderHome(){
     const q = (document.getElementById("searchInput").value || "").trim();
     const list = document.getElementById("landlordList");
@@ -535,16 +1015,21 @@
   }
 
   function toggleSort(key){
-    if(state.sortKey === key) state.sortDir = state.sortDir === "desc" ? "asc" : "desc";
-    else { state.sortKey = key; state.sortDir = "desc"; }
-
+    if(state.sortKey === key){
+      state.sortDir = state.sortDir === "desc" ? "asc" : "desc";
+    }else{
+      state.sortKey = key;
+      state.sortDir = "desc";
+    }
     document.querySelectorAll(".chipRow .chip").forEach(el=>{
       el.classList.toggle("active", el.dataset.chip === state.sortKey);
     });
     renderHome();
   }
 
-  // ===== Profile view =====
+  /**********************
+   * PROFILE VIEW
+   **********************/
   function openProfile(id){
     state.view = "profile";
     state.selectedLandlordId = id;
@@ -553,7 +1038,7 @@
     document.getElementById("profileView").style.display = "block";
 
     const l = db.landlords.find(x => x.id === id);
-    if(!l){ alert("Landlord not found."); return; }
+    if(!l){ showToast("Landlord not found.", "ERROR"); return; }
     const stats = landlordStats(l);
 
     document.getElementById("profileName").textContent = l.name || "—";
@@ -562,8 +1047,7 @@
     document.getElementById("profileReviewCount").textContent = stats.count;
 
     const tags = tagsFromStats(stats);
-    document.getElementById("profileTags").innerHTML =
-      tags.map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("");
+    document.getElementById("profileTags").innerHTML = tags.map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("");
 
     const barKeys = [
       ["repairs","Repairs"],
@@ -600,7 +1084,7 @@
       const created = createdRaw ? new Date(createdRaw).toLocaleDateString() : "";
 
       const resp = r.response || null;
-      const respCreated = resp?.createdAt || "";
+      const respCreated = resp?.createdAt || resp?.created_at || "";
       const respHtml = resp
         ? `
           <div class="ownerResp">
@@ -638,25 +1122,20 @@
     portal.style.display = "none";
     portal.innerHTML = "";
 
-    if(!currentUser){
-      return;
-    }
+    if(!currentUser) return;
 
     const claim = myClaimForLandlord(l.id);
-
     let statusPill = "";
-    if(IS_GH_PAGES){
-      statusPill = `<span class="pill warn">Demo mode (claims disabled)</span>`;
-    } else if(claim){
+    if(claim){
       const cls = claim.status === "approved" ? "good" : (claim.status === "denied" ? "bad" : "warn");
       statusPill = `<span class="pill ${cls}">Claim: ${escapeHtml(claim.status)}</span>`;
-    } else {
+    }else{
       statusPill = `<span class="pill warn">Not claimed</span>`;
     }
 
-    const canRespond = (!IS_GH_PAGES) && ((claim && claim.status === "approved") || (currentUser.role === "admin"));
-
     portal.style.display = "block";
+    const canRespond = (claim && claim.status === "approved") || (currentUser.role === "admin");
+
     portal.innerHTML = `
       <div class="portalTop">
         <div>
@@ -672,10 +1151,7 @@
         <div class="tiny muted" style="margin-bottom:6px;">
           Claim this listing (submit proof for admin review):
         </div>
-        ${IS_GH_PAGES
-          ? `<div class="tiny muted">Claims are disabled on GitHub Pages demo.</div>`
-          : `<button class="btn" onclick="openModal('claimLandlord')">Request verification</button>`
-        }
+        <button class="btn" onclick="openModal('claimLandlord')">Request verification</button>
       </div>
 
       <div class="hr"></div>
@@ -701,36 +1177,27 @@
     renderHome();
   }
 
-  // ===== Modals =====
-  function ratingField(label, id, def=5){
-    return `
-      <div class="field">
-        <label>${label} (1–5)</label>
-        <select id="${id}">
-          ${[1,2,3,4,5].map(v => `<option ${v===def ? "selected":""}>${v}</option>`).join("")}
-        </select>
-      </div>
-    `;
-  }
-
+  /**********************
+   * MODALS
+   **********************/
   function openModal(type){
     currentModal.type = type;
     const title = document.getElementById("modalTitle");
     const body = document.getElementById("modalBody");
     const submitBtn = document.getElementById("modalSubmitBtn");
     submitBtn.style.display = "inline-flex";
+    submitBtn.disabled = false;
 
     if(type === "auth"){
       title.textContent = "Log in / Sign up";
       body.innerHTML = `
-        ${IS_GH_PAGES ? `<div class="note">GitHub Pages Demo Mode: this “login” is stored in your browser.</div>` : ``}
         <div class="field">
           <label>Email</label>
-          <input id="m_auth_email" placeholder="you@email.com" />
+          <input id="m_auth_email" placeholder="you@email.com" autocapitalize="none" autocomplete="email" />
         </div>
         <div class="field" style="margin-top:10px;">
           <label>Password</label>
-          <input id="m_auth_pw" type="password" placeholder="••••••••" />
+          <input id="m_auth_pw" type="password" placeholder="••••••••" autocomplete="current-password" />
         </div>
         <div class="field" style="margin-top:10px;">
           <label>I am a...</label>
@@ -740,7 +1207,9 @@
           </select>
         </div>
         <div class="tiny muted" style="margin-top:10px;">
-          Local dev: login first; if it fails, we sign you up. First ever user becomes admin.
+          ${DEMO
+            ? "Demo Mode: account is stored on this device only."
+            : "Local Dev: first-ever user becomes admin on the backend."}
         </div>
       `;
     }
@@ -808,10 +1277,7 @@
 
     if(type === "claimLandlord"){
       title.textContent = "Request verification (claim listing)";
-      if(IS_GH_PAGES){
-        body.innerHTML = `<div class="tiny muted">Claims are disabled on GitHub Pages demo.</div>`;
-        submitBtn.style.display = "none";
-      } else if(!currentUser){
+      if(!currentUser){
         body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
         submitBtn.style.display = "none";
       }else if(!state.selectedLandlordId){
@@ -823,7 +1289,9 @@
         const statusLine = claim ? `<div class="tiny muted">Current claim status: <b>${escapeHtml(claim.status)}</b></div>` : "";
 
         body.innerHTML = `
-          <div class="tiny muted">Request permission to respond for:</div>
+          <div class="tiny muted">
+            You’re requesting permission to respond as the verified owner/manager for:
+          </div>
           <div style="font-weight:1000; margin-top:6px;">${escapeHtml(l?.name || "—")}</div>
           <div class="tiny muted" style="margin-top:10px;">${statusLine}</div>
 
@@ -831,9 +1299,15 @@
             <label>Proof (type it here)</label>
             <textarea id="m_claim_proof" placeholder="Examples:
 • Link to management site showing your name
-• Lease header info (no personal tenant info)
 • Business email domain used for leasing
+• Lease header info (no personal tenant info)
 • Any context for the admin"></textarea>
+          </div>
+
+          <div class="tiny muted" style="margin-top:10px;">
+            ${DEMO
+              ? "Demo Mode: approvals happen inside this page via Admin (if you’re admin)."
+              : "Local Dev: admin approves claims via Admin UI (or curl)."}
           </div>
         `;
       }
@@ -841,22 +1315,19 @@
 
     if(type === "respondReview"){
       title.textContent = "Respond to a review";
-      if(IS_GH_PAGES){
-        body.innerHTML = `<div class="tiny muted">Responses require the backend; disabled on GitHub Pages demo.</div>`;
-        submitBtn.style.display = "none";
-      } else if(!currentUser){
+      if(!currentUser){
         body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
         submitBtn.style.display = "none";
-      } else if(!state.selectedLandlordId){
+      }else if(!state.selectedLandlordId){
         body.innerHTML = `<div class="tiny muted">Open a landlord profile first.</div>`;
         submitBtn.style.display = "none";
-      } else {
+      }else{
         const claim = myClaimForLandlord(state.selectedLandlordId);
         const canRespond = (claim && claim.status === "approved") || (currentUser.role === "admin");
         if(!canRespond){
           body.innerHTML = `<div class="tiny muted">You must be approved for this listing before you can respond.</div>`;
           submitBtn.style.display = "none";
-        } else {
+        }else{
           const l = db.landlords.find(x => x.id === state.selectedLandlordId);
           const options = (l?.reviews || []).slice().reverse().map(r => {
             const label = (r.title || "Review") + " — " + (r.text || "").slice(0, 40);
@@ -880,284 +1351,375 @@
     }
 
     if(type === "adminClaims"){
-      title.textContent = "Admin: pending claims";
-      if(IS_GH_PAGES){
-        body.innerHTML = `<div class="tiny muted">Admin actions require the backend; disabled on GitHub Pages demo.</div>`;
+      title.textContent = "Admin: Pending claims";
+      if(!currentUser || currentUser.role !== "admin"){
+        body.innerHTML = `<div class="tiny muted">Admin only.</div>`;
         submitBtn.style.display = "none";
-      } else if(!currentUser || currentUser.role !== "admin"){
-        body.innerHTML = `<div class="tiny muted">Admins only.</div>`;
-        submitBtn.style.display = "none";
-      } else {
-        submitBtn.style.display = "none";
-        body.innerHTML = `<div class="tiny muted">Loading…</div>`;
-        loadPendingClaimsIntoModal().catch(e => {
-          body.innerHTML = `<div class="tiny muted">Failed: ${escapeHtml(e.message)}</div>`;
-        });
+      }else{
+        submitBtn.textContent = "Close";
+        submitBtn.onclick = () => closeModal();
+
+        // Render list
+        const pending = getPendingClaims();
+        body.innerHTML = `
+          <div class="tiny muted" style="margin-bottom:10px;">
+            Approve/deny landlord verification requests.
+          </div>
+          ${pending.length ? pending.map(c => `
+            <div class="rowCard" style="cursor:default;">
+              <div class="rowMain">
+                <div class="rowTitle">${escapeHtml(c.landlord_name || c.landlord_id)}</div>
+                <div class="rowSub">${escapeHtml(c.email || "—")} • ${new Date(c.created_at).toLocaleString()}</div>
+                <div style="white-space:pre-wrap; font-weight:750; color:#344054;">
+                  ${escapeHtml(c.proof_text || "")}
+                </div>
+                <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn primary" onclick="adminApprove('${escapeHtml(c.id)}')">Approve</button>
+                  <button class="btn danger" onclick="adminDeny('${escapeHtml(c.id)}')">Deny</button>
+                </div>
+              </div>
+            </div>
+          `).join("") : `<div class="tiny muted">No pending claims.</div>`}
+        `;
       }
     }
 
-    document.getElementById("modalBackdrop").style.display = "block";
+    // show modal
+    const backdrop = document.getElementById("modalBackdrop");
+    backdrop.style.display = "block";
+    backdrop.style.pointerEvents = "auto";
+
     setTimeout(()=>{
-      const first = body.querySelector("input,select,textarea");
+      const first = document.getElementById("modalBody").querySelector("input,select,textarea");
       if(first) first.focus();
     }, 30);
   }
 
-  async function loadPendingClaimsIntoModal(){
-    const body = document.getElementById("modalBody");
-    const r = await fetch(`${API_BASE}/claims/pending`, { credentials: "include" });
-    const data = await r.json().catch(()=> ({}));
-    if(!r.ok) throw new Error(data.error || "Admin fetch failed");
-    const claims = Array.isArray(data.claims) ? data.claims : [];
-
-    if(!claims.length){
-      body.innerHTML = `<div class="tiny muted">No pending claims 🎉</div>`;
-      return;
-    }
-
-    body.innerHTML = `
-      <div class="tiny muted" style="margin-bottom:10px;">
-        Approve/deny claims. Approved users can respond as the landlord for that listing.
+  function ratingField(label, id, def=5){
+    return `
+      <div class="field">
+        <label>${label} (1–5)</label>
+        <select id="${id}">
+          ${[1,2,3,4,5].map(v => `<option ${v===def ? "selected":""}>${v}</option>`).join("")}
+        </select>
       </div>
-      ${claims.map(c => `
-        <div class="card" style="box-shadow:none; border-radius:16px; margin-top:10px;">
-          <div class="bd">
-            <div style="font-weight:1000;">Landlord ID: ${escapeHtml(c.landlord_id)}</div>
-            <div class="tiny muted" style="margin-top:4px;">User: ${escapeHtml(c.email)}</div>
-            <div class="tiny muted">Submitted: ${c.created_at ? new Date(c.created_at).toLocaleString() : ""}</div>
-            <div class="hr"></div>
-            <div style="white-space:pre-wrap; font-weight:750; color:#344054;">${escapeHtml(c.proof_text || "")}</div>
-            <div class="hr"></div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="btn primary" onclick="adminApprove(${Number(c.id)})">Approve</button>
-              <button class="btn danger" onclick="adminDeny(${Number(c.id)})">Deny</button>
-            </div>
-          </div>
-        </div>
-      `).join("")}
     `;
   }
 
-  async function adminApprove(claimId){
-    const r = await fetch(`${API_BASE}/claims/approve`, {
-      method:"POST",
-      credentials:"include",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ claimId })
-    });
-    const data = await r.json().catch(()=> ({}));
-    if(!r.ok) return alert(data.error || "Approve failed");
-    await loadMyClaims().catch(()=>{});
-    await loadPendingClaimsIntoModal().catch(()=>{});
-    alert("Approved.");
-  }
-
-  async function adminDeny(claimId){
-    const r = await fetch(`${API_BASE}/claims/deny`, {
-      method:"POST",
-      credentials:"include",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ claimId })
-    });
-    const data = await r.json().catch(()=> ({}));
-    if(!r.ok) return alert(data.error || "Deny failed");
-    await loadMyClaims().catch(()=>{});
-    await loadPendingClaimsIntoModal().catch(()=>{});
-    alert("Denied.");
-  }
-
   function closeModal(){
-    document.getElementById("modalBackdrop").style.display = "none";
+    const backdrop = document.getElementById("modalBackdrop");
+    backdrop.style.display = "none";
+    // Safety: if iOS gets weird, ensure hidden backdrop never blocks taps
+    backdrop.style.pointerEvents = "none";
+    setTimeout(() => { backdrop.style.pointerEvents = "auto"; }, 0);
+
     document.getElementById("modalSubmitBtn").style.display = "inline-flex";
+    document.getElementById("modalSubmitBtn").disabled = false;
+    document.getElementById("modalSubmitBtn").textContent = "Save";
+    document.getElementById("modalSubmitBtn").onclick = () => handleModalSubmit();
     currentModal.type = null;
   }
 
   async function handleModalSubmit(){
     const t = currentModal.type;
+    const submitBtn = document.getElementById("modalSubmitBtn");
+    submitBtn.disabled = true;
 
-    if(t === "auth"){
-      const email = (document.getElementById("m_auth_email").value || "").trim();
-      const password = (document.getElementById("m_auth_pw").value || "").trim();
-      const role = document.getElementById("m_auth_role").value;
-      if(!email || !password) return alert("Enter email + password.");
+    try{
+      if(t === "auth"){
+        const email = (document.getElementById("m_auth_email").value || "").trim().toLowerCase();
+        const password = (document.getElementById("m_auth_pw").value || "").trim();
+        const role = document.getElementById("m_auth_role").value;
 
-      if(IS_GH_PAGES){
-        currentUser = { id: "demo", email, role };
-        localStorage.setItem(LS_USER_KEY, JSON.stringify(currentUser));
-        myClaims = [];
-        renderAuthPill();
+        if(!email || !password) { submitBtn.disabled=false; return showToast("Enter email + password.", "WARN"); }
+
+        if(DEMO){
+          // Demo: create user locally; first user becomes admin
+          const existing = lsGet(LS_AUTH_KEY, null);
+          const isFirst = !existing && !lsGet("rml_any_user_exists", false);
+          const finalRole = isFirst ? "admin" : (role === "landlord" ? "landlord" : "tenant");
+          const user = { id: crypto.randomUUID(), email, role: finalRole };
+          lsSet(LS_AUTH_KEY, user);
+          lsSet("rml_any_user_exists", true);
+          currentUser = user;
+          await loadMyClaims_demo();
+          renderAuthPill(); renderAdminBtn();
+          closeModal();
+          showToast(`Logged in: ${currentUser.role}`, "OK");
+          if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
+          return;
+        }
+
+        // Local dev: login first; if fails, signup
+        let r = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        if(!r.ok){
+          r = await fetch(`${API_BASE}/auth/signup`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, role })
+          });
+        }
+
+        const data = await r.json().catch(()=> ({}));
+        if(!r.ok) { submitBtn.disabled=false; return showToast(data.error || "Auth failed", "ERROR"); }
+
+        currentUser = data.user || null;
+        await loadMyClaims_backend().catch(()=>{});
+        renderAuthPill(); renderAdminBtn();
         closeModal();
-        alert(`(Demo) Logged in as ${currentUser.email} (${currentUser.role})`);
+        showToast(`Logged in: ${currentUser.role}`, "OK");
         if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
         return;
       }
 
-      let r = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
+      if(t === "addLandlord"){
+        const name = (document.getElementById("m_landlord_name").value || "").trim();
+        const neighborhood = (document.getElementById("m_landlord_neighborhood").value || "").trim();
+        const city = (document.getElementById("m_landlord_city").value || "").trim();
+        if(name.length < 2){ submitBtn.disabled=false; return showToast("Please enter a landlord name.", "WARN"); }
 
-      if(!r.ok){
-        r = await fetch(`${API_BASE}/auth/signup`, {
+        db.landlords.unshift({
+          id: crypto.randomUUID(),
+          name,
+          neighborhood: neighborhood || null,
+          city: city || null,
+          created_at: new Date().toISOString(),
+          reviews: []
+        });
+
+        await saveDB();
+        closeModal();
+        renderHome();
+        openProfile(db.landlords[0].id);
+        showToast("Landlord saved.", "OK");
+        return;
+      }
+
+      if(t === "addReview"){
+        if(!state.selectedLandlordId){ submitBtn.disabled=false; return; }
+        const l = db.landlords.find(x => x.id === state.selectedLandlordId);
+        if(!l){ submitBtn.disabled=false; return showToast("Landlord not found.", "ERROR"); }
+
+        const title = (document.getElementById("m_review_title").value || "").trim();
+        const text = (document.getElementById("m_review_text").value || "").trim();
+        if(text.length < 10){ submitBtn.disabled=false; return showToast("Write a bit more detail (10+ chars).", "WARN"); }
+
+        const ratings = {
+          overall: Number(document.getElementById("m_overall").value),
+          repairs: Number(document.getElementById("m_repairs").value),
+          responsiveness: Number(document.getElementById("m_responsiveness").value),
+          deposits: Number(document.getElementById("m_deposits").value),
+          conditions: Number(document.getElementById("m_conditions").value),
+          communication: Number(document.getElementById("m_communication").value),
+        };
+
+        l.reviews = l.reviews || [];
+        l.reviews.push({
+          id: crypto.randomUUID(),
+          title,
+          text,
+          ratings,
+          createdAt: new Date().toISOString()
+        });
+
+        await saveDB();
+        closeModal();
+        openProfile(l.id);
+        showToast("Review posted.", "OK");
+        return;
+      }
+
+      if(t === "importData"){
+        const raw = (document.getElementById("m_import_json").value || "").trim();
+        if(!raw){ submitBtn.disabled=false; return showToast("Paste your JSON export.", "WARN"); }
+        try{
+          const parsed = JSON.parse(raw);
+          if(!parsed || !Array.isArray(parsed.landlords)) throw new Error("Invalid format.");
+          db = parsed;
+          db.version = db.version || 1;
+          db.landlords = db.landlords || [];
+          db.reports = db.reports || [];
+          await saveDB();
+          closeModal();
+          goHome();
+          showToast("Imported successfully.", "OK");
+        }catch(e){
+          submitBtn.disabled=false;
+          showToast("Import failed: " + e.message, "ERROR");
+        }
+        return;
+      }
+
+      if(t === "claimLandlord"){
+        if(!currentUser){ submitBtn.disabled=false; return showToast("Log in first.", "WARN"); }
+        if(!state.selectedLandlordId){ submitBtn.disabled=false; return; }
+
+        const proofText = (document.getElementById("m_claim_proof").value || "").trim();
+
+        if(DEMO){
+          const all = lsGet(LS_CLAIMS_KEY, []);
+          const id = crypto.randomUUID();
+          const l = db.landlords.find(x => x.id === state.selectedLandlordId);
+          all.push({
+            id,
+            landlord_id: state.selectedLandlordId,
+            landlord_name: l?.name || state.selectedLandlordId,
+            user_id: currentUser.id,
+            email: currentUser.email,
+            status: "pending",
+            proof_text: proofText.slice(0, 4000),
+            created_at: new Date().toISOString()
+          });
+          lsSet(LS_CLAIMS_KEY, all);
+          await loadMyClaims_demo();
+          closeModal();
+          showToast("Claim submitted (pending).", "OK");
+          openProfile(state.selectedLandlordId);
+          return;
+        }
+
+        const r = await fetch(`${API_BASE}/claims/request`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, role })
+          body: JSON.stringify({ landlordId: state.selectedLandlordId, proofText })
         });
-      }
+        const data = await r.json().catch(()=> ({}));
+        if(!r.ok){ submitBtn.disabled=false; return showToast(data.error || "Claim request failed", "ERROR"); }
 
-      const data = await r.json().catch(()=> ({}));
-      if(!r.ok) return alert(data.error || "Auth failed");
-
-      currentUser = data.user || null;
-      await loadMyClaims().catch(()=>{});
-      renderAuthPill();
-      closeModal();
-      alert(`Logged in as ${currentUser.email} (${currentUser.role})`);
-      if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-      return;
-    }
-
-    if(t === "addLandlord"){
-      const name = (document.getElementById("m_landlord_name").value || "").trim();
-      const neighborhood = (document.getElementById("m_landlord_neighborhood").value || "").trim();
-      const city = (document.getElementById("m_landlord_city").value || "").trim();
-      if(name.length < 2) return alert("Please enter a landlord name.");
-
-      db.landlords.unshift({
-        id: crypto.randomUUID(),
-        name,
-        neighborhood: neighborhood || null,
-        city: city || null,
-        created_at: new Date().toISOString(),
-        reviews: []
-      });
-
-      await saveDB();
-      closeModal();
-      renderHome();
-      openProfile(db.landlords[0].id);
-      return;
-    }
-
-    if(t === "addReview"){
-      if(!state.selectedLandlordId) return;
-
-      const l = db.landlords.find(x => x.id === state.selectedLandlordId);
-      if(!l) return alert("Landlord not found.");
-
-      const title = (document.getElementById("m_review_title").value || "").trim();
-      const text = (document.getElementById("m_review_text").value || "").trim();
-      if(text.length < 10) return alert("Please write a bit more detail (10+ chars).");
-
-      const ratings = {
-        overall: Number(document.getElementById("m_overall").value),
-        repairs: Number(document.getElementById("m_repairs").value),
-        responsiveness: Number(document.getElementById("m_responsiveness").value),
-        deposits: Number(document.getElementById("m_deposits").value),
-        conditions: Number(document.getElementById("m_conditions").value),
-        communication: Number(document.getElementById("m_communication").value),
-      };
-
-      l.reviews = l.reviews || [];
-      l.reviews.push({
-        id: crypto.randomUUID(),
-        title,
-        text,
-        ratings,
-        createdAt: new Date().toISOString()
-      });
-
-      await saveDB();
-      closeModal();
-      openProfile(l.id);
-      return;
-    }
-
-    if(t === "importData"){
-      const raw = (document.getElementById("m_import_json").value || "").trim();
-      if(!raw) return alert("Paste your JSON export.");
-      try{
-        const parsed = JSON.parse(raw);
-        if(!parsed || !Array.isArray(parsed.landlords)) throw new Error("Invalid format.");
-        db = parsed;
-        db.version = db.version || 1;
-        db.landlords = db.landlords || [];
-        db.reports = db.reports || [];
-        await saveDB();
+        await loadMyClaims_backend().catch(()=>{});
         closeModal();
-        goHome();
-        alert("Imported successfully.");
-      }catch(e){
-        alert("Import failed: " + e.message);
+        showToast("Claim submitted (pending).", "OK");
+        openProfile(state.selectedLandlordId);
+        return;
       }
-      return;
-    }
 
-    if(t === "claimLandlord"){
-      if(!currentUser) return;
-      if(!state.selectedLandlordId) return;
+      if(t === "respondReview"){
+        const reviewId = (document.getElementById("m_resp_reviewId").value || "").trim();
+        const text = (document.getElementById("m_resp_text").value || "").trim();
+        if(!reviewId){ submitBtn.disabled=false; return showToast("Pick a review.", "WARN"); }
+        if(text.length < 5){ submitBtn.disabled=false; return showToast("Write a little more.", "WARN"); }
 
-      const proofText = (document.getElementById("m_claim_proof").value || "").trim();
+        if(DEMO){
+          const claim = myClaimForLandlord(state.selectedLandlordId);
+          const canRespond = (claim && claim.status === "approved") || (currentUser.role === "admin");
+          if(!canRespond){ submitBtn.disabled=false; return showToast("Not verified for this listing.", "ERROR"); }
 
-      const r = await fetch(`${API_BASE}/claims/request`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ landlordId: state.selectedLandlordId, proofText })
-      });
-      const data = await r.json().catch(()=> ({}));
-      if(!r.ok) return alert(data.error || "Claim request failed");
+          const respMap = lsGet(LS_RESP_KEY, {});
+          respMap[`${state.selectedLandlordId}:${reviewId}`] = { text, createdAt: new Date().toISOString() };
+          lsSet(LS_RESP_KEY, respMap);
 
-      await loadMyClaims().catch(()=>{});
+          closeModal();
+          await syncNow();
+          showToast("Response posted.", "OK");
+          return;
+        }
+
+        const r = await fetch(`${API_BASE}/reviews/respond`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ landlordId: state.selectedLandlordId, reviewId, text })
+        });
+        const data = await r.json().catch(()=> ({}));
+        if(!r.ok){ submitBtn.disabled=false; return showToast(data.error || "Response failed", "ERROR"); }
+
+        closeModal();
+        await syncNow();
+        showToast("Response posted.", "OK");
+        return;
+      }
+
+      // Default: close
       closeModal();
-      alert("Claim submitted! Waiting for admin approval.");
-      openProfile(state.selectedLandlordId);
-      return;
-    }
-
-    if(t === "respondReview"){
-      const reviewId = (document.getElementById("m_resp_reviewId").value || "").trim();
-      const text = (document.getElementById("m_resp_text").value || "").trim();
-      if(!reviewId) return alert("Pick a review.");
-      if(text.length < 5) return alert("Write a little more.");
-
-      const r = await fetch(`${API_BASE}/reviews/respond`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ landlordId: state.selectedLandlordId, reviewId, text })
-      });
-      const data = await r.json().catch(()=> ({}));
-      if(!r.ok) return alert(data.error || "Response failed");
-
-      closeModal();
-      await syncNow();
-      alert("Response posted.");
-      return;
+    } finally {
+      // Only re-enable if modal is still open
+      const backdrop = document.getElementById("modalBackdrop");
+      if(backdrop.style.display === "block"){
+        submitBtn.disabled = false;
+      }
     }
   }
 
+  /**********************
+   * ADMIN (demo + local)
+   **********************/
+  function getPendingClaims(){
+    if(!currentUser || currentUser.role !== "admin") return [];
+    if(DEMO){
+      const all = lsGet(LS_CLAIMS_KEY, []);
+      const pending = all.filter(c => c.status === "pending");
+      return pending;
+    }
+    // Local backend: we fetch live
+    // NOTE: for simplicity we do an on-demand fetch when opening modal
+    return [];
+  }
+
+  async function adminApprove(id){
+    if(!currentUser || currentUser.role !== "admin") return;
+    if(DEMO){
+      const all = lsGet(LS_CLAIMS_KEY, []);
+      const c = all.find(x => x.id === id);
+      if(c) c.status = "approved";
+      lsSet(LS_CLAIMS_KEY, all);
+      await loadMyClaims_demo();
+      openModal("adminClaims"); // refresh view
+      showToast("Approved.", "OK");
+      return;
+    }
+    // Local backend: needs claimId numeric from backend list.
+    // If you want this fully wired locally, tell me and I’ll plug in /claims/pending fetch + approve/deny.
+    showToast("Local admin UI needs backend /claims/pending wired. (Say: 'wire local admin ui')", "INFO");
+  }
+
+  async function adminDeny(id){
+    if(!currentUser || currentUser.role !== "admin") return;
+    if(DEMO){
+      const all = lsGet(LS_CLAIMS_KEY, []);
+      const c = all.find(x => x.id === id);
+      if(c) c.status = "denied";
+      lsSet(LS_CLAIMS_KEY, all);
+      await loadMyClaims_demo();
+      openModal("adminClaims");
+      showToast("Denied.", "OK");
+      return;
+    }
+    showToast("Local admin UI needs backend /claims/pending wired. (Say: 'wire local admin ui')", "INFO");
+  }
+
+  /**********************
+   * LOGOUT
+   **********************/
   async function logout(){
-    if(IS_GH_PAGES){
-      localStorage.removeItem(LS_USER_KEY);
-      currentUser = null;
-      myClaims = [];
-      renderAuthPill();
-      alert("(Demo) Logged out.");
+    try{
+      if(DEMO){
+        lsSet(LS_AUTH_KEY, null);
+        currentUser = null;
+        myClaims = [];
+      }else{
+        await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
+        currentUser = null;
+        myClaims = [];
+      }
+      renderAuthPill(); renderAdminBtn();
+      showToast("Logged out.", "OK");
       if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-      return;
+    }catch{
+      showToast("Logout failed.", "ERROR");
     }
-    await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
-    currentUser = null;
-    myClaims = [];
-    renderAuthPill();
-    alert("Logged out.");
-    if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
   }
 
+  /**********************
+   * EXPORT / RESET
+   **********************/
   function exportData(){
     const payload = JSON.stringify(db, null, 2);
     const blob = new Blob([payload], { type:"application/json" });
@@ -1172,12 +1734,23 @@
   }
 
   async function resetAllData(){
-    if(!confirm("This will erase all landlords/reviews in your current storage. Continue?")) return;
+    const ok = confirm("This will erase all landlords/reviews in your local data for this browser. Continue?");
+    if(!ok) return;
     db = { version: 1, landlords: [], reports: [] };
-    await saveDB();
+    if(DEMO){
+      lsSet(LS_DB_KEY, db);
+      lsSet(LS_CLAIMS_KEY, []);
+      lsSet(LS_RESP_KEY, {});
+    }else{
+      await saveDB().catch(()=>{});
+    }
     goHome();
+    showToast("Reset complete.", "OK");
   }
 
+  /**********************
+   * MODAL CLOSE HELPERS
+   **********************/
   document.getElementById("modalBackdrop").addEventListener("click", (e)=>{
     if(e.target.id === "modalBackdrop") closeModal();
   });
@@ -1185,16 +1758,20 @@
     if(e.key === "Escape") closeModal();
   });
 
-  // ===== Init =====
+  /**********************
+   * INIT
+   **********************/
   (async function init(){
-    try{
-      await loadMe().catch(()=>{});
-      await loadMyClaims().catch(()=>{});
-      await loadDB();
-      renderHome();
-    }catch(err){
-      alert(err.message);
+    renderModePill();
+    // If on GitHub Pages, do NOT show scary “failed to fetch” popups
+    if(DEMO){
+      demoEnsure();
+      await syncNow();
+      showToast("Demo mode: data saves in this browser.", "INFO");
+      return;
     }
+    // Local dev
+    await syncNow();
   })();
 </script>
 </body>
