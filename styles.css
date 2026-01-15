@@ -781,3 +781,73 @@ textarea{ resize: vertical; min-height: 90px; }
   .filtersRow{ grid-template-columns: 1fr; }
   .breakGrid{ grid-template-columns: 1fr; }
 }
+/* === Emoji → translucent hover bubbles === */
+.bubbleIcon{
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(35,24,16,.14);
+  background: rgba(255,249,240,.55);
+  box-shadow: 0 10px 22px rgba(35,24,16,.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: .62;
+  transition: opacity .12s ease, transform .12s ease, box-shadow .12s ease;
+  position: relative;
+  flex: 0 0 auto;
+}
+.bubbleIcon:hover{
+  opacity: .92;
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(35,24,16,.10);
+}
+
+/* tiny glyph inside bubble (no emojis) */
+.bubbleIcon::after{
+  content:"";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(35,24,16,.28);
+}
+
+/* Tooltip */
+.bubbleIcon[data-tip]::before{
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(255,249,240,.98);
+  border: 1px solid rgba(35,24,16,.12);
+  box-shadow: var(--shadow2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(35,24,16,.82);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease;
+}
+.bubbleIcon[data-tip]:hover::before{
+  opacity: 1;
+}
+
+/* Make stars ALWAYS horizontal */
+.stars, .starStars{
+  display:flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.star{
+  width: 18px;
+  height: 18px;
+  display:block;
+}
+
+/* If any star block is accidentally stacking, force it */
+.stars > *{ display:block; }
