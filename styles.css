@@ -611,3 +611,173 @@ textarea{ resize: vertical; min-height: 90px; }
   .btn{ padding: 10px 12px; }
   .split2{ grid-template-columns: 1fr; }
 }
+/* =========================================================
+   CASA app.js compatibility patch
+   Add to END of your existing style.css
+========================================================= */
+
+/* App.js sometimes uses .stars (you have .starStars) */
+.stars{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+/* Home "try it" mini input */
+.miniInput{
+  width: 100%;
+  min-width: 240px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border:1px solid rgba(35,24,16,.12);
+  outline:none;
+  font-size: 14px;
+  background: rgba(255,249,240,.95);
+  color: var(--ink);
+}
+.miniInput:focus{
+  box-shadow: var(--focus);
+  border-color: rgba(35,24,16,.20);
+}
+
+/* Expandable instruction cards used by app.js */
+.stepsGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.expandCard{
+  border:1px solid rgba(35,24,16,.10);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255,249,240,.94);
+  box-shadow: 0 10px 22px rgba(35,24,16,.06);
+  cursor:pointer;
+  user-select:none;
+  transition: transform .10s ease, box-shadow .10s ease;
+}
+.expandCard:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(35,24,16,.10);
+}
+.expandBody{
+  margin-top: 10px;
+  color: rgba(35,24,16,.74);
+  font-weight: 850;
+  font-size: 13px;
+  line-height: 1.38;
+  display:none;
+}
+.expandCard.open .expandBody{
+  display:block;
+}
+
+/* Optional subtle tints for the 3 cards */
+.tint1{ background: rgba(255,249,240,.94); }
+.tint2{ background: rgba(255,249,240,.94); }
+.tint3{ background: rgba(255,249,240,.94); }
+
+/* Trust pills used by app.js (you have miniTrust; this bridges it) */
+.trustPill{
+  border:1px solid rgba(35,24,16,.10);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(243,235,221,.45);
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* Search page top bar (app.js uses these) */
+.searchTop{
+  margin-top: 6px;
+}
+.searchTop__bar{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255,249,240,.95);
+  border:1px solid rgba(35,24,16,.12);
+  box-shadow: 0 10px 30px rgba(35,24,16,.06);
+}
+.searchTop__bar input{
+  border:none;
+  outline:none;
+  width:100%;
+  font-size: 15px;
+  background: transparent;
+  color: var(--ink);
+}
+
+/* Filters row used on search page */
+.filtersRow{
+  margin-top: 12px;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+/* Rating breakdown grid on landlord profile */
+.breakGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Rating button group (Write Review page) */
+.ratingPick{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+}
+.starBtn{
+  border:1px solid rgba(35,24,16,.12);
+  background: rgba(255,249,240,.95);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight: 950;
+  box-shadow: 0 10px 22px rgba(35,24,16,.06);
+}
+.starBtn:hover{
+  box-shadow: 0 18px 40px rgba(35,24,16,.10);
+  transform: translateY(-1px);
+}
+.starBtn.selected{
+  border-color: rgba(35,24,16,.22);
+  box-shadow: 0 18px 45px rgba(35,24,16,.12);
+}
+.ratingValue{
+  font-size: 12.5px;
+  color: rgba(35,24,16,.82);
+  font-weight: 1000;
+}
+
+/* Make disabled buttons look disabled (Landlord Portal uses this) */
+.btn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* App.js uses this sometimes */
+.btn--outline:hover{
+  box-shadow: 0 10px 22px rgba(35,24,16,.08);
+}
+
+/* Ensure footer card in renderFooter doesn't look odd */
+.footer .card{
+  box-shadow:none;
+}
+
+/* Responsive tweaks for new grids */
+@media (max-width: 980px){
+  .stepsGrid{ grid-template-columns: 1fr; }
+  .filtersRow{ grid-template-columns: 1fr; }
+  .breakGrid{ grid-template-columns: 1fr; }
+}
