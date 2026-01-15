@@ -3,16 +3,526 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CASA</title>
+  <title>CASA — Landlord lookup + reviews</title>
 
-  <!-- IMPORTANT: project pages must use relative paths -->
+  <!-- IMPORTANT: your file is styles.css (plural) -->
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
-  <div id="app"></div>
+  <!-- NAV -->
+  <header class="nav">
+    <div class="wrap nav__inner">
+      <a class="brand" href="#/">
+        <div class="brand__mark" aria-hidden="true">
+          <!-- simple wave mark -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 15c3-4 7-4 10 0s7 4 10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4 10c3-4 7-4 10 0s7 4 10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+            <path d="M4 5c3-4 7-4 10 0s7 4 10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+          </svg>
+        </div>
+        <div class="brand__text">
+          <!-- lowercase logo -->
+          <div class="brand__name">casa</div>
+          <div class="brand__tag">landlord lookup + reviews</div>
+        </div>
+      </a>
 
-  <!-- IMPORTANT: must be relative -->
-  <script src="./app.js" defer></script>
+      <nav class="nav__center" aria-label="Primary">
+        <a class="nav__link" href="#/search">Search</a>
+        <a class="nav__link" href="#/add">Add Landlord</a>
+        <a class="nav__link" href="#/how">How It Works</a>
+        <a class="nav__link" href="#/trust">Trust & Safety</a>
+      </nav>
+
+      <div class="nav__right">
+        <button class="btn btn--outline nav__hamburger" id="hamburgerBtn" aria-label="Open menu">
+          Menu
+        </button>
+        <button class="btn btn--ghost" id="portalBtn">
+          Landlord Portal
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile drawer -->
+    <div class="navDrawer" id="navDrawer">
+      <div class="navDrawer__inner">
+        <a class="navDrawer__link" href="#/search">Search</a>
+        <a class="navDrawer__link" href="#/add">Add Landlord</a>
+        <a class="navDrawer__link" href="#/how">How It Works</a>
+        <a class="navDrawer__link" href="#/trust">Trust & Safety</a>
+        <div class="navDrawer__sep"></div>
+        <button class="btn btn--primary btn--block" id="portalBtn2">Landlord Portal</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="section">
+    <div class="wrap">
+      <!-- HERO -->
+      <section class="card">
+        <div class="pad hero">
+          <div>
+            <div class="kicker">CASA</div>
+            <h1>Know your landlord<br/>before you sign.</h1>
+            <p class="lead">
+              Search landlords, read tenant reviews, and add your building in minutes.
+            </p>
+          </div>
+
+          <div class="heroSearch">
+            <div class="heroSearch__bar">
+              <span class="tiny" aria-hidden="true">🔎</span>
+              <input id="searchInput" placeholder="Search landlord name, management company, or address..." autocomplete="off" />
+              <div class="suggest" id="suggestBox"></div>
+            </div>
+            <button class="btn btn--primary" id="searchBtn">Search</button>
+            <button class="btn btn--outline" id="addBtn">Add a landlord</button>
+          </div>
+
+          <div class="trustLine">
+            No account required to review. Verified landlords can respond.
+          </div>
+
+          <!-- HOW IT WORKS bubbles (NO emojis) -->
+          <div class="cards3" style="margin-top: 14px;">
+            <div class="xCard" data-acc="1">
+              <div class="xCard__top">
+                <div class="xCard__title">
+                  <span class="xCard__icon">1</span>
+                  Look Up
+                </div>
+                <span class="badge">Tap</span>
+              </div>
+              <div class="xCard__body">
+                Search by name, entity, or address.
+                <div class="tiny" style="margin-top:8px;">Examples: “ABC Management”, “123 Main St”, “John Doe”</div>
+              </div>
+            </div>
+
+            <div class="xCard" data-acc="2">
+              <div class="xCard__top">
+                <div class="xCard__title">
+                  <span class="xCard__icon">2</span>
+                  Review
+                </div>
+                <span class="badge">Tap</span>
+              </div>
+              <div class="xCard__body">
+                Write what happened. No sign-up required. You’ll get an edit link after posting.
+              </div>
+            </div>
+
+            <div class="xCard" data-acc="3">
+              <div class="xCard__top">
+                <div class="xCard__title">
+                  <span class="xCard__icon">3</span>
+                  Improve
+                </div>
+                <span class="badge badge--verified">Verified responses</span>
+              </div>
+              <div class="xCard__body">
+                Verified landlords can respond publicly. Reports help keep listings accurate.
+              </div>
+            </div>
+          </div>
+
+          <!-- Trust bullets = translucent hover chips -->
+          <div class="trustRow">
+            <div class="miniTrust">
+              <div class="miniTrust__t">
+                <span class="tipBubble" tabindex="0" data-tip="Tenants can post, edit landlord pages, and submit reviews without accounts.">
+                  No login required
+                </span>
+              </div>
+              <div class="miniTrust__b">Post instantly — you’ll receive an edit link.</div>
+            </div>
+
+            <div class="miniTrust">
+              <div class="miniTrust__t">
+                <span class="tipBubble" tabindex="0" data-tip="Only landlords can create accounts. Verification is required to respond to reviews.">
+                  Verified landlord responses
+                </span>
+              </div>
+              <div class="miniTrust__b">Accountability through identity checks.</div>
+            </div>
+
+            <div class="miniTrust">
+              <div class="miniTrust__t">
+                <span class="tipBubble" tabindex="0" data-tip="Report harassment, spam, personal info, or inaccurate listings for review.">
+                  Moderation tools
+                </span>
+              </div>
+              <div class="miniTrust__b">Safer, cleaner reviews.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTENT GRID -->
+      <section class="grid">
+        <!-- LEFT -->
+        <div class="card">
+          <div class="hd">
+            <div>
+              <div class="kicker">Featured Reviews</div>
+              <h2>Recent highlights</h2>
+              <div class="muted">Browse ratings and landlord profiles.</div>
+            </div>
+
+            <button class="btn btn--outline" id="browseBtn">Browse all</button>
+          </div>
+
+          <div class="bd">
+            <div class="featuredGrid" id="featuredGrid">
+              <!-- populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <aside class="card side">
+          <div class="kicker">Quick Actions</div>
+          <h2 style="margin-top:6px;">Start here</h2>
+          <div class="box" style="margin-top: 10px;">
+            <div class="tiny" style="margin-bottom:10px;">
+              Search a landlord or add a missing profile.
+            </div>
+            <button class="btn btn--primary btn--block" id="findLandlordBtn">Find a landlord</button>
+            <div style="height:10px;"></div>
+            <button class="btn btn--outline btn--block" id="addLandlordBtn2">Add a landlord</button>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <div class="kicker">Landlord Portal</div>
+            <div class="tiny" style="margin-top:6px;">
+              Landlords must verify identity before responding.
+            </div>
+            <button class="btn btn--ghost btn--block" id="portalBtn3" style="margin-top:10px;">
+              Open portal
+            </button>
+          </div>
+        </aside>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="wrap footer">
+        <div class="tiny">© <span id="year"></span> casa</div>
+        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+          <a href="#/trust">Trust & Safety</a>
+          <a href="#/how">How it works</a>
+          <a href="#/search">Search</a>
+        </div>
+      </footer>
+    </div>
+  </main>
+
+  <!-- MODAL: Landlord Portal -->
+  <div class="modalBackdrop" id="portalModal" role="dialog" aria-modal="true" aria-label="Landlord Portal">
+    <div class="modal">
+      <div class="modal__head">
+        <div>
+          <div class="kicker">Landlord Portal</div>
+          <div class="modal__title">Sign in or create an account</div>
+        </div>
+        <button class="btn btn--ghost" id="closePortal">✕</button>
+      </div>
+
+      <div class="modal__body">
+        <div class="split2">
+          <!-- SIGN IN -->
+          <div class="card" style="box-shadow:none;">
+            <div class="pad">
+              <div class="kicker">Sign in</div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Email</label>
+                <input id="loginEmail" type="email" placeholder="you@company.com" />
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Password</label>
+                <input id="loginPass" type="password" placeholder="••••••••" />
+              </div>
+
+              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="loginBtn">
+                Sign in
+              </button>
+
+              <div class="tiny" style="margin:12px 0 10px; text-align:center;">
+                or continue with
+              </div>
+
+              <!-- SSO buttons -->
+              <button class="btn btn--outline btn--block" id="googleBtn">
+                Continue with Google
+              </button>
+              <div style="height:8px;"></div>
+              <button class="btn btn--outline btn--block" id="appleBtn">
+                Continue with Apple
+              </button>
+              <div style="height:8px;"></div>
+              <button class="btn btn--outline btn--block" id="microsoftBtn">
+                Continue with Microsoft
+              </button>
+            </div>
+          </div>
+
+          <!-- CREATE -->
+          <div class="card" style="box-shadow:none;">
+            <div class="pad">
+              <div class="kicker">Create account</div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Email</label>
+                <input id="signupEmail" type="email" placeholder="you@company.com" />
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Password</label>
+                <input id="signupPass" type="password" placeholder="Create a strong password" />
+              </div>
+
+              <div class="field" style="margin-top:10px;">
+                <label>Verification document</label>
+                <input id="verifyDoc" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+                <div class="tiny" style="margin-top:6px;">
+                  Upload proof you manage/own the property (lease header, LLC registration, or management agreement).
+                </div>
+              </div>
+
+              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signupBtn">
+                Create account
+              </button>
+
+              <div class="tiny" style="margin-top:10px;">
+                Your account will be marked as <strong>Pending Verification</strong> until reviewed.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__foot">
+        <button class="btn btn--ghost" id="portalHelp">How verification works</button>
+        <button class="btn btn--outline" id="closePortal2">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Inline JS (no framework needed) -->
+  <script>
+    // ---------- Helpers ----------
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    function toast(msg){
+      const el = $("#toast");
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => el.style.display = "none", 2600);
+    }
+
+    // ---------- Mobile drawer ----------
+    const drawer = $("#navDrawer");
+    $("#hamburgerBtn")?.addEventListener("click", () => {
+      drawer.classList.toggle("open");
+    });
+
+    // ---------- Accordions ----------
+    $$(".xCard").forEach(card => {
+      card.addEventListener("click", () => {
+        card.classList.toggle("open");
+      });
+    });
+
+    // ---------- Featured reviews (demo data) ----------
+    const featured = [
+      {
+        name: "Northside Properties",
+        addr: "123 Main St • Williamsburg • Brooklyn, NY",
+        score: 4,
+        date: "1/5/2026",
+        text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently."
+      },
+      {
+        name: "Park Ave Management",
+        addr: "22 Park Ave • Manhattan • New York, NY",
+        score: 3,
+        date: "12/18/2025",
+        text: "Great location, but communication was slow. Security deposit itemization took weeks."
+      },
+      {
+        name: "Seaside Rentals",
+        addr: "8 Ocean Dr • Miami Beach • Miami, FL",
+        score: 5,
+        date: "11/30/2025",
+        text: "Extremely responsive. Clean building. Transparent lease terms and fast repairs."
+      }
+    ];
+
+    function starRow(score){
+      // Horizontal stars (fixing your vertical problem)
+      let html = '<div class="starRow"><div class="starStars">';
+      for(let i=1;i<=5;i++){
+        const on = i <= score;
+        html += `
+          <svg class="star" viewBox="0 0 24 24" fill="${on ? "var(--starOn)" : "var(--starOff)"}" aria-hidden="true">
+            <path d="M12 17.3l-6.18 3.6 1.64-7.03L2 9.24l7.19-.62L12 2l2.81 6.62 7.19.62-5.46 4.63 1.64 7.03z"/>
+          </svg>
+        `;
+      }
+      html += `</div><div class="scoreText">${score}/5</div></div>`;
+      return html;
+    }
+
+    function renderFeatured(){
+      const grid = $("#featuredGrid");
+      grid.innerHTML = "";
+      featured.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "smallCard";
+        div.innerHTML = `
+          <div class="smallCard__top">
+            <div>
+              <div class="smallCard__name">${item.name}</div>
+              <div class="smallCard__addr">${item.addr}</div>
+            </div>
+            <div class="smallCard__time">${item.date}</div>
+          </div>
+          ${starRow(item.score)}
+          <div class="smallCard__text">${item.text}</div>
+          <div class="smallCard__foot">
+            <span class="tiny">Verified landlord response eligible</span>
+            <button class="btn btn--outline" data-view>View</button>
+          </div>
+        `;
+        div.querySelector("[data-view]").addEventListener("click", () => {
+          toast("Demo: open landlord profile (wire this to your router)");
+        });
+        grid.appendChild(div);
+      });
+    }
+    renderFeatured();
+
+    // ---------- Search suggestions (demo only) ----------
+    const suggestions = [
+      "ABC Management",
+      "123 Main St",
+      "John Doe",
+      "Park Ave Management",
+      "Northside Properties"
+    ];
+
+    const searchInput = $("#searchInput");
+    const suggestBox = $("#suggestBox");
+
+    function openSuggest(){
+      suggestBox.classList.add("open");
+    }
+    function closeSuggest(){
+      suggestBox.classList.remove("open");
+    }
+
+    function renderSuggest(q){
+      const query = (q || "").trim().toLowerCase();
+      const matches = suggestions
+        .filter(s => s.toLowerCase().includes(query))
+        .slice(0, 6);
+
+      suggestBox.innerHTML = "";
+      if(matches.length === 0){
+        closeSuggest();
+        return;
+      }
+
+      matches.forEach(text => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = text;
+        btn.addEventListener("click", () => {
+          searchInput.value = text;
+          closeSuggest();
+          toast("Searching: " + text);
+        });
+        suggestBox.appendChild(btn);
+      });
+
+      openSuggest();
+    }
+
+    searchInput?.addEventListener("input", (e) => renderSuggest(e.target.value));
+    searchInput?.addEventListener("focus", () => renderSuggest(searchInput.value));
+    document.addEventListener("click", (e) => {
+      if(!suggestBox.contains(e.target) && e.target !== searchInput){
+        closeSuggest();
+      }
+    });
+
+    // ---------- CTA buttons ----------
+    $("#searchBtn")?.addEventListener("click", () => toast("Search (wire to /search)"));
+    $("#addBtn")?.addEventListener("click", () => toast("Add landlord (wire to /add)"));
+    $("#browseBtn")?.addEventListener("click", () => toast("Browse all (wire to /search)"));
+    $("#findLandlordBtn")?.addEventListener("click", () => toast("Go to search"));
+    $("#addLandlordBtn2")?.addEventListener("click", () => toast("Go to add landlord"));
+
+    // ---------- Landlord Portal modal ----------
+    const modal = $("#portalModal");
+    function openPortal(){
+      modal.classList.add("open");
+      drawer.classList.remove("open");
+    }
+    function closePortal(){
+      modal.classList.remove("open");
+    }
+
+    ["#portalBtn", "#portalBtn2", "#portalBtn3"].forEach(id => {
+      document.querySelector(id)?.addEventListener("click", openPortal);
+    });
+
+    $("#closePortal")?.addEventListener("click", closePortal);
+    $("#closePortal2")?.addEventListener("click", closePortal);
+
+    modal?.addEventListener("click", (e) => {
+      if(e.target === modal) closePortal();
+    });
+
+    // ---------- Auth actions (simple local demo wiring) ----------
+    $("#loginBtn")?.addEventListener("click", () => {
+      const email = $("#loginEmail").value.trim();
+      const pass = $("#loginPass").value.trim();
+      if(!email || !pass) return toast("Enter email + password.");
+      toast("Signed in (demo): " + email);
+      closePortal();
+    });
+
+    $("#signupBtn")?.addEventListener("click", () => {
+      const email = $("#signupEmail").value.trim();
+      const pass = $("#signupPass").value.trim();
+      const doc = $("#verifyDoc").files?.[0];
+      if(!email || !pass) return toast("Enter email + password.");
+      if(!doc) return toast("Upload a verification document.");
+      toast("Account created (demo). Pending verification.");
+    });
+
+    // SSO UI buttons
+    $("#googleBtn")?.addEventListener("click", () => toast("Google sign-in (connect OAuth later)"));
+    $("#appleBtn")?.addEventListener("click", () => toast("Apple sign-in (connect OAuth later)"));
+    $("#microsoftBtn")?.addEventListener("click", () => toast("Microsoft sign-in (connect OAuth later)"));
+
+    $("#portalHelp")?.addEventListener("click", () => {
+      toast("Verification: upload proof of management/ownership. Admin reviews before response access.");
+    });
+
+    // ---------- Footer year ----------
+    $("#year").textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
