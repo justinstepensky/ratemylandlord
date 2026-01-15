@@ -65,10 +65,52 @@
 
   <!-- APP ROOT -->
   <main id="app"></main>
+<noscript>
+  <div class="wrap section">
+    <div class="card pad">
+      <h2>Enable JavaScript</h2>
+      <p class="muted">This site requires JavaScript to run.</p>
+    </div>
+  </div>
+</noscript>
+
+<script>
+  // Fallback: if app.js fails, show a basic homepage instead of blank
+  window.addEventListener("load", () => {
+    const app = document.getElementById("app");
+    if (!app) return;
+    // if app.js didn't render anything within a tick, show fallback
+    setTimeout(() => {
+      if (app.innerHTML.trim().length > 0) return;
+      app.innerHTML = `
+        <section class="section">
+          <div class="wrap">
+            <div class="card pad">
+              <div class="kicker">casa</div>
+              <h1 style="margin-top:8px;">Know your landlord<br/>before you sign.</h1>
+              <p class="lead">Search landlords, read tenant reviews, and add your building in minutes.</p>
+
+              <div class="heroSearch">
+                <div class="heroSearch__bar">
+                  <input placeholder="Search landlord name, management company, or address..." />
+                </div>
+                <a class="btn btn--primary" href="#/search">Search</a>
+                <a class="btn btn--outline" href="#/add">Add a landlord</a>
+              </div>
+
+              <div class="trustLine" style="margin-top:10px;">
+                No account required to review. Verified landlords can respond.
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    }, 50);
+  });
+</script>
 
   <!-- JS -->
-  <script src="./app.js"></script>
-
+  <script src="./app.js" defer></script>
   <script>
     // mobile drawer toggle
     const btn = document.getElementById("hamburgerBtn");
