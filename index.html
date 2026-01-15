@@ -2,71 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#F6F0E6" />
-  <title>casa</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CASA</title>
+
+  <!-- IMPORTANT: project pages must use relative paths -->
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
-  <header class="nav" role="banner">
-    <div class="wrap nav__inner">
-      <a class="brand" href="#/" aria-label="casa home">
-        <div class="brand__mark" aria-hidden="true">
-          <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
-            <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
-            <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
-            <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
-            <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
-          </svg>
-        </div>
-        <div class="brand__text">
-          <div class="brand__name">casa</div>
-          <div class="brand__tag">landlord lookup + reviews</div>
-        </div>
-      </a>
+  <div id="app"></div>
 
-      <nav class="nav__center" aria-label="Primary">
-        <a class="nav__link" href="#/search">Search</a>
-        <a class="nav__link" href="#/add-landlord">Add Landlord</a>
-        <a class="nav__link" href="#/how-it-works">How It Works</a>
-        <a class="nav__link" href="#/trust-safety">Trust & Safety</a>
-      </nav>
-
-      <div class="nav__right">
-        <a class="btn btn--outline" href="#/landlord-portal">Landlord Portal</a>
-        <button class="btn btn--ghost nav__hamburger" id="hamburgerBtn" aria-expanded="false">Menu</button>
-      </div>
-    </div>
-
-    <div class="navDrawer" id="navDrawer" aria-hidden="true">
-      <div class="wrap navDrawer__inner">
-        <a class="navDrawer__link" href="#/search">Search</a>
-        <a class="navDrawer__link" href="#/add-landlord">Add Landlord</a>
-        <a class="navDrawer__link" href="#/how-it-works">How It Works</a>
-        <a class="navDrawer__link" href="#/trust-safety">Trust & Safety</a>
-        <div class="navDrawer__sep"></div>
-        <a class="navDrawer__link" href="#/landlord-portal">Landlord Portal</a>
-      </div>
-    </div>
-  </header>
-
-  <main class="wrap" id="app" role="main"></main>
-
-  <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
-
-  <div class="modalBackdrop" id="modalBackdrop" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal__head">
-        <div class="modal__title" id="modalTitle">—</div>
-        <button class="btn btn--ghost" id="modalCloseBtn" aria-label="Close">✕</button>
-      </div>
-      <div class="modal__body" id="modalBody"></div>
-      <div class="modal__foot" id="modalFoot"></div>
-    </div>
-  </div>
-
-  <script src="./app.js"></script>
+  <!-- IMPORTANT: must be relative -->
+  <script src="./app.js" defer></script>
 </body>
 </html>
