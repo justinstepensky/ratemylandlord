@@ -450,8 +450,111 @@
   </div>
 
 <script>
-  const API_BASE = "http://localhost:8787";
-  const API_DB = `${API_BASE}/db`;
+ // ===== Mode detection =====
+const IS_GH_PAGES = location.hostname.endsWith("github.io");
+
+// Local dev backend (works when you run node server.js)
+const DEV_API_BASE = "http://localhost:8787";
+
+// If GH Pages: no backend, use LocalStorage
+const API_BASE = IS_GH_PAGES ? null : DEV_API_BASE;
+const API_DB   = IS_GH_PAGES ? null : `${DEV_API_BASE}/db`;
+
+const LS_DB_KEY = "rml_db_v1";
+const LS_USER_KEY = "rml_user_v1";
+
+// ===== LocalStorage DB helpers (GH Pages demo mode) =====
+function readLocalDB(){
+  try{
+    const raw = localStorage.getItem(LS_DB_KEY);
+    if(!raw) return { version: 1, landlords: [], reports: [] };
+    const parsed = JSON.parse(raw);
+    parsed.version = parsed.version || 1;
+    parsed.landlords = parsed.landlords || [];
+    parsed.reports = parsed.reports || [];
+    return parsed;
+  }catch{
+    return { version: 1, landlords: [], reports: [] };
+  }
+}
+function writeLocalDB(next){
+  localStorage.setItem(LS_DB_KEY, JSON.stringify(next));
+}
+
+// ===== Data in memory =====
+let db = { version: 1, landlords: [], reports: [] };
+
+// ===== User session in memory =====
+let currentUser = null;
+let myClaims = []; // demo mode: empty
+
+// ===== Backend I/O (with GH Pages fallback) =====
+async function loadDB(){
+  if(IS_GH_PAGES){
+    db = readLocalDB();
+    return;
+  }
+  const res = await fetch(API_DB, { credentials: "include" });
+  if(!res.ok) throw new Error("Backend not reachable. Is node server.js running?");
+  db = await res.json();
+  db.version = db.version || 1;
+  db.landlords = db.landlords || [];
+  db.reports = db.reports || [];
+}
+
+async function saveDB(){
+  if(IS_GH_PAGES){
+    writeLocalDB(db);
+    return;
+  }
+  const res = await fetch(API_DB, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(db)
+  });
+  if(!res.ok){
+    const data = await res.json().catch(()=> ({}));
+    throw new Error(data.error || "Failed to save to backend");
+  }
+}
+
+async function loadMe(){
+  if(IS_GH_PAGES){
+    try{
+      currentUser = JSON.parse(localStorage.getItem(LS_USER_KEY) || "null");
+    }catch{
+      currentUser = null;
+    }
+    renderAuthPill();
+    return;
+  }
+  const r = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+  const data = await r.json().catch(()=> ({}));
+  currentUser = data.user || null;
+  renderAuthPill();
+}
+
+async function loadMyClaims(){
+  myClaims = [];
+  if(!currentUser) return;
+  if(IS_GH_PAGES) return; // no backend claims in demo mode
+  const r = await fetch(`${API_BASE}/claims/mine`, { credentials: "include" });
+  const data = await r.json().catch(()=> ({}));
+  if(r.ok && Array.isArray(data.claims)) myClaims = data.claims;
+}
+
+async function syncNow(){
+  await loadMe().catch(()=>{});
+  await loadMyClaims().catch(()=>{});
+  await loadDB();
+  if(state.view === "profile" && state.selectedLandlordId){
+    openProfile(state.selectedLandlordId);
+  }else{
+    renderHome();
+  }
+}
+
 
   let db = { version: 1, landlords: [], reports: [] };
   let currentUser = null;
@@ -997,37 +1100,53 @@
   async function handleModalSubmit(){
     const t = currentModal.type;
 
-    if(t === "auth"){
-      const email = (document.getElementById("m_auth_email").value || "").trim();
-      const password = (document.getElementById("m_auth_pw").value || "").trim();
-      const role = document.getElementById("m_auth_role").value;
-      if(!email || !password) return alert("Enter email + password.");
+if(t === "auth"){
+  const email = (document.getElementById("m_auth_email").value || "").trim();
+  const password = (document.getElementById("m_auth_pw").value || "").trim();
+  const role = document.getElementById("m_auth_role").value;
 
-      let r = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
+  if(!email || !password) return alert("Enter email + password.");
 
-      if(!r.ok){
-        r = await fetch(`${API_BASE}/auth/signup`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, role })
-        });
-      }
+  // GH Pages demo mode: fake login stored in LocalStorage
+  if(IS_GH_PAGES){
+    currentUser = { id: "demo", email, role };
+    localStorage.setItem(LS_USER_KEY, JSON.stringify(currentUser));
+    myClaims = [];
+    renderAuthPill();
+    closeModal();
+    alert(`(Demo) Logged in as ${currentUser.email} (${currentUser.role})`);
+    if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
+    return;
+  }
 
-      const data = await r.json().catch(()=> ({}));
-      if(!r.ok) return alert(data.error || "Auth failed");
+  // Local dev (real backend)
+  let r = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
 
-      currentUser = data.user || null;
-      await loadMyClaims().catch(()=>{});
-      renderAuthPill();
-      closeModal();
-      alert(`Logged in as ${currentUser.email} (${currentUser.role})`);
-      await syncNow();
-      return;
-    }
+  if(!r.ok){
+    r = await fetch(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, role })
+    });
+  }
+
+  const data = await r.json().catch(()=> ({}));
+  if(!r.ok) return alert(data.error || "Auth failed");
+
+  currentUser = data.user || null;
+  await loadMyClaims().catch(()=>{});
+  renderAuthPill();
+  closeModal();
+  alert(`Logged in as ${currentUser.email} (${currentUser.role})`);
+  if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
+  return;
+}
 
     if(t === "moveOutLink"){
       const landlordId = (document.getElementById("m_mo_landlord").value || "").trim();
@@ -1206,14 +1325,26 @@
     URL.revokeObjectURL(url);
   }
 
-  async function logout(){
-    await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
+async function logout(){
+  if(IS_GH_PAGES){
+    localStorage.removeItem(LS_USER_KEY);
     currentUser = null;
     myClaims = [];
     renderAuthPill();
-    alert("Logged out.");
-    await syncNow();
+    alert("(Demo) Logged out.");
+    if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
+    return;
   }
+
+  await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
+  currentUser = null;
+  myClaims = [];
+  renderAuthPill();
+  alert("Logged out.");
+  if(state.view === "profile" && state.selectedLandlordId){
+    openProfile(state.selectedLandlordId);
+  }
+}
 
   function exportData(){
     const payload = JSON.stringify(db, null, 2);
