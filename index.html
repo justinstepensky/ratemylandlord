@@ -4,20 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>casa — landlord lookup + reviews</title>
-
-  <!-- IMPORTANT: your file is styles.css (NOT style.css) -->
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
-
-  <!-- NAV -->
   <header class="nav" role="banner">
     <div class="wrap nav__inner">
-
-      <!-- ✅ YOUR ORIGINAL LOGO (UNCHANGED) -->
       <a class="brand" href="#/" aria-label="casa home">
         <div class="brand__mark" aria-hidden="true">
+          <!-- YOUR ORIGINAL LOGO -->
           <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
             <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
@@ -32,7 +27,6 @@
         </div>
       </a>
 
-      <!-- DESKTOP NAV -->
       <nav class="nav__center" aria-label="Primary">
         <a class="nav__link" href="#/search">Search</a>
         <a class="nav__link" href="#/add">Add Landlord</a>
@@ -40,18 +34,13 @@
         <a class="nav__link" href="#/trust">Trust & Safety</a>
       </nav>
 
-      <!-- RIGHT NAV -->
       <div class="nav__right">
         <a class="btn btn--outline" href="#/portal">Landlord Portal</a>
-
-        <button class="btn btn--ghost nav__hamburger" id="hamburgerBtn" aria-label="Open menu">
-          Menu
-        </button>
+        <button class="btn btn--ghost nav__hamburger" id="hamburgerBtn">Menu</button>
       </div>
     </div>
 
-    <!-- MOBILE DRAWER -->
-    <div class="navDrawer" id="navDrawer" aria-hidden="true">
+    <div class="navDrawer" id="navDrawer">
       <div class="navDrawer__inner">
         <a class="navDrawer__link" href="#/search">Search</a>
         <a class="navDrawer__link" href="#/add">Add Landlord</a>
@@ -63,63 +52,15 @@
     </div>
   </header>
 
-  <!-- APP ROOT -->
   <main id="app"></main>
-<noscript>
-  <div class="wrap section">
-    <div class="card pad">
-      <h2>Enable JavaScript</h2>
-      <p class="muted">This site requires JavaScript to run.</p>
-    </div>
-  </div>
-</noscript>
 
-<script>
-  // Fallback: if app.js fails, show a basic homepage instead of blank
-  window.addEventListener("load", () => {
-    const app = document.getElementById("app");
-    if (!app) return;
-    // if app.js didn't render anything within a tick, show fallback
-    setTimeout(() => {
-      if (app.innerHTML.trim().length > 0) return;
-      app.innerHTML = `
-        <section class="section">
-          <div class="wrap">
-            <div class="card pad">
-              <div class="kicker">casa</div>
-              <h1 style="margin-top:8px;">Know your landlord<br/>before you sign.</h1>
-              <p class="lead">Search landlords, read tenant reviews, and add your building in minutes.</p>
-
-              <div class="heroSearch">
-                <div class="heroSearch__bar">
-                  <input placeholder="Search landlord name, management company, or address..." />
-                </div>
-                <a class="btn btn--primary" href="#/search">Search</a>
-                <a class="btn btn--outline" href="#/add">Add a landlord</a>
-              </div>
-
-              <div class="trustLine" style="margin-top:10px;">
-                No account required to review. Verified landlords can respond.
-              </div>
-            </div>
-          </div>
-        </section>
-      `;
-    }, 50);
-  });
-</script>
-
-  <!-- JS -->
-  <script src="./app.js" defer></script>
   <script>
-    // mobile drawer toggle
     const btn = document.getElementById("hamburgerBtn");
     const drawer = document.getElementById("navDrawer");
-
-    btn?.addEventListener("click", () => {
-      const open = drawer.classList.toggle("open");
-      drawer.setAttribute("aria-hidden", open ? "false" : "true");
-    });
+    btn?.addEventListener("click", () => drawer.classList.toggle("open"));
+    window.addEventListener("hashchange", () => drawer?.classList.remove("open"));
   </script>
+
+  <script src="./app.js" defer></script>
 </body>
 </html>
