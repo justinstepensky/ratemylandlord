@@ -1265,17 +1265,22 @@
   }
 
   // ---------- Init ----------
-  (async function init(){
-    try{
-      await loadMe().catch(()=>{});
-      await loadMyClaims().catch(()=>{});
-      await loadDB();
-      renderHome();
-      await tryLoadTokenFromURL();
-    }catch(err){
-      alert(err.message);
-    }
-  })();
+(async function init(){
+  // Try backend sync, but if it fails (like on GitHub Pages), just run in demo mode.
+  try{
+    await loadMe().catch(()=>{});
+    await loadMyClaims().catch(()=>{});
+    await loadDB();
+  } catch (err) {
+    console.log("Backend not reachable. Running in demo mode.", err);
+
+    // Optional: show a friendly banner instead of an alert
+    alert("Demo mode: backend is offline. Reviews you add are saved only in your browser.");
+  }
+
+  renderHome();
+})();
+
 </script>
 </body>
 </html>
