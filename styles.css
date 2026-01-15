@@ -676,3 +676,37 @@ textarea{ resize: vertical; min-height: 90px; }
   .btn{ padding: 10px 12px; }
   .split2{ grid-template-columns: 1fr; }
 }
+/* app.js uses .stars */
+.stars{ display:flex; gap:6px; align-items:center; }
+/* bubble icon (if not already added) */
+.bubbleIcon{
+  width: 30px; height: 30px; border-radius: 999px;
+  border: 1px solid rgba(35,24,16,.14);
+  background: rgba(255,249,240,.55);
+  opacity:.62;
+  display:inline-flex; align-items:center; justify-content:center;
+  position:relative;
+  transition: opacity .12s ease, transform .12s ease, box-shadow .12s ease;
+}
+.bubbleIcon:hover{ opacity:.92; transform: translateY(-1px); box-shadow: 0 18px 40px rgba(35,24,16,.10); }
+.bubbleIcon::after{ content:""; width:10px; height:10px; border-radius:999px; background: rgba(35,24,16,.28); }
+.bubbleIcon[data-tip]::before{
+  content: attr(data-tip);
+  position:absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,249,240,.98);
+  border: 1px solid rgba(35,24,16,.12);
+  box-shadow: var(--shadow2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(35,24,16,.82);
+  opacity: 0;
+  pointer-events:none;
+  transition: opacity .12s ease;
+  white-space: nowrap;
+}
+.bubbleIcon[data-tip]:hover::before{ opacity:1; }
