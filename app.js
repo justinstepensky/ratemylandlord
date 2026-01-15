@@ -4,270 +4,276 @@
  - Review edit via secure edit link token
  - Landlord Portal: landlord accounts only + verification workflow
  - Verified landlords can claim + respond to reviews
- - AUTO_VERIFY toggle: add ?autoVerify=1 to URL
+ - Ratings: STARS (★★★★★) ONLY
+ - Safety: reporting + auto-hide when flagged
 *******************************************************/
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-const LS_KEY = "casa_db_v3";
+const LS_KEY = "casa_db_v4";
 const AUTO_VERIFY = new URLSearchParams(location.search).get("autoVerify") === "1";
+
+// moderation thresholds
+const REPORT_HIDE_THRESHOLD = 3;
+const DOXXING_KEYWORDS = [
+  "ssn", "social security", "passport", "driver's license", "drivers license",
+  "phone number", "email", "@gmail.com", "@yahoo.com",
+  "venmo", "cashapp", "zelle",
+  "my number is", "call me at", "text me at",
+];
 
 let db = loadDB();
 
+/* ------------------------------------------------------
+   ROUTES (NEW IA)
+------------------------------------------------------ */
 const routes = {
   "/": renderHome,
-  "/lookup": renderLookup,
-  "/landlord": renderLandlordProfile,      // expects id
+
+  // Search + core flows
+  "/search": renderSearch,
+  "/landlord": renderLandlordProfile,          // expects /landlord/:id
   "/add-landlord": renderAddLandlord,
-  "/edit-landlord": renderEditLandlord,   // expects id
-  "/review/new": renderNewReview,         // expects landlordId
-  "/review/edit": renderEditReview,       // expects token
-  "/landlord-portal": renderLandlordPortal,
-  "/guidelines": renderGuidelines,
-  "/how": renderHow,
+  "/edit-landlord": renderEditLandlord,        // expects /edit-landlord/:id
+  "/write-review": renderWriteReview,          // expects /write-review/:landlordId
+  "/edit-review": renderEditReview,            // expects /edit-review/:token
+
+  // Informational
+  "/how-it-works": renderHowItWorks,
+  "/trust-safety": renderTrustSafety,
   "/about": renderAbout,
   "/contact": renderContact,
   "/privacy": renderPrivacy,
+
+  // Landlord Portal
+  "/landlord-portal": renderLandlordPortalLanding,
+  "/landlord-portal/login": renderLandlordPortalLogin,
+  "/landlord-portal/signup": renderLandlordPortalSignup,
+  "/landlord-portal/dashboard": renderLandlordPortalDashboard,
+  "/landlord-portal/verify": renderLandlordPortalVerify,
 };
 
-initNavMenu();
-initModal();
 initRouter();
+initModal();
 seedIfEmpty();
 render();
 
-function initNavMenu(){
-  const btn = $("#menuBtn");
-  const panel = $("#menuPanel");
-
-  btn.addEventListener("click", () => {
-    const open = panel.classList.toggle("open");
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-  });
-
-  panel.addEventListener("click", (e) => {
-    const item = e.target.closest(".menu__item");
-    if(!item) return;
-    const r = item.getAttribute("data-route");
-    panel.classList.remove("open");
-    btn.setAttribute("aria-expanded", "false");
-    location.hash = r;
-  });
-
-  document.addEventListener("click", (e) => {
-    if(panel.classList.contains("open")){
-      if(!panel.contains(e.target) && !btn.contains(e.target)){
-        panel.classList.remove("open");
-        btn.setAttribute("aria-expanded","false");
-      }
-    }
-  });
+/* ------------------------------------------------------
+   UTIL
+------------------------------------------------------ */
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return { version: 4, landlords: [], reviews: [], landlordAccounts: [], reports: [] };
+    const parsed = JSON.parse(raw);
+    parsed.version = 4;
+    parsed.landlords ||= [];
+    parsed.reviews ||= [];
+    parsed.landlordAccounts ||= [];
+    parsed.reports ||= [];
+    return parsed;
+  } catch {
+    return { version: 4, landlords: [], reviews: [], landlordAccounts: [], reports: [] };
+  }
 }
-
-function initModal(){
-  $("#modalCloseBtn").addEventListener("click", closeModal);
-  $("#modalBackdrop").addEventListener("click", (e) => {
-    if(e.target.id === "modalBackdrop") closeModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if(e.key === "Escape") closeModal();
-  });
+function saveDB(next) {
+  localStorage.setItem(LS_KEY, JSON.stringify(next));
 }
-
-function openModal(title, bodyHtml, footHtml){
-  $("#modalTitle").textContent = title;
-  $("#modalBody").innerHTML = bodyHtml;
-  $("#modalFoot").innerHTML = footHtml || "";
-  $("#modalBackdrop").classList.add("open");
-  $("#modalBackdrop").setAttribute("aria-hidden","false");
-  setTimeout(() => {
-    const first = $("#modalBody").querySelector("input,textarea,select,button");
-    if(first) first.focus();
-  }, 50);
+function uuid() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  return "id-" + Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
-function closeModal(){
-  $("#modalBackdrop").classList.remove("open");
-  $("#modalBackdrop").setAttribute("aria-hidden","true");
+function token() {
+  return (crypto?.randomUUID ? crypto.randomUUID().replaceAll("-", "") : uuid().replaceAll("-", "")) + Math.random().toString(16).slice(2);
 }
-function toast(msg){
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleDateString(); } catch { return ""; }
+}
+function avg(nums) {
+  if (!nums.length) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+function fmtScore(x) {
+  if (x === null || x === undefined) return "—";
+  return (Math.round(x * 10) / 10).toFixed(1);
+}
+function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;
   t.style.display = "block";
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => t.style.display = "none", 2400);
+  window.__toastTimer = setTimeout(() => (t.style.display = "none"), 2400);
 }
 
-/* Router */
-function initRouter(){
+/* ------------------------------------------------------
+   MODAL
+------------------------------------------------------ */
+function initModal() {
+  $("#modalCloseBtn").addEventListener("click", closeModal);
+  $("#modalBackdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modalBackdrop") closeModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+}
+function openModal(title, bodyHtml, footHtml) {
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = bodyHtml;
+  $("#modalFoot").innerHTML = footHtml || "";
+  $("#modalBackdrop").classList.add("open");
+  $("#modalBackdrop").setAttribute("aria-hidden", "false");
+  setTimeout(() => {
+    const first = $("#modalBody").querySelector("input,textarea,select,button");
+    if (first) first.focus();
+  }, 50);
+}
+function closeModal() {
+  $("#modalBackdrop").classList.remove("open");
+  $("#modalBackdrop").setAttribute("aria-hidden", "true");
+}
+
+/* ------------------------------------------------------
+   ROUTER
+------------------------------------------------------ */
+function initRouter() {
   window.addEventListener("hashchange", render);
 }
-function parseHash(){
+function parseHash() {
   const h = location.hash.replace(/^#/, "") || "/";
-  // supports: /landlord?id=... or /review/edit/<token>
-  const [pathAndMaybe, rest] = h.split("/").filter(Boolean);
-  const path = h.startsWith("/review/edit/")
-    ? "/review/edit"
-    : h.startsWith("/landlord/")
-      ? "/landlord"
-      : h.startsWith("/edit-landlord/")
-        ? "/edit-landlord"
-        : h.startsWith("/review/new/")
-          ? "/review/new"
-          : (h.startsWith("/") ? h.split("?")[0] : `/${h.split("?")[0]}`);
-
   const full = h.startsWith("/") ? h : `/${h}`;
+
+  // path normalization for dynamic routes
+  const path =
+    full.startsWith("/landlord/") ? "/landlord" :
+    full.startsWith("/edit-landlord/") ? "/edit-landlord" :
+    full.startsWith("/write-review/") ? "/write-review" :
+    full.startsWith("/edit-review/") ? "/edit-review" :
+    full.split("?")[0];
+
   const qs = full.includes("?") ? full.split("?")[1] : "";
   const params = new URLSearchParams(qs);
 
-  const token = h.startsWith("/review/edit/") ? h.split("/review/edit/")[1] : null;
-  const landlordIdFromPath = h.startsWith("/landlord/") ? h.split("/landlord/")[1] : null;
-  const editLandlordIdFromPath = h.startsWith("/edit-landlord/") ? h.split("/edit-landlord/")[1] : null;
-  const reviewNewLandlordIdFromPath = h.startsWith("/review/new/") ? h.split("/review/new/")[1] : null;
+  const landlordId = full.startsWith("/landlord/") ? full.split("/landlord/")[1].split("?")[0] : null;
+  const editLandlordId = full.startsWith("/edit-landlord/") ? full.split("/edit-landlord/")[1].split("?")[0] : null;
+  const reviewNewLandlordId = full.startsWith("/write-review/") ? full.split("/write-review/")[1].split("?")[0] : null;
+  const editToken = full.startsWith("/edit-review/") ? full.split("/edit-review/")[1].split("?")[0] : null;
 
-  return {
-    path,
-    params,
-    token,
-    landlordIdFromPath,
-    editLandlordIdFromPath,
-    reviewNewLandlordIdFromPath,
-  };
+  return { path, params, landlordId, editLandlordId, reviewNewLandlordId, editToken };
 }
-
-function render(){
-  db = loadDB(); // always refresh from storage
+function render() {
+  db = loadDB();
   const { path } = parseHash();
   const fn = routes[path] || renderNotFound;
   fn();
 }
 
-/* Data model:
-db = {
-  version:3,
-  landlords: [
-    { id, name, entityName, address, neighborhood, city, buildings:[...], createdAt, updatedAt, claimedByLandlordId? }
-  ],
-  reviews: [
-    { id, landlordId, title, text, timeline, ratings:{overall,...}, createdAt, updatedAt, editToken, response?: { landlordAccountId, text, createdAt, verifiedAtLabel } }
-  ],
-  landlordAccounts: [
-    { id, fullName, email, phone, relationship, entityName, propertyAddresses:[...], uploads:[{name,type,size}], verificationStatus:"pending"|"verified", createdAt }
-  ]
-}
-*/
+/* ------------------------------------------------------
+   NAVBAR (REAL NAVBAR IN HTML/CSS)
+   - You said you already have index/styles, so:
+   - This app.js assumes those links route by hash.
+------------------------------------------------------ */
 
-function loadDB(){
-  try{
-    const raw = localStorage.getItem(LS_KEY);
-    if(!raw){
-      return { version: 3, landlords: [], reviews: [], landlordAccounts: [] };
-    }
-    const parsed = JSON.parse(raw);
-    parsed.version = 3;
-    parsed.landlords ||= [];
-    parsed.reviews ||= [];
-    parsed.landlordAccounts ||= [];
-    return parsed;
-  }catch{
-    return { version: 3, landlords: [], reviews: [], landlordAccounts: [] };
-  }
-}
-function saveDB(next){
-  localStorage.setItem(LS_KEY, JSON.stringify(next));
-}
-function uuid(){
-  if(crypto?.randomUUID) return crypto.randomUUID();
-  return "id-" + Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-function token(){
-  // compact-ish token
-  return (crypto?.randomUUID ? crypto.randomUUID().replaceAll("-","") : uuid().replaceAll("-","")) + Math.random().toString(16).slice(2);
-}
-function esc(s){
-  return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-function fmtDate(iso){
-  try{ return new Date(iso).toLocaleDateString(); }catch{ return ""; }
-}
-function avg(nums){
-  if(!nums.length) return null;
-  return nums.reduce((a,b)=>a+b,0)/nums.length;
-}
-function fmtScore(x){
-  if(x === null || x === undefined) return "—";
-  return (Math.round(x*10)/10).toFixed(1);
-}
-
-/* Lobsters (minimal outline style) */
-function lobsterSVG(on=true){
-  const stroke = on ? "var(--lobsterOn)" : "var(--lobsterOff)";
-  const fill = on ? "rgba(42,27,18,.08)" : "transparent";
+/* ------------------------------------------------------
+   RATINGS — STARS ONLY
+------------------------------------------------------ */
+function starSVG(on = true) {
+  const fill = on ? "var(--starOn, #2A1B12)" : "transparent";
+  const stroke = on ? "var(--starOn, #2A1B12)" : "rgba(42,27,18,.25)";
   return `
-    <svg class="lobster" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M15 18c-6-6-12-1-11 5 1 5 6 9 11 9" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" fill="none"/>
-      <path d="M49 18c6-6 12-1 11 5-1 5-6 9-11 9" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" fill="none"/>
-      <path d="M20 26c-6-2-10 0-12 4" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" fill="none"/>
-      <path d="M44 26c6-2 10 0 12 4" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" fill="none"/>
-      <path d="M32 18c-7 0-13 6-13 15 0 7 3 12 8 15v8c0 3 2 6 5 6s5-3 5-6v-8c5-3 8-8 8-15 0-9-6-15-13-15Z"
-            stroke="${stroke}" stroke-width="3.6" stroke-linejoin="round" fill="${fill}"/>
-      <path d="M25 38h14" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
-      <path d="M25 45h14" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" opacity=".85"/>
-      <path d="M28 52h8" stroke="${stroke}" stroke-width="3.6" stroke-linecap="round" opacity=".75"/>
+    <svg class="star" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2.5l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.9 5.8 20.8l1.6-6.8L2.2 9.4l6.9-.6L12 2.5z"
+        fill="${fill}" stroke="${stroke}" stroke-width="1.6" />
     </svg>
   `;
 }
-function lobsterStars(score){
-  if(score === null || score === undefined) return `<span class="tiny muted">No reviews</span>`;
+function starRow(score) {
+  if (score === null || score === undefined) return `<span class="tiny muted">No reviews</span>`;
   const filled = Math.round(score);
   let out = "";
-  for(let i=1;i<=5;i++) out += lobsterSVG(i<=filled);
+  for (let i = 1; i <= 5; i++) out += starSVG(i <= filled);
   return out;
 }
 
-/* Search helpers */
-function landlordHay(l){
+/* ------------------------------------------------------
+   SEARCH HELPERS
+------------------------------------------------------ */
+function landlordHay(l) {
   return [
     l.name, l.entityName, l.address, l.neighborhood, l.city,
     ...(l.buildings || [])
   ].filter(Boolean).join(" ").toLowerCase();
 }
-function addressHay(l){
-  return [
-    l.address, l.neighborhood, l.city,
-    ...(l.buildings || [])
-  ].filter(Boolean).join(" ").toLowerCase();
+function addressHay(l) {
+  return [l.address, l.neighborhood, l.city, ...(l.buildings || [])]
+    .filter(Boolean).join(" ").toLowerCase();
 }
 
-function landlordStats(landlordId){
-  const rs = db.reviews.filter(r => r.landlordId === landlordId);
-  const keys = ["overall","repairs","responsiveness","deposits","conditions","communication"];
+/* ------------------------------------------------------
+   STATS
+------------------------------------------------------ */
+const RATING_KEYS = [
+  ["responsiveness", "Responsiveness"],
+  ["repairs", "Repairs & Maintenance"],
+  ["deposits", "Deposit Fairness"],
+  ["conditions", "Building Conditions"],
+  ["respect", "Respect / Professionalism"],
+];
+
+function landlordStats(landlordId) {
+  const rs = db.reviews.filter(r => r.landlordId === landlordId && !r.hidden);
   const stats = { count: rs.length };
-  for(const k of keys){
+
+  const keys = ["overall", ...RATING_KEYS.map(([k]) => k)];
+  for (const k of keys) {
     stats[k] = avg(rs.map(r => Number(r.ratings?.[k] ?? null)).filter(v => Number.isFinite(v)));
   }
   return stats;
 }
-function tagsFromStats(stats){
+
+function tagsFromStats(stats) {
   const tags = [];
-  if(!stats.count) return ["No reviews yet"];
-  if(stats.repairs >= 4.2) tags.push("Fast repairs");
-  if(stats.responsiveness >= 4.2) tags.push("Responsive");
-  if(stats.communication >= 4.0) tags.push("Clear comms");
-  if(stats.conditions <= 2.8) tags.push("Condition issues");
-  if(stats.deposits <= 2.5) tags.push("Deposit issues");
-  if(!tags.length) tags.push("Mixed experiences");
-  return tags.slice(0,3);
+  if (!stats.count) return ["No reviews yet"];
+  if ((stats.repairs ?? 0) >= 4.2) tags.push("Fast repairs");
+  if ((stats.responsiveness ?? 0) >= 4.2) tags.push("Responsive");
+  if ((stats.deposits ?? 99) <= 2.5) tags.push("Deposit issues");
+  if ((stats.conditions ?? 99) <= 2.8) tags.push("Condition issues");
+  if (!tags.length) tags.push("Mixed experiences");
+  return tags.slice(0, 3);
 }
 
-/* Seed */
-function seedIfEmpty(){
-  if(db.landlords.length || db.reviews.length) return;
+/* ------------------------------------------------------
+   SAFETY: REPORTING + AUTO-HIDE
+------------------------------------------------------ */
+function containsDoxxing(text) {
+  const t = String(text || "").toLowerCase();
+  return DOXXING_KEYWORDS.some(k => t.includes(k));
+}
+function reviewReportCount(reviewId) {
+  return db.reports.filter(r => r.reviewId === reviewId).length;
+}
+function ensureAutoHide(review) {
+  const count = reviewReportCount(review.id);
+  if (count >= REPORT_HIDE_THRESHOLD || containsDoxxing(review.text) || containsDoxxing(review.timeline)) {
+    review.hidden = true;
+  }
+}
+
+/* ------------------------------------------------------
+   SEED
+------------------------------------------------------ */
+function seedIfEmpty() {
+  if (db.landlords.length || db.reviews.length) return;
+
   const l1 = {
     id: uuid(),
     name: "Northside Properties",
@@ -280,6 +286,7 @@ function seedIfEmpty(){
     updatedAt: new Date().toISOString(),
     claimedByLandlordId: null
   };
+
   const l2 = {
     id: uuid(),
     name: "Seaport Management",
@@ -299,276 +306,295 @@ function seedIfEmpty(){
     title: "Reliable repairs, decent communication",
     text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
     timeline: "3/2: reported leak • 3/4: plumber scheduled • 3/9: repair completed",
-    ratings: { overall: 4, repairs: 5, responsiveness: 4, deposits: 4, conditions: 3, communication: 4 },
-    createdAt: new Date(Date.now()-1000*60*60*24*10).toISOString(),
-    updatedAt: new Date(Date.now()-1000*60*60*24*10).toISOString(),
+    ratings: {
+      overall: 4,
+      responsiveness: 4,
+      repairs: 5,
+      deposits: 4,
+      conditions: 3,
+      respect: 4,
+    },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
     editToken: token(),
-    response: null
+    response: null,
+    hidden: false
   };
 
   const next = {
     ...db,
     landlords: [l1, l2],
     reviews: [r1],
+    reports: [],
   };
   saveDB(next);
   db = next;
 }
 
-/* Pages */
-
-function renderHome(){
+/* ------------------------------------------------------
+   HOME (SEARCH-FIRST)
+------------------------------------------------------ */
+function renderHome() {
   const app = $("#app");
+
+  // Featured reviews (3 newest visible)
+  const featured = db.reviews
+    .filter(r => !r.hidden)
+    .slice()
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt))
+    .slice(0, 3)
+    .map(r => ({ r, l: db.landlords.find(x => x.id === r.landlordId) }))
+    .filter(x => x.l);
+
   app.innerHTML = `
     <section class="section">
       <div class="card">
         <div class="pad">
           <div class="kicker">Casa</div>
-          <h1>Look up a landlord.<br/>Leave factual reviews.</h1>
+
+          <h1>Know your landlord<br/>before you sign.</h1>
           <p class="lead">
-            Casa is designed to feel calm and usable. No reviewer accounts required.
-            Verified landlords can respond after verification through the Landlord Portal.
+            Search landlords, read tenant reviews, and add your building in minutes.
           </p>
 
-          <!-- Dual search module (hero) -->
-          <div id="heroSearchModule" class="searchModule" aria-label="Search module">
-            <div class="searchBubble" id="bubbleLandlord">
+          <div class="heroSearch">
+            <div class="heroSearch__bar">
               <span class="tiny">⌕</span>
-              <input id="heroLandlordInput" autocomplete="off"
-                placeholder="Search by landlord (name / LLC / management company)" />
-              <div class="suggest" id="heroLandlordSuggest"></div>
+              <input id="homeSearchInput" autocomplete="off"
+                placeholder="Search landlord name, management company, or address…" />
+              <button class="btn btn--primary" id="homeSearchBtn">Search</button>
             </div>
-            <div class="searchAction">
-              <button class="btn btn--primary" id="heroLandlordBtn">Search</button>
+            <button class="btn btn--ghost" id="homeAddBtn">Add a landlord</button>
+          </div>
+
+          <div class="tiny" style="margin-top:10px;">
+            No account required to review. Verified landlords can respond.
+          </div>
+
+          <!-- Instruction cards (expandable) -->
+          <div class="stepsGrid" style="margin-top:18px;" aria-label="How to use Casa">
+            ${expandCardHTML({
+              id: "card_lookup",
+              icon: "🔎",
+              title: "Look Up",
+              sub: `Examples: “ABC Management”, “123 Main St”, “John Doe”`,
+              body: `
+                <div class="tiny">Try it now:</div>
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                  <input class="miniInput" id="tryLookup" placeholder="Type a landlord or address…" />
+                  <button class="btn btn--primary" id="tryLookupBtn">Search</button>
+                </div>
+              `
+            })}
+            ${expandCardHTML({
+              id: "card_review",
+              icon: "✍️",
+              title: "Review",
+              sub: `Write what happened — no sign-up needed.`,
+              badge: "No sign-up needed",
+              body: `
+                <ol class="tiny" style="margin-top:8px; line-height:1.55;">
+                  <li>Pick a landlord / building</li>
+                  <li>Rate categories (stars)</li>
+                  <li>Write what happened + timeline</li>
+                  <li>Submit — save edit link</li>
+                </ol>
+              `
+            })}
+            ${expandCardHTML({
+              id: "card_improve",
+              icon: "🛡️",
+              title: "Improve",
+              sub: `Accountability + verified responses.`,
+              body: `
+                <div class="tiny" style="line-height:1.55;">
+                  • Verified landlords can respond publicly<br/>
+                  • Report abusive / fake reviews<br/>
+                  • Edits welcome: add missing buildings + correct entities
+                </div>
+              `
+            })}
+          </div>
+
+          <!-- Trust Row -->
+          <div class="trustRow" style="margin-top:14px;">
+            ${trustPill("🔓", "No login required for reviews")}
+            ${trustPill("✅", "Verified Landlord Responses")}
+            ${trustPill("🚨", "Moderation + Reporting Tools")}
+          </div>
+
+          <!-- Featured Reviews -->
+          <div style="margin-top:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <div style="font-weight:1000;">Featured Reviews</div>
+              <a class="btn btn--ghost" href="#/search">Browse all</a>
             </div>
 
-            <div class="searchBubble" id="bubbleAddress">
-              <span class="tiny">⌕</span>
-              <input id="heroAddressInput" autocomplete="off"
-                placeholder="Search by address" />
-              <div class="suggest" id="heroAddressSuggest"></div>
-            </div>
-            <div class="searchAction">
-              <button class="btn btn--primary" id="heroAddressBtn">Search</button>
+            <div class="featuredGrid" style="margin-top:10px;">
+              ${
+                featured.length
+                  ? featured.map(({r,l}) => featuredReviewCard(r, l)).join("")
+                  : `<div class="box"><div class="tiny">No reviews yet — be the first.</div></div>`
+              }
             </div>
           </div>
 
-          <div class="previewRow">
-            <div class="previewCard" aria-label="Example review preview">
-              <div class="rowTitle">Example review preview</div>
-              <div class="rowSub">Short timeline beats ranting. Specific beats vague.</div>
-              <div class="lobsterRow" style="margin-top:10px;">
-                <div class="lobsterStars">${lobsterStars(4)}</div>
-                <div class="scoreText">4/5</div>
-                <span class="pill" style="margin-left:auto;">Factual • Timeline • Specific</span>
-              </div>
-              <div class="tagRow">
-                <span class="tag">Fast repairs</span>
-                <span class="tag">Clear comms</span>
-                <span class="tag">Deposit fair</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 1/2/3 clickable instructional cards -->
-          <div class="stepsGrid" aria-label="How to use Casa">
-            <div tabindex="0" class="stepCard tint1" id="step1">
-              <div class="stepCard__badge">1</div>
-              <div class="stepCard__title">1 — Look Up</div>
-              <div class="stepCard__body">Choose a search method below to find a landlord fast.</div>
-            </div>
-
-            <div tabindex="0" class="stepCard tint2" id="step2">
-              <div class="stepCard__badge">2</div>
-              <div class="stepCard__title">2 — Review</div>
-              <div class="stepCard__body">Write a factual review: rate 1–5 lobsters, add a timeline, and keep it specific.</div>
-            </div>
-
-            <div tabindex="0" class="stepCard tint3" id="step3">
-              <div class="stepCard__badge">3</div>
-              <div class="stepCard__title">3 — Improve</div>
-              <div class="stepCard__body">Fix missing info: add buildings, correct names/LLCs, and update details.</div>
-            </div>
-          </div>
-
-          <div class="tiny" style="margin-top:14px;">
-            Tip: for demo/dev verification, open <b>Landlord Portal</b> and submit docs. Add <b>?autoVerify=1</b> to auto-verify.
-          </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
-  // Step card actions
-  $("#step1").addEventListener("click", () => focusHeroLandlord());
-  $("#step1").addEventListener("keydown", (e) => { if(e.key==="Enter") focusHeroLandlord(); });
-
-  $("#step2").addEventListener("click", () => {
-    // If no landlord selected, prompt search first
-    openModal(
-      "Write a review",
-      `<div class="tiny">First, pick a landlord. Search on the homepage or go to results.</div>
-       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-         <button class="btn btn--primary" id="goLookup">Go to results</button>
-         <button class="btn btn--ghost" id="closeM">Close</button>
-       </div>`,
-      ``
-    );
-    $("#goLookup").onclick = () => { closeModal(); location.hash = "#/lookup"; };
-    $("#closeM").onclick = closeModal;
+  // Wire actions
+  $("#homeSearchBtn").onclick = () => {
+    const q = ($("#homeSearchInput").value || "").trim();
+    location.hash = `#/search?q=${encodeURIComponent(q)}`;
+  };
+  $("#homeSearchInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#homeSearchBtn").click();
   });
+  $("#homeAddBtn").onclick = () => (location.hash = "#/add-landlord");
 
-  $("#step2").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("#step2").click(); });
-
-  $("#step3").addEventListener("click", () => {
-    location.hash = "#/lookup";
-    toast("Search, select a landlord, then edit the profile.");
-  });
-  $("#step3").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("#step3").click(); });
-
-  // Search buttons
-  $("#heroLandlordBtn").addEventListener("click", () => {
-    const q = $("#heroLandlordInput").value.trim();
-    goLookup({ type: "landlord", q });
-  });
-  $("#heroAddressBtn").addEventListener("click", () => {
-    const q = $("#heroAddressInput").value.trim();
-    goLookup({ type: "address", q });
-  });
-
-  // Autosuggest
-  attachSuggest("#heroLandlordInput", "#heroLandlordSuggest", "landlord");
-  attachSuggest("#heroAddressInput", "#heroAddressSuggest", "address");
-
-  // allow Enter key
-  $("#heroLandlordInput").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("#heroLandlordBtn").click(); });
-  $("#heroAddressInput").addEventListener("keydown", (e)=>{ if(e.key==="Enter") $("#heroAddressBtn").click(); });
-}
-
-function focusHeroLandlord(){
-  const el = $("#heroLandlordInput");
-  if(el){
-    el.scrollIntoView({ behavior:"smooth", block:"center" });
-    setTimeout(()=> el.focus(), 220);
-  }else{
-    location.hash = "#/lookup";
-  }
-}
-
-function goLookup({ type, q }){
-  const params = new URLSearchParams();
-  params.set("type", type);
-  params.set("q", q || "");
-  location.hash = `#/lookup?${params.toString()}`;
-}
-
-/* Autosuggest for landlords + addresses */
-function attachSuggest(inputSel, suggestSel, mode){
-  const input = $(inputSel);
-  const suggest = $(suggestSel);
-
-  function close(){
-    suggest.classList.remove("open");
-    suggest.innerHTML = "";
-  }
-
-  input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
-    if(!q){
-      close();
-      return;
-    }
-
-    let items = [];
-    if(mode === "landlord"){
-      items = db.landlords
-        .map(l => ({
-          id: l.id,
-          label: l.entityName ? `${l.name} (${l.entityName})` : l.name,
-          hay: landlordHay(l)
-        }))
-        .filter(x => x.hay.includes(q))
-        .slice(0,6);
-    } else {
-      items = db.landlords
-        .flatMap(l => {
-          const addresses = [
-            [l.address, l.neighborhood, l.city].filter(Boolean).join(", "),
-            ...(l.buildings || [])
-          ].filter(Boolean);
-
-          return addresses.map(a => ({ landlordId: l.id, label: a, hay: a.toLowerCase() }));
-        })
-        .filter(x => x.hay.includes(q))
-        .slice(0,6);
-    }
-
-    if(!items.length){
-      close();
-      return;
-    }
-
-    suggest.innerHTML = items.map((it, idx) => {
-      return `<button type="button" data-idx="${idx}">${esc(it.label)}</button>`;
-    }).join("");
-    suggest.classList.add("open");
-
-    suggest.querySelectorAll("button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const i = Number(btn.getAttribute("data-idx"));
-        const picked = items[i];
-        input.value = picked.label;
-        close();
-
-        // Suggest click routes
-        if(mode === "landlord"){
-          goLookup({ type:"landlord", q: picked.label });
-        } else {
-          goLookup({ type:"address", q: picked.label });
-        }
-      });
+  // Expandable cards
+  $$(".expandCard").forEach(card => {
+    card.addEventListener("click", (e) => {
+      // avoid toggling when clicking buttons/inputs inside
+      if (e.target.closest("button") || e.target.closest("input") || e.target.closest("a")) return;
+      card.classList.toggle("open");
     });
   });
 
-  input.addEventListener("blur", () => {
-    setTimeout(close, 120); // allow click
-  });
-  input.addEventListener("focus", () => {
-    // if typed already, re-open
-    input.dispatchEvent(new Event("input"));
+  // Try lookup inside card
+  const tryBtn = $("#tryLookupBtn");
+  if (tryBtn) {
+    tryBtn.onclick = () => {
+      const q = ($("#tryLookup").value || "").trim();
+      location.hash = `#/search?q=${encodeURIComponent(q)}`;
+    };
+  }
+
+  // featured landlord links
+  $$(".viewLandlordLink").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const id = a.getAttribute("data-landlord");
+      location.hash = `#/landlord/${id}`;
+    });
   });
 }
 
-/* Lookup page */
-function renderLookup(){
+function expandCardHTML({ id, icon, title, sub, body, badge }) {
+  return `
+    <div class="expandCard tint1" id="${esc(id)}" tabindex="0" role="button" aria-label="${esc(title)} card">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+        <div>
+          <div class="tiny" style="font-weight:1000; color:rgba(35,24,16,.85);">${esc(icon)} ${esc(title)}</div>
+          <div class="rowSub" style="margin-top:6px;">${esc(sub)}</div>
+        </div>
+        ${badge ? `<span class="badge badge--verified">${esc(badge)}</span>` : `<span class="tiny">＋</span>`}
+      </div>
+      <div class="expandBody" style="margin-top:10px; display:none;">
+        ${body}
+      </div>
+    </div>
+  `;
+}
+
+function trustPill(icon, text) {
+  return `
+    <div class="trustPill">
+      <span>${esc(icon)}</span>
+      <span class="tiny" style="color:rgba(35,24,16,.72);">${esc(text)}</span>
+    </div>
+  `;
+}
+
+function featuredReviewCard(r, l) {
+  const created = fmtDate(r.createdAt);
+  const overall = r.ratings?.overall ?? null;
+  const excerpt = (r.text || "").slice(0, 140) + ((r.text || "").length > 140 ? "…" : "");
+  return `
+    <div class="rowCard" style="cursor:default;">
+      <div style="flex:1; min-width:0;">
+        <div class="rowTitle">${esc(l.name)}</div>
+        <div class="rowSub">${esc([l.address, l.neighborhood, l.city].filter(Boolean).join(" • ") || "—")}</div>
+        <div class="starRow" style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+          <div class="stars">${starRow(overall)}</div>
+          <div class="scoreText">${overall ? `${overall}/5` : "—"}</div>
+          <span class="tiny" style="margin-left:auto;">${esc(created)}</span>
+        </div>
+        <div class="tiny" style="margin-top:10px; color:rgba(35,24,16,.82); font-weight:850;">
+          ${esc(excerpt)}
+        </div>
+        <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+          <a href="#/landlord/${esc(l.id)}" class="btn btn--ghost viewLandlordLink" data-landlord="${esc(l.id)}">View Landlord</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderFooter() {
+  return `
+    <footer class="footer" style="margin-top:22px;">
+      <div class="card" style="box-shadow:none;">
+        <div class="bd" style="display:flex; gap:10px; justify-content:space-between; flex-wrap:wrap;">
+          <div class="tiny" style="font-weight:900;">© Casa</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="tiny" href="#/about">About</a>
+            <a class="tiny" href="#/trust-safety">Trust & Safety</a>
+            <a class="tiny" href="#/contact">Contact</a>
+            <a class="tiny" href="#/privacy">Privacy</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  `;
+}
+
+/* ------------------------------------------------------
+   SEARCH PAGE (CONVERSION ENGINE)
+------------------------------------------------------ */
+function renderSearch() {
   const { params } = parseHash();
-  const type = params.get("type") || "landlord";
   const q = (params.get("q") || "").trim().toLowerCase();
+
+  const type = params.get("type") || "all"; // all | landlord | building
+  const minRating = Number(params.get("minRating") || 0);
+  const verifiedOnly = params.get("verified") === "1";
 
   const app = $("#app");
 
+  // Build results
   const results = db.landlords
     .map(l => ({ l, stats: landlordStats(l.id) }))
-    .filter(({l}) => {
-      if(!q) return true;
-      if(type === "address") return addressHay(l).includes(q);
-      return landlordHay(l).includes(q);
+    .filter(({ l, stats }) => {
+      if (verifiedOnly && !isLandlordVerifiedClaimed(l)) return false;
+      if (minRating && (stats.overall ?? 0) < minRating) return false;
+
+      if (!q) return true;
+      const hay = (type === "building")
+        ? addressHay(l)
+        : landlordHay(l);
+
+      if (type === "all") return landlordHay(l).includes(q) || addressHay(l).includes(q);
+      return hay.includes(q);
     })
-    .sort((a,b) => {
+    .sort((a, b) => {
       const ao = a.stats.overall ?? -1;
       const bo = b.stats.overall ?? -1;
-      if(bo !== ao) return bo - ao;
+      if (bo !== ao) return bo - ao;
       return (b.stats.count || 0) - (a.stats.count || 0);
     });
 
   app.innerHTML = `
     <section class="section">
       <div class="card">
-        <div class="hd">
-          <div>
-            <div class="kicker">Results</div>
-            <div style="font-weight:1000;">${type === "address" ? "Search by address" : "Search by landlord"}</div>
-            <div class="tiny">${q ? `Query: “${esc(params.get("q"))}”` : "No query — showing top results"}</div>
+        <div class="hd" style="align-items:center;">
+          <div style="min-width:0;">
+            <div class="kicker">Search</div>
+            <div style="font-weight:1000;">Search results</div>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <a class="btn btn--ghost" href="#/">← Home</a>
@@ -577,40 +603,88 @@ function renderLookup(){
         </div>
 
         <div class="bd">
-          ${
-            results.length ? "" : `
-              <div class="box">
-                <div style="font-weight:1000;">No results.</div>
-                <div class="tiny" style="margin-top:6px;">Not found? Add landlord →</div>
-                <div style="margin-top:10px;">
-                  <a class="btn btn--primary" href="#/add-landlord">Add landlord</a>
-                </div>
-              </div>
-            `
-          }
 
-          <div class="grid">
-            <div>
-              ${results.map(({l,stats}) => landlordRowCard(l, stats)).join("")}
+          <!-- Always-visible search bar -->
+          <div class="searchTop">
+            <div class="searchTop__bar">
+              <span class="tiny">⌕</span>
+              <input id="searchInput" value="${esc(params.get("q") || "")}"
+                placeholder="Search landlord name, management company, or address…" />
+              <button class="btn btn--primary" id="searchBtn">Search</button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="filtersRow">
+            <div class="field">
+              <label>Type</label>
+              <select id="filterType">
+                <option value="all" ${type === "all" ? "selected" : ""}>Landlord or building</option>
+                <option value="landlord" ${type === "landlord" ? "selected" : ""}>Landlord</option>
+                <option value="building" ${type === "building" ? "selected" : ""}>Building / address</option>
+              </select>
             </div>
 
-            <aside class="card side">
-              <div style="font-weight:1000;">Tips</div>
-              <div class="box" style="margin-top:10px;">
-                <div class="tiny">
-                  • No account needed to add/edit landlords or write reviews.<br/>
-                  • Use timelines and dates.<br/>
-                  • Landlords respond only after verification.
-                </div>
-              </div>
-            </aside>
+            <div class="field">
+              <label>Minimum rating</label>
+              <select id="filterMin">
+                ${[0, 3, 3.5, 4, 4.5].map(v => `<option value="${v}" ${v === minRating ? "selected" : ""}>${v === 0 ? "Any" : `${v}+`}</option>`).join("")}
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Verified response</label>
+              <select id="filterVerified">
+                <option value="0" ${verifiedOnly ? "" : "selected"}>Any</option>
+                <option value="1" ${verifiedOnly ? "selected" : ""}>Has verified landlord</option>
+              </select>
+            </div>
           </div>
+
+          ${results.length ? "" : `
+            <div class="box" style="margin-top:14px;">
+              <div style="font-weight:1000;">No matches found — want to add this landlord/building?</div>
+              <div style="margin-top:10px;">
+                <a class="btn btn--primary" href="#/add-landlord">Add Landlord</a>
+              </div>
+            </div>
+          `}
+
+          <div style="margin-top:10px;">
+            ${results.map(({l,stats}) => landlordResultCard(l, stats)).join("")}
+          </div>
+
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
-  // attach click handlers
+  $("#searchBtn").onclick = () => doSearchRefresh();
+  $("#searchInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#searchBtn").click();
+  });
+
+  // filter change
+  ["filterType", "filterMin", "filterVerified"].forEach(id => {
+    $("#" + id).addEventListener("change", doSearchRefresh);
+  });
+
+  function doSearchRefresh() {
+    const nq = ($("#searchInput").value || "").trim();
+    const nt = $("#filterType").value;
+    const nm = $("#filterMin").value;
+    const nv = $("#filterVerified").value;
+
+    const p = new URLSearchParams();
+    p.set("q", nq);
+    p.set("type", nt);
+    p.set("minRating", nm);
+    p.set("verified", nv);
+    location.hash = `#/search?${p.toString()}`;
+  }
+
   $$(".rowCard[data-landlord]").forEach(el => {
     el.addEventListener("click", () => {
       const id = el.getAttribute("data-landlord");
@@ -619,19 +693,20 @@ function renderLookup(){
   });
 }
 
-function landlordRowCard(l, stats){
+function landlordResultCard(l, stats) {
   const locationLine = [l.address, l.neighborhood, l.city].filter(Boolean).join(" • ") || "—";
   const tags = tagsFromStats(stats);
   return `
     <div class="rowCard" data-landlord="${esc(l.id)}" role="button" aria-label="Open landlord ${esc(l.name)}">
       <div style="flex:1; min-width:0;">
         <div class="rowTitle">${esc(l.name)}</div>
-        <div class="lobsterRow">
-          <div class="lobsterStars">${lobsterStars(stats.overall)}</div>
-          <div class="scoreText">${stats.overall ? `${Math.round(stats.overall)}/5` : "—"}</div>
+        <div class="starRow" style="display:flex; gap:10px; align-items:center;">
+          <div class="stars">${starRow(stats.overall)}</div>
+          <div class="scoreText">${stats.overall ? `${fmtScore(stats.overall)} ★` : "—"}</div>
+          <span class="tiny" style="margin-left:auto;">${stats.count} review${stats.count===1?"":"s"}</span>
           ${isLandlordVerifiedClaimedBadge(l)}
         </div>
-        <div class="rowSub">${esc(locationLine)} • ${stats.count} review${stats.count===1?"":"s"}</div>
+        <div class="rowSub">${esc(locationLine)}</div>
         <div class="tagRow">
           ${tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}
         </div>
@@ -640,28 +715,31 @@ function landlordRowCard(l, stats){
   `;
 }
 
-function isLandlordVerifiedClaimedBadge(l){
-  if(!l.claimedByLandlordId) return "";
-  const acc = db.landlordAccounts.find(a => a.id === l.claimedByLandlordId);
-  if(!acc) return "";
-  if(acc.verificationStatus !== "verified") return "";
-  return `<span class="badge badge--verified" style="margin-left:auto;">Verified Landlord</span>`;
-}
-
-/* Landlord profile */
-function renderLandlordProfile(){
-  const { landlordIdFromPath } = parseHash();
-  const id = landlordIdFromPath;
+/* ------------------------------------------------------
+   LANDLORD PROFILE (COMPLETE)
+------------------------------------------------------ */
+function renderLandlordProfile() {
+  const { landlordId } = parseHash();
+  const id = landlordId;
   const l = db.landlords.find(x => x.id === id);
   const app = $("#app");
 
-  if(!l){
+  if (!l) {
     app.innerHTML = `<section class="section"><div class="card"><div class="pad">Landlord not found.</div></div></section>`;
     return;
   }
 
   const stats = landlordStats(l.id);
-  const reviews = db.reviews.filter(r => r.landlordId === l.id).slice().sort((a,b)=> (b.createdAt||"").localeCompare(a.createdAt||""));
+  const sort = (new URLSearchParams(location.hash.split("?")[1] || "")).get("sort") || "recent";
+
+  let reviews = db.reviews
+    .filter(r => r.landlordId === l.id && !r.hidden)
+    .slice();
+
+  if (sort === "high") reviews.sort((a,b)=> (b.ratings?.overall ?? 0) - (a.ratings?.overall ?? 0));
+  else if (sort === "low") reviews.sort((a,b)=> (a.ratings?.overall ?? 0) - (b.ratings?.overall ?? 0));
+  else reviews.sort((a,b)=> (b.createdAt||"").localeCompare(a.createdAt));
+
   const claimedAcc = l.claimedByLandlordId ? db.landlordAccounts.find(a => a.id === l.claimedByLandlordId) : null;
   const verifiedClaimed = Boolean(claimedAcc && claimedAcc.verificationStatus === "verified");
 
@@ -670,31 +748,53 @@ function renderLandlordProfile(){
       <div class="card">
         <div class="hd">
           <div style="min-width:0;">
-            <h2>${esc(l.name)} ${verifiedClaimed ? `<span class="badge badge--verified">Verified Landlord</span>` : ""}</h2>
+            <h2 style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              ${esc(l.name)}
+              ${verifiedClaimed ? `<span class="badge badge--verified">Verified Landlord</span>` : ``}
+            </h2>
             <div class="muted">${esc([l.address, l.neighborhood, l.city].filter(Boolean).join(" • ") || "—")}</div>
+
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
+              <div class="stars">${starRow(stats.overall)}</div>
+              <div class="scoreText">${stats.overall ? `${fmtScore(stats.overall)} ★` : "—"}</div>
+              <div class="tiny">${stats.count} review${stats.count===1?"":"s"}</div>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn btn--primary" href="#/write-review/${esc(l.id)}">Write a Review</a>
+              <a class="btn btn--ghost" href="#/edit-landlord/${esc(l.id)}">Suggest an Edit</a>
+              <a class="tiny" href="#/landlord-portal">Landlord? Claim this profile</a>
+            </div>
           </div>
+
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <a class="btn btn--ghost" href="#/lookup">← Results</a>
-            <a class="btn btn--ghost" href="#/edit-landlord/${esc(l.id)}">Edit landlord</a>
-            <a class="btn btn--primary" href="#/review/new/${esc(l.id)}">Write review</a>
+            <a class="btn btn--ghost" href="#/search">← Back to search</a>
           </div>
         </div>
 
         <div class="bd">
           <div class="grid">
             <div>
+
+              <!-- Rating Breakdown -->
               <div class="card" style="box-shadow:none;">
                 <div class="hd" style="padding:14px 14px 8px;">
-                  <div class="kicker">Overall</div>
-                  <div class="tiny">${stats.count} reviews</div>
+                  <div>
+                    <div class="kicker">Rating breakdown</div>
+                    <div class="tiny">Averages from visible reviews</div>
+                  </div>
                 </div>
                 <div class="bd" style="padding: 0 14px 14px;">
-                  <div class="lobsterRow">
-                    <div class="lobsterStars">${lobsterStars(stats.overall)}</div>
-                    <div class="scoreText">${stats.overall ? `${Math.round(stats.overall)}/5` : "—"}</div>
-                  </div>
-                  <div class="tagRow">
-                    ${tagsFromStats(stats).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}
+                  <div class="breakGrid">
+                    ${RATING_KEYS.map(([k,label]) => `
+                      <div class="box" style="border-style:solid;">
+                        <div class="tiny" style="font-weight:1000; color:rgba(35,24,16,.85);">${esc(label)}</div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                          <div class="stars">${starRow(stats[k])}</div>
+                          <div class="scoreText">${stats[k] ? `${fmtScore(stats[k])} ★` : "—"}</div>
+                        </div>
+                      </div>
+                    `).join("")}
                   </div>
 
                   ${
@@ -704,7 +804,7 @@ function renderLandlordProfile(){
                           <div class="tiny">Responses are from a Verified Landlord.</div>
                         </div>`
                       : `<div class="box" style="margin-top:12px;">
-                          <div style="font-weight:1000;">Landlord response requires verification</div>
+                          <div style="font-weight:1000;">Landlord responses require verification</div>
                           <div class="tiny">Landlords must verify in the Landlord Portal before responding.</div>
                           <div style="margin-top:10px;">
                             <a class="btn btn--primary" href="#/landlord-portal">Landlord Portal</a>
@@ -714,14 +814,30 @@ function renderLandlordProfile(){
                 </div>
               </div>
 
+              <!-- Reviews header + sort -->
               <div style="margin-top:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                   <div style="font-weight:1000;">Reviews</div>
-                  <div class="tiny">${reviews.length ? "" : "No reviews yet — be the first."}</div>
+
+                  <div class="field" style="min-width:220px;">
+                    <label>Sort</label>
+                    <select id="reviewSort">
+                      <option value="recent" ${sort==="recent"?"selected":""}>Most recent</option>
+                      <option value="high" ${sort==="high"?"selected":""}>Highest rating</option>
+                      <option value="low" ${sort==="low"?"selected":""}>Lowest rating</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div id="reviewsList" style="margin-top:10px;">
-                  ${reviews.map(r => reviewCard(r, l)).join("")}
+                  ${reviews.length ? reviews.map(r => reviewCard(r, l)).join("") : `
+                    <div class="box">
+                      <div class="tiny">No reviews yet — be the first.</div>
+                      <div style="margin-top:10px;">
+                        <a class="btn btn--primary" href="#/write-review/${esc(l.id)}">Write a Review</a>
+                      </div>
+                    </div>
+                  `}
                 </div>
               </div>
             </div>
@@ -730,33 +846,50 @@ function renderLandlordProfile(){
               <div style="font-weight:1000;">Landlord info</div>
               <div class="box" style="margin-top:10px;">
                 <div class="tiny"><b>Entity:</b> ${esc(l.entityName || "—")}</div>
-                <div class="tiny" style="margin-top:6px;"><b>Buildings:</b><br/>${(l.buildings||[]).length ? (l.buildings||[]).map(b=>`• ${esc(b)}`).join("<br/>") : "—"}</div>
+                <div class="tiny" style="margin-top:6px;"><b>Properties:</b><br/>${
+                  (l.buildings||[]).length
+                    ? (l.buildings||[]).map(b=>`• ${esc(b)}`).join("<br/>")
+                    : "—"
+                }</div>
               </div>
 
               <div style="margin-top:12px;">
-                <a class="btn btn--block btn--primary" href="#/review/new/${esc(l.id)}">Write review</a>
+                <a class="btn btn--block btn--primary" href="#/write-review/${esc(l.id)}">Write a Review</a>
               </div>
               <div style="margin-top:10px;">
-                <a class="btn btn--block btn--ghost" href="#/edit-landlord/${esc(l.id)}">Edit landlord</a>
+                <a class="btn btn--block btn--ghost" href="#/edit-landlord/${esc(l.id)}">Suggest an Edit</a>
+              </div>
+
+              <div class="box" style="margin-top:12px;">
+                <div style="font-weight:1000;">Trust & Safety</div>
+                <div class="tiny" style="margin-top:6px;">
+                  Keep reviews factual. No personal info. Reporting tools are available.
+                </div>
+                <div style="margin-top:10px;">
+                  <a class="btn btn--ghost btn--block" href="#/trust-safety">Trust & Safety</a>
+                </div>
               </div>
             </aside>
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
-  // Attach landlord response handlers (only if verified + claimed by current landlord portal session)
-  // Demo: landlord portal session stored as currentLandlordAccountId in localStorage
+  // sort wiring
+  $("#reviewSort").onchange = () => {
+    const s = $("#reviewSort").value;
+    location.hash = `#/landlord/${l.id}?sort=${encodeURIComponent(s)}`;
+  };
+
+  // landlord respond wiring (verified + claimed by current landlord session)
   const currentAccId = localStorage.getItem("casa_current_landlord_account_id");
   const currentAcc = currentAccId ? db.landlordAccounts.find(a => a.id === currentAccId) : null;
-  const canRespond = Boolean(
-    currentAcc &&
-    currentAcc.verificationStatus === "verified" &&
-    l.claimedByLandlordId === currentAcc.id
-  );
+  const canRespond = Boolean(currentAcc && currentAcc.verificationStatus === "verified" && l.claimedByLandlordId === currentAcc.id);
 
-  if(canRespond){
+  if (canRespond) {
     $$(".respondBtn").forEach(btn => {
       btn.addEventListener("click", () => {
         const reviewId = btn.getAttribute("data-review");
@@ -764,33 +897,52 @@ function renderLandlordProfile(){
       });
     });
   }
+
+  // report buttons
+  $$(".reportBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rid = btn.getAttribute("data-review");
+      openReportModal({ reviewId: rid });
+    });
+  });
 }
 
-function reviewCard(r, landlord){
+function isLandlordVerifiedClaimed(l) {
+  if (!l.claimedByLandlordId) return false;
+  const acc = db.landlordAccounts.find(a => a.id === l.claimedByLandlordId);
+  return Boolean(acc && acc.verificationStatus === "verified");
+}
+function isLandlordVerifiedClaimedBadge(l) {
+  if (!isLandlordVerifiedClaimed(l)) return "";
+  return `<span class="badge badge--verified" style="margin-left:auto;">Verified Landlord</span>`;
+}
+
+function reviewCard(r, landlord) {
   const created = fmtDate(r.createdAt);
   const overall = r.ratings?.overall ?? null;
   const hasResponse = Boolean(r.response && r.response.text);
 
-  // Show respond button only if landlord verified and claimed by current account
   const currentAccId = localStorage.getItem("casa_current_landlord_account_id");
   const currentAcc = currentAccId ? db.landlordAccounts.find(a => a.id === currentAccId) : null;
-  const canRespond = Boolean(
-    currentAcc &&
-    currentAcc.verificationStatus === "verified" &&
-    landlord.claimedByLandlordId === currentAcc.id
-  );
+  const canRespond = Boolean(currentAcc && currentAcc.verificationStatus === "verified" && landlord.claimedByLandlordId === currentAcc.id);
 
   return `
     <div class="rowCard" style="cursor:default;">
       <div style="flex:1; min-width:0;">
-        <div class="rowTitle">${esc(r.title || "Review")}</div>
-        <div class="lobsterRow" style="margin-top:-2px;">
-          <div class="lobsterStars">${lobsterStars(overall)}</div>
-          <div class="scoreText">${overall ? `${overall}/5` : "—"}</div>
-          <span class="tiny" style="margin-left:auto;">${esc(created)}</span>
+        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div class="rowTitle">${esc(r.title || "Review")}</div>
+          <span class="tiny">${esc(created)}</span>
         </div>
 
-        <div class="tiny" style="margin-top:8px; color:rgba(35,24,16,.82); font-weight:850; white-space:pre-wrap;">
+        <div class="starRow" style="margin-top:6px; display:flex; align-items:center; gap:10px;">
+          <div class="stars">${starRow(overall)}</div>
+          <div class="scoreText">${overall ? `${overall}/5` : "—"}</div>
+          <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn--ghost reportBtn" data-review="${esc(r.id)}">Report</button>
+          </div>
+        </div>
+
+        <div class="tiny" style="margin-top:10px; color:rgba(35,24,16,.82); font-weight:850; white-space:pre-wrap;">
           ${esc(r.text || "")}
         </div>
 
@@ -799,7 +951,7 @@ function reviewCard(r, landlord){
         ${
           hasResponse
             ? `<div class="box" style="margin-top:12px; border-style:solid;">
-                <div class="badge badge--verified">Response from Verified Landlord</div>
+                <div class="badge badge--verified">Verified Landlord Response</div>
                 <div class="tiny" style="margin-top:10px; white-space:pre-wrap;">${esc(r.response.text)}</div>
                 <div class="tiny" style="margin-top:8px;">${esc(fmtDate(r.response.createdAt))}</div>
               </div>`
@@ -818,14 +970,70 @@ function reviewCard(r, landlord){
   `;
 }
 
-function openRespondModal({ reviewId, landlordId, landlordAccountId }){
+function openReportModal({ reviewId }) {
+  openModal(
+    "Report review",
+    `
+      <div class="tiny">Help keep Casa factual and safe. Reports may hide content pending review.</div>
+      <div class="field" style="margin-top:12px;">
+        <label>Reason</label>
+        <select id="reportReason">
+          <option value="spam">Spam</option>
+          <option value="harassment">Harassment</option>
+          <option value="doxxing">Personal info / doxxing</option>
+          <option value="fake">Fake review</option>
+          <option value="irrelevant">Irrelevant</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Notes (optional)</label>
+        <textarea id="reportNotes" placeholder="Optional detail…"></textarea>
+      </div>
+    `,
+    `
+      <button class="btn btn--ghost" id="cancelReport">Cancel</button>
+      <button class="btn btn--primary" id="submitReport">Submit report</button>
+    `
+  );
+  $("#cancelReport").onclick = closeModal;
+  $("#submitReport").onclick = () => {
+    const reason = $("#reportReason").value;
+    const notes = ($("#reportNotes").value || "").trim() || null;
+
+    const next = loadDB();
+    next.reports.push({
+      id: uuid(),
+      reviewId,
+      reason,
+      notes,
+      createdAt: new Date().toISOString()
+    });
+
+    const review = next.reviews.find(x => x.id === reviewId);
+    if (review) {
+      // auto hide logic
+      review.hidden ||= false;
+      ensureAutoHide(review);
+      saveDB(next);
+      closeModal();
+      toast(review.hidden ? "Reported. Review hidden pending moderation." : "Reported. Thank you.");
+      render();
+    } else {
+      saveDB(next);
+      closeModal();
+      toast("Reported. Thank you.");
+    }
+  };
+}
+
+function openRespondModal({ reviewId, landlordId, landlordAccountId }) {
   openModal(
     "Post a response",
     `
-      <div class="tiny">This will appear as “Response from Verified Landlord”.</div>
+      <div class="tiny">This will appear as “Verified Landlord Response”. Keep it calm and specific.</div>
       <div class="field" style="margin-top:10px;">
         <label>Response</label>
-        <textarea id="respText" placeholder="Keep it calm and specific…"></textarea>
+        <textarea id="respText" placeholder="Example: We’re sorry this happened. Here’s what we changed…"></textarea>
       </div>
     `,
     `
@@ -836,19 +1044,18 @@ function openRespondModal({ reviewId, landlordId, landlordAccountId }){
   $("#cancelResp").onclick = closeModal;
   $("#saveResp").onclick = () => {
     const text = ($("#respText").value || "").trim();
-    if(text.length < 3) return toast("Write a little more.");
+    if (text.length < 3) return toast("Write a little more.");
 
     const next = loadDB();
     const rev = next.reviews.find(x => x.id === reviewId);
-    if(!rev) return toast("Review not found.");
-    if(rev.response?.text) return toast("Response already exists.");
+    if (!rev) return toast("Review not found.");
+    if (rev.response?.text) return toast("Response already exists.");
 
-    // verify that current landlord session matches and is verified
     const acc = next.landlordAccounts.find(a => a.id === landlordAccountId);
     const l = next.landlords.find(x => x.id === landlordId);
-    if(!acc || !l) return toast("Not permitted.");
-    if(acc.verificationStatus !== "verified") return toast("Not verified.");
-    if(l.claimedByLandlordId !== acc.id) return toast("You must claim this profile.");
+    if (!acc || !l) return toast("Not permitted.");
+    if (acc.verificationStatus !== "verified") return toast("Not verified.");
+    if (l.claimedByLandlordId !== acc.id) return toast("You must claim this profile.");
 
     rev.response = {
       landlordAccountId: acc.id,
@@ -865,8 +1072,10 @@ function openRespondModal({ reviewId, landlordId, landlordAccountId }){
   };
 }
 
-/* Add landlord (no login required) */
-function renderAddLandlord(){
+/* ------------------------------------------------------
+   ADD / EDIT LANDLORD (NO LOGIN)
+------------------------------------------------------ */
+function renderAddLandlord() {
   const app = $("#app");
   app.innerHTML = `
     <section class="section">
@@ -877,7 +1086,7 @@ function renderAddLandlord(){
             <div class="tiny">No account needed.</div>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <a class="btn btn--ghost" href="#/lookup">← Results</a>
+            <a class="btn btn--ghost" href="#/search">← Search</a>
             <a class="btn btn--ghost" href="#/">Home</a>
           </div>
         </div>
@@ -887,14 +1096,17 @@ function renderAddLandlord(){
             <label>Landlord / company name</label>
             <input id="lname" placeholder="e.g., Northside Properties" />
           </div>
+
           <div class="field" style="margin-top:10px;">
             <label>Entity name (LLC / management company)</label>
             <input id="lentity" placeholder="e.g., Northside Properties LLC" />
           </div>
+
           <div class="field" style="margin-top:10px;">
             <label>Primary address (optional)</label>
             <input id="laddr" placeholder="e.g., 123 Main St" />
           </div>
+
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
             <div class="field">
               <label>Neighborhood (optional)</label>
@@ -907,28 +1119,30 @@ function renderAddLandlord(){
           </div>
 
           <div class="field" style="margin-top:10px;">
-            <label>Buildings (optional, one per line)</label>
+            <label>Properties / buildings (optional, one per line)</label>
             <textarea id="lbuildings" placeholder="123 Main St, Williamsburg&#10;125 Main St, Williamsburg"></textarea>
           </div>
 
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px; flex-wrap:wrap;">
-            <a class="btn btn--ghost" href="#/lookup">Cancel</a>
+            <a class="btn btn--ghost" href="#/search">Cancel</a>
             <button class="btn btn--primary" id="saveLandlord">Save landlord</button>
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
   $("#saveLandlord").onclick = () => {
     const name = ($("#lname").value || "").trim();
-    if(name.length < 2) return toast("Enter a name.");
+    if (name.length < 2) return toast("Enter a name.");
 
     const entityName = ($("#lentity").value || "").trim() || null;
     const address = ($("#laddr").value || "").trim() || null;
     const neighborhood = ($("#lhood").value || "").trim() || null;
     const city = ($("#lcity").value || "").trim() || null;
-    const buildings = ($("#lbuildings").value || "").split("\n").map(s=>s.trim()).filter(Boolean);
+    const buildings = ($("#lbuildings").value || "").split("\n").map(s => s.trim()).filter(Boolean);
 
     const next = loadDB();
     const newL = {
@@ -943,6 +1157,7 @@ function renderAddLandlord(){
       updatedAt: new Date().toISOString(),
       claimedByLandlordId: null
     };
+
     next.landlords.unshift(newL);
     saveDB(next);
     toast("Landlord added.");
@@ -950,15 +1165,13 @@ function renderAddLandlord(){
   };
 }
 
-/* Edit landlord (no login required) */
-function renderEditLandlord(){
-  const { editLandlordIdFromPath } = parseHash();
-  const id = editLandlordIdFromPath;
+function renderEditLandlord() {
+  const { editLandlordId } = parseHash();
   const next = loadDB();
-  const l = next.landlords.find(x => x.id === id);
-
+  const l = next.landlords.find(x => x.id === editLandlordId);
   const app = $("#app");
-  if(!l){
+
+  if (!l) {
     app.innerHTML = `<section class="section"><div class="card"><div class="pad">Landlord not found.</div></div></section>`;
     return;
   }
@@ -968,7 +1181,7 @@ function renderEditLandlord(){
       <div class="card">
         <div class="hd">
           <div>
-            <div class="kicker">Edit landlord</div>
+            <div class="kicker">Suggest an edit</div>
             <div style="font-weight:1000;">${esc(l.name)}</div>
             <div class="tiny">No account needed.</div>
           </div>
@@ -990,6 +1203,7 @@ function renderEditLandlord(){
             <label>Primary address</label>
             <input id="eaddr" value="${esc(l.address || "")}" />
           </div>
+
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
             <div class="field">
               <label>Neighborhood</label>
@@ -1002,29 +1216,35 @@ function renderEditLandlord(){
           </div>
 
           <div class="field" style="margin-top:10px;">
-            <label>Buildings (one per line)</label>
-            <textarea id="ebuildings">${esc((l.buildings||[]).join("\n"))}</textarea>
+            <label>Properties (one per line)</label>
+            <textarea id="ebuildings">${esc((l.buildings || []).join("\n"))}</textarea>
           </div>
 
           <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px; flex-wrap:wrap;">
             <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Cancel</a>
             <button class="btn btn--primary" id="saveEdit">Save changes</button>
           </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div class="tiny"><b>Note:</b> In a real app, edits should show an audit trail + moderation. This demo writes directly.</div>
+          </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
   $("#saveEdit").onclick = () => {
     const name = ($("#ename").value || "").trim();
-    if(name.length < 2) return toast("Name too short.");
+    if (name.length < 2) return toast("Name too short.");
 
     l.name = name;
     l.entityName = ($("#eentity").value || "").trim() || null;
     l.address = ($("#eaddr").value || "").trim() || null;
     l.neighborhood = ($("#ehood").value || "").trim() || null;
     l.city = ($("#ecity").value || "").trim() || null;
-    l.buildings = ($("#ebuildings").value || "").split("\n").map(s=>s.trim()).filter(Boolean);
+    l.buildings = ($("#ebuildings").value || "").split("\n").map(s => s.trim()).filter(Boolean);
     l.updatedAt = new Date().toISOString();
 
     saveDB(next);
@@ -1033,34 +1253,28 @@ function renderEditLandlord(){
   };
 }
 
-/* New review (no login) + edit link token */
-function renderNewReview(){
-  const { reviewNewLandlordIdFromPath } = parseHash();
-  const landlordId = reviewNewLandlordIdFromPath;
+/* ------------------------------------------------------
+   WRITE REVIEW (NO LOGIN) + TOKEN EDIT LINK
+------------------------------------------------------ */
+function renderWriteReview() {
+  const { reviewNewLandlordId } = parseHash();
+  const landlordId = reviewNewLandlordId;
   const l = db.landlords.find(x => x.id === landlordId);
   const app = $("#app");
 
-  if(!l){
+  if (!l) {
     app.innerHTML = `<section class="section"><div class="card"><div class="pad">Choose a landlord first.</div></div></section>`;
     return;
   }
-
-  const ratingKeys = [
-    ["repairs","Repairs"],
-    ["responsiveness","Responsiveness"],
-    ["deposits","Deposits"],
-    ["conditions","Conditions"],
-    ["communication","Communication"]
-  ];
 
   app.innerHTML = `
     <section class="section">
       <div class="card">
         <div class="hd">
           <div>
-            <div class="kicker">Write review</div>
+            <div class="kicker">Write a review</div>
             <div style="font-weight:1000;">${esc(l.name)}</div>
-            <div class="tiny">No account needed. You’ll get an edit link after posting.</div>
+            <div class="tiny">No account needed. You’ll get a private edit link after posting.</div>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">← Back</a>
@@ -1068,6 +1282,7 @@ function renderNewReview(){
         </div>
 
         <div class="bd">
+
           <div class="field">
             <label>Title (optional)</label>
             <input id="rtTitle" placeholder="e.g., Fast repairs, mixed communication" />
@@ -1083,18 +1298,22 @@ function renderNewReview(){
             <textarea id="rtTimeline" placeholder="Example: 3/2 reported leak • 3/4 plumber scheduled • 3/9 repair completed"></textarea>
           </div>
 
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Ratings</div>
+            <div class="tiny" style="margin-top:6px;">Use stars. Leave categories if unsure.</div>
+          </div>
+
           <div class="field" style="margin-top:12px;">
             <label>Overall rating</label>
             <div class="ratingPick" id="overallPick"></div>
-            <div class="tiny" style="margin-top:6px;">Shows lobsters + numeric value (e.g., 4/5).</div>
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
-            ${ratingKeys.map(([k,label]) => `
+            ${RATING_KEYS.map(([k,label]) => `
               <div class="field">
-                <label>${label}</label>
-                <select id="rk_${k}">
-                  ${[1,2,3,4,5].map(v=>`<option value="${v}" ${v===5?"selected":""}>${v}</option>`).join("")}
+                <label>${esc(label)}</label>
+                <select id="rk_${esc(k)}">
+                  ${[1,2,3,4,5].map(v=>`<option value="${v}" ${v===4?"selected":""}>${v}</option>`).join("")}
                 </select>
               </div>
             `).join("")}
@@ -1104,51 +1323,66 @@ function renderNewReview(){
             <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Cancel</a>
             <button class="btn btn--primary" id="postReview">Post review</button>
           </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div class="tiny"><b>Reminder:</b> No personal info. Dates & specifics only.</div>
+          </div>
+
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
   let overall = 5;
   renderOverallPicker();
 
-  function renderOverallPicker(){
+  function renderOverallPicker() {
     const wrap = $("#overallPick");
     wrap.innerHTML = "";
-    for(let i=1;i<=5;i++){
+    for (let i = 1; i <= 5; i++) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "lobsterBtn" + (i===overall ? " selected" : "");
-      btn.innerHTML = `${lobsterSVG(true)} <span class="ratingValue">${i}/5</span>`;
-      btn.addEventListener("click", () => {
-        overall = i;
-        renderOverallPicker();
-      });
+      btn.className = "starBtn" + (i === overall ? " selected" : "");
+      btn.innerHTML = `${starSVG(true)} <span class="ratingValue">${i}/5</span>`;
+      btn.addEventListener("click", () => { overall = i; renderOverallPicker(); });
       wrap.appendChild(btn);
     }
   }
 
   $("#postReview").onclick = () => {
     const text = ($("#rtText").value || "").trim();
-    if(text.length < 10) return toast("Write a bit more detail (10+ chars).");
+    if (text.length < 10) return toast("Write a bit more detail (10+ chars).");
 
     const title = ($("#rtTitle").value || "").trim() || null;
     const timeline = ($("#rtTimeline").value || "").trim() || null;
 
+    // doxxing prevention
+    if (containsDoxxing(text) || containsDoxxing(timeline)) {
+      openModal(
+        "Review blocked",
+        `<div class="box"><div style="font-weight:1000;">Personal info detected</div><div class="tiny" style="margin-top:6px;">Please remove contact info or identifying personal details.</div></div>`,
+        `<button class="btn btn--primary" id="okBlocked">OK</button>`
+      );
+      $("#okBlocked").onclick = closeModal;
+      return;
+    }
+
     const ratings = {
       overall,
-      repairs: Number($("#rk_repairs").value),
       responsiveness: Number($("#rk_responsiveness").value),
+      repairs: Number($("#rk_repairs").value),
       deposits: Number($("#rk_deposits").value),
       conditions: Number($("#rk_conditions").value),
-      communication: Number($("#rk_communication").value),
+      respect: Number($("#rk_respect").value),
     };
 
     const editToken = token();
     const reviewId = uuid();
 
     const next = loadDB();
-    next.reviews.push({
+    const newReview = {
       id: reviewId,
       landlordId,
       title,
@@ -1158,54 +1392,57 @@ function renderNewReview(){
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       editToken,
-      response: null
-    });
+      response: null,
+      hidden: false
+    };
+
+    next.reviews.push(newReview);
     saveDB(next);
 
-    // Show edit link
-    const editLink = `${location.origin}${location.pathname}#/review/edit/${editToken}`;
+    // REQUIRED modal format
+    const editLink = `${location.origin}${location.pathname}#/edit-review/${editToken}`;
+
     openModal(
-      "Review posted",
+      "Edit Link Created 🔒",
       `
         <div class="box">
-          <div style="font-weight:1000;">Save this edit link</div>
-          <div class="tiny" style="margin-top:6px;">You’ll need it to edit later.</div>
+          <div style="font-weight:1000;">Save this link to edit your review later.</div>
+          <div class="tiny" style="margin-top:6px;">Anyone with the link can edit.</div>
+
           <div class="field" style="margin-top:10px;">
             <label>Edit link</label>
             <input id="editLinkField" value="${esc(editLink)}" readonly />
           </div>
+
           <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn btn--primary" id="copyLink">Copy link</button>
-            <button class="btn btn--ghost" id="goBack">Back to landlord</button>
+            <button class="btn btn--primary" id="copyLink">Copy Link</button>
+            <button class="btn btn--ghost" id="doneLink">Done</button>
           </div>
         </div>
       `,
       ``
     );
+
     $("#copyLink").onclick = async () => {
-      try{
-        await navigator.clipboard.writeText(editLink);
-        toast("Copied.");
-      }catch{
-        toast("Copy failed — select and copy manually.");
-      }
+      try { await navigator.clipboard.writeText(editLink); toast("Copied."); }
+      catch { toast("Copy failed — select and copy manually."); }
     };
-    $("#goBack").onclick = () => {
+    $("#doneLink").onclick = () => {
       closeModal();
+      toast("Review posted.");
       location.hash = `#/landlord/${landlordId}`;
-      toast("Review saved.");
     };
   };
 }
 
-/* Edit review via token link */
-function renderEditReview(){
-  const { token: tok } = parseHash();
+/* Edit review via token */
+function renderEditReview() {
+  const { editToken } = parseHash();
   const next = loadDB();
-  const r = next.reviews.find(x => x.editToken === tok);
+  const r = next.reviews.find(x => x.editToken === editToken);
   const app = $("#app");
 
-  if(!r){
+  if (!r) {
     app.innerHTML = `
       <section class="section">
         <div class="card">
@@ -1229,7 +1466,7 @@ function renderEditReview(){
           <div>
             <div class="kicker">Edit review</div>
             <div style="font-weight:1000;">${esc(l?.name || "Landlord")}</div>
-            <div class="tiny">This page works without any account.</div>
+            <div class="tiny">No account required. Anyone with this link can edit.</div>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <a class="btn btn--ghost" href="#/landlord/${esc(r.landlordId)}">← Back</a>
@@ -1262,16 +1499,24 @@ function renderEditReview(){
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
   $("#saveReviewEdit").onclick = () => {
     const text = ($("#etText").value || "").trim();
-    if(text.length < 10) return toast("Write a bit more detail (10+ chars).");
+    if (text.length < 10) return toast("Write a bit more detail (10+ chars).");
+
+    const timeline = ($("#etTimeline").value || "").trim() || null;
+    if (containsDoxxing(text) || containsDoxxing(timeline)) {
+      toast("Remove personal info before saving.");
+      return;
+    }
 
     r.title = ($("#etTitle").value || "").trim() || null;
     r.text = text;
-    r.timeline = ($("#etTimeline").value || "").trim() || null;
+    r.timeline = timeline;
     r.updatedAt = new Date().toISOString();
 
     saveDB(next);
@@ -1280,13 +1525,59 @@ function renderEditReview(){
   };
 }
 
-/* Landlord Portal (only landlord accounts exist) */
-function renderLandlordPortal(){
+/* ------------------------------------------------------
+   LANDLORD PORTAL — ROUTES
+   Accounts exist ONLY for landlords.
+------------------------------------------------------ */
+function renderLandlordPortalLanding() {
+  const app = $("#app");
+  app.innerHTML = `
+    <section class="section">
+      <div class="card">
+        <div class="hd">
+          <div>
+            <div class="kicker">Landlord Portal</div>
+            <div style="font-weight:1000;">Manage claims, verification, and responses</div>
+            <div class="tiny">Tenants never need accounts. Landlords must verify to respond publicly.</div>
+          </div>
+          <a class="btn btn--ghost" href="#/">← Home</a>
+        </div>
+        <div class="bd">
+          <div class="box">
+            <div style="font-weight:1000;">Get started</div>
+            <div class="tiny" style="margin-top:6px;">
+              Create an account, upload verification documents, then claim your profile to respond.
+            </div>
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn btn--primary" href="#/landlord-portal/signup">Create account</a>
+              <a class="btn btn--ghost" href="#/landlord-portal/login">Log in</a>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Verification required</div>
+            <div class="tiny" style="margin-top:6px;">
+              Upload proof (deed / tax bill / management agreement / utility / business registration).
+              Status: Not submitted → Pending → Verified (or Rejected).
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${renderFooter()}
+    </section>
+  `;
+}
+
+function getCurrentLandlordAccount(snapshot) {
+  const currentId = localStorage.getItem("casa_current_landlord_account_id");
+  if (!currentId) return null;
+  return snapshot.landlordAccounts.find(a => a.id === currentId) || null;
+}
+
+function renderLandlordPortalLogin() {
   const app = $("#app");
   const next = loadDB();
-
-  const currentId = localStorage.getItem("casa_current_landlord_account_id");
-  const current = currentId ? next.landlordAccounts.find(a => a.id === currentId) : null;
 
   app.innerHTML = `
     <section class="section">
@@ -1294,347 +1585,498 @@ function renderLandlordPortal(){
         <div class="hd">
           <div>
             <div class="kicker">Landlord Portal</div>
-            <div class="tiny">Only landlords can create accounts. Reviewers never need accounts.</div>
+            <div style="font-weight:1000;">Log in</div>
+            <div class="tiny">Demo login uses email only (front-end demo).</div>
           </div>
+          <a class="btn btn--ghost" href="#/landlord-portal">← Back</a>
+        </div>
+
+        <div class="bd">
+          <div class="field">
+            <label>Email</label>
+            <input id="lpEmail" placeholder="name@email.com" />
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px;">
+            <button class="btn btn--primary" id="lpLoginBtn">Log in</button>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div class="tiny">No account? <a href="#/landlord-portal/signup"><b>Create one</b></a></div>
+          </div>
+        </div>
+      </div>
+
+      ${renderFooter()}
+    </section>
+  `;
+
+  $("#lpLoginBtn").onclick = () => {
+    const email = ($("#lpEmail").value || "").trim().toLowerCase();
+    if (!email.includes("@")) return toast("Enter a valid email.");
+
+    const acc = next.landlordAccounts.find(a => (a.email || "").toLowerCase() === email);
+    if (!acc) return toast("No account found. Create one.");
+
+    localStorage.setItem("casa_current_landlord_account_id", acc.id);
+    toast("Logged in.");
+    location.hash = "#/landlord-portal/dashboard";
+  };
+}
+
+function renderLandlordPortalSignup() {
+  const app = $("#app");
+  app.innerHTML = `
+    <section class="section">
+      <div class="card">
+        <div class="hd">
+          <div>
+            <div class="kicker">Landlord Portal</div>
+            <div style="font-weight:1000;">Create account</div>
+            <div class="tiny">Verification required to respond publicly.</div>
+          </div>
+          <a class="btn btn--ghost" href="#/landlord-portal">← Back</a>
+        </div>
+
+        <div class="bd">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="field">
+              <label>Full name</label>
+              <input id="lpName" placeholder="Full name" />
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input id="lpEmail" placeholder="name@email.com" />
+            </div>
+          </div>
+
+          <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="field">
+              <label>Phone (optional)</label>
+              <input id="lpPhone" placeholder="(optional)" />
+            </div>
+            <div class="field">
+              <label>Relationship</label>
+              <select id="lpRel">
+                <option value="">Select…</option>
+                <option>Owner</option>
+                <option>Property Manager</option>
+                <option>Agent</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:10px;">
+            <label>Entity name (LLC / management company)</label>
+            <input id="lpEntity" placeholder="Example: Northside Properties LLC" />
+          </div>
+
+          <div class="field" style="margin-top:10px;">
+            <label>Properties managed (one per line)</label>
+            <textarea id="lpProps" placeholder="123 Main St, Brooklyn&#10;88 Water St, New York"></textarea>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <button class="btn btn--primary" id="lpCreateBtn">Create account</button>
+          </div>
+
+          <div class="tiny" style="margin-top:10px;">
+            Next: upload verification documents in the dashboard.
+          </div>
+        </div>
+      </div>
+
+      ${renderFooter()}
+    </section>
+  `;
+
+  $("#lpCreateBtn").onclick = () => {
+    const fullName = ($("#lpName").value || "").trim();
+    const email = ($("#lpEmail").value || "").trim();
+    const phone = ($("#lpPhone").value || "").trim() || null;
+    const relationship = ($("#lpRel").value || "").trim();
+    const entityName = ($("#lpEntity").value || "").trim() || null;
+    const props = ($("#lpProps").value || "").split("\n").map(s => s.trim()).filter(Boolean);
+
+    if (fullName.length < 2) return toast("Enter full name.");
+    if (!email.includes("@")) return toast("Enter a valid email.");
+    if (!relationship) return toast("Pick a relationship.");
+    if (!entityName && !props.length) return toast("Enter an entity or at least 1 property.");
+
+    const next = loadDB();
+    if (next.landlordAccounts.some(a => (a.email || "").toLowerCase() === email.toLowerCase())) {
+      return toast("Account already exists. Log in instead.");
+    }
+
+    const account = {
+      id: uuid(),
+      fullName,
+      email,
+      phone,
+      relationship,
+      entityName,
+      propertyAddresses: props,
+      uploads: [],
+      verificationStatus: "not_submitted", // Not Submitted / Pending / Verified / Rejected
+      verificationReason: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    next.landlordAccounts.push(account);
+    saveDB(next);
+    localStorage.setItem("casa_current_landlord_account_id", account.id);
+
+    toast("Account created.");
+    location.hash = "#/landlord-portal/dashboard";
+  };
+}
+
+function renderLandlordPortalDashboard() {
+  const app = $("#app");
+  const next = loadDB();
+  const current = getCurrentLandlordAccount(next);
+
+  if (!current) {
+    location.hash = "#/landlord-portal/login";
+    return;
+  }
+
+  const statusBadge = current.verificationStatus === "verified"
+    ? `<span class="badge badge--verified">Verified Landlord</span>`
+    : `<span class="badge">${esc(statusLabel(current.verificationStatus))}</span>`;
+
+  app.innerHTML = `
+    <section class="section">
+      <div class="card">
+        <div class="hd">
+          <div>
+            <div class="kicker">Landlord Portal</div>
+            <div style="font-weight:1000;">Dashboard</div>
+            <div class="tiny">${esc(current.email)} • ${esc(current.relationship)}</div>
+          </div>
+
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <a class="btn btn--ghost" href="#/">← Home</a>
+            <a class="btn btn--ghost" href="#/">Home</a>
+            <button class="btn btn--ghost" id="lpLogout">Log out</button>
           </div>
         </div>
 
         <div class="bd">
-          ${
-            current
-              ? landlordPortalDashboard(current, next)
-              : landlordPortalSignupForm()
-          }
+
+          <div class="box">
+            <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="font-weight:1000;">${esc(current.fullName)} ${statusBadge}</div>
+              <a class="btn btn--ghost" href="#/landlord-portal/verify">Verification</a>
+            </div>
+
+            <div class="tiny" style="margin-top:6px;">
+              Entity: ${esc(current.entityName || "—")}
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Claim a profile</div>
+            <div class="tiny" style="margin-top:6px;">
+              Only verified landlords can claim profiles. Claiming lets you respond to reviews.
+            </div>
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn--primary" id="lpClaimBtn" ${current.verificationStatus !== "verified" ? "disabled" : ""}>Claim a landlord profile</button>
+              ${
+                current.verificationStatus !== "verified" && AUTO_VERIFY
+                  ? `<button class="btn btn--ghost" id="lpAutoVerifyBtn">Demo: mark verified</button>`
+                  : ``
+              }
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Your claimed profiles</div>
+            <div class="tiny" style="margin-top:6px;">
+              ${(next.landlords.filter(l => l.claimedByLandlordId === current.id)).length
+                ? next.landlords.filter(l => l.claimedByLandlordId === current.id).map(l => `• <a href="#/landlord/${esc(l.id)}"><b>${esc(l.name)}</b></a>`).join("<br/>")
+                : "None yet."
+              }
+            </div>
+          </div>
+
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 
-  // If no session, wire up create
-  if(!current){
-    $("#lpSubmit").onclick = () => {
-      const fullName = ($("#lpName").value || "").trim();
-      const email = ($("#lpEmail").value || "").trim();
-      const phone = ($("#lpPhone").value || "").trim() || null;
-      const relationship = ($("#lpRel").value || "").trim();
-      const entityName = ($("#lpEntity").value || "").trim() || null;
+  $("#lpLogout").onclick = () => {
+    localStorage.removeItem("casa_current_landlord_account_id");
+    toast("Logged out.");
+    location.hash = "#/landlord-portal";
+  };
 
-      const props = ($("#lpProps").value || "").split("\n").map(s=>s.trim()).filter(Boolean);
-      const uploads = $("#lpUploads").files ? Array.from($("#lpUploads").files) : [];
-
-      if(fullName.length < 2) return toast("Enter full name.");
-      if(!email.includes("@")) return toast("Enter a valid email.");
-      if(!relationship) return toast("Pick a relationship.");
-      if(!entityName && !props.length) return toast("Enter an entity name or at least one property address.");
-      if(uploads.length < 2) return toast("Upload at least 2 documents.");
-
-      const account = {
-        id: uuid(),
-        fullName,
-        email,
-        phone,
-        relationship,
-        entityName,
-        propertyAddresses: props,
-        uploads: uploads.map(f => ({ name: f.name, type: f.type, size: f.size })),
-        verificationStatus: AUTO_VERIFY ? "verified" : "pending",
-        createdAt: new Date().toISOString(),
-      };
-
+  const autoVerifyBtn = $("#lpAutoVerifyBtn");
+  if (autoVerifyBtn) {
+    autoVerifyBtn.onclick = () => {
       const fresh = loadDB();
-      fresh.landlordAccounts.push(account);
+      const acc = fresh.landlordAccounts.find(a => a.id === current.id);
+      if (!acc) return;
+      acc.verificationStatus = "verified";
+      acc.verificationReason = null;
       saveDB(fresh);
-
-      localStorage.setItem("casa_current_landlord_account_id", account.id);
-
-      toast(AUTO_VERIFY ? "Verified (AUTO_VERIFY)" : "Submitted for verification");
+      toast("Marked verified (demo).");
       render();
     };
-  } else {
-    // dashboard actions
-    const logoutBtn = $("#lpLogout");
-    if(logoutBtn){
-      logoutBtn.onclick = () => {
-        localStorage.removeItem("casa_current_landlord_account_id");
-        toast("Logged out.");
-        render();
-      };
-    }
+  }
 
-    const claimBtn = $("#lpClaimBtn");
-    if(claimBtn){
-      claimBtn.onclick = () => {
-        openModal(
-          "Claim a landlord profile",
-          `
-            <div class="tiny">Search and claim a profile. Only verified landlords can claim.</div>
-            <div class="field" style="margin-top:10px;">
-              <label>Search by landlord name / entity</label>
-              <input id="claimSearch" placeholder="Type to search…" autocomplete="off" />
-            </div>
-            <div class="box" style="margin-top:10px;" id="claimResults">
-              <div class="tiny">Type to see matches…</div>
-            </div>
-          `,
-          `
-            <button class="btn btn--ghost" id="cancelClaim">Close</button>
-          `
-        );
-        $("#cancelClaim").onclick = closeModal;
-
-        const input = $("#claimSearch");
-        const resultsBox = $("#claimResults");
-
-        input.addEventListener("input", () => {
-          const q = (input.value || "").trim().toLowerCase();
-          if(!q){
-            resultsBox.innerHTML = `<div class="tiny">Type to see matches…</div>`;
-            return;
-          }
-
-          const matches = loadDB().landlords
-            .filter(l => landlordHay(l).includes(q))
-            .slice(0,8);
-
-          if(!matches.length){
-            resultsBox.innerHTML = `<div class="tiny">No matches.</div>`;
-            return;
-          }
-
-          resultsBox.innerHTML = matches.map(l => `
-            <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(35,24,16,.08);">
-              <div style="min-width:0;">
-                <div style="font-weight:1000;">${esc(l.name)}</div>
-                <div class="tiny">${esc(l.entityName || "")}</div>
-              </div>
-              <button class="btn btn--primary" data-claim="${esc(l.id)}">Claim</button>
-            </div>
-          `).join("");
-
-          resultsBox.querySelectorAll("button[data-claim]").forEach(btn => {
-            btn.onclick = () => {
-              const lid = btn.getAttribute("data-claim");
-              const fresh = loadDB();
-              const acc = fresh.landlordAccounts.find(a => a.id === current.id);
-              if(!acc) return toast("Session expired.");
-              if(acc.verificationStatus !== "verified") return toast("Verification pending. Cannot claim yet.");
-
-              const landlord = fresh.landlords.find(x => x.id === lid);
-              if(!landlord) return toast("Not found.");
-
-              landlord.claimedByLandlordId = acc.id;
-              landlord.updatedAt = new Date().toISOString();
-              saveDB(fresh);
-
-              closeModal();
-              toast("Profile claimed.");
-              location.hash = `#/landlord/${lid}`;
-            };
-          });
-        });
-      };
-    }
-
-    const verifyBtn = $("#lpAutoVerifyBtn");
-    if(verifyBtn){
-      verifyBtn.onclick = () => {
-        const fresh = loadDB();
-        const acc = fresh.landlordAccounts.find(a => a.id === current.id);
-        if(!acc) return;
-        acc.verificationStatus = "verified";
-        saveDB(fresh);
-        toast("Marked verified (demo).");
-        render();
-      };
-    }
+  const claimBtn = $("#lpClaimBtn");
+  if (claimBtn) {
+    claimBtn.onclick = () => openClaimModal(current);
   }
 }
 
-function landlordPortalSignupForm(){
-  return `
-    <div class="box">
-      <div style="font-weight:1000;">Create a Landlord Portal account</div>
-      <div class="tiny" style="margin-top:6px;">
-        Verification requires document uploads (at least 2). Redacted docs are allowed.
+function renderLandlordPortalVerify() {
+  const app = $("#app");
+  const next = loadDB();
+  const current = getCurrentLandlordAccount(next);
+
+  if (!current) {
+    location.hash = "#/landlord-portal/login";
+    return;
+  }
+
+  app.innerHTML = `
+    <section class="section">
+      <div class="card">
+        <div class="hd">
+          <div>
+            <div class="kicker">Landlord Portal</div>
+            <div style="font-weight:1000;">Verification</div>
+            <div class="tiny">Upload proof to respond publicly.</div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn btn--ghost" href="#/landlord-portal/dashboard">← Dashboard</a>
+          </div>
+        </div>
+
+        <div class="bd">
+          <div class="box">
+            <div style="font-weight:1000;">Status: ${esc(statusLabel(current.verificationStatus))}</div>
+            ${current.verificationStatus === "rejected" ? `<div class="tiny" style="margin-top:6px;">Reason: ${esc(current.verificationReason || "—")}</div>` : ""}
+            <div class="tiny" style="margin-top:6px;">
+              Acceptable docs: deed, property tax, management agreement, utility bill, business registration.
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:12px;">
+            <label>Upload documents (PDF/JPG/PNG)</label>
+            <input id="lpUploads" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <button class="btn btn--primary" id="lpSubmitVerify">Submit verification</button>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Uploaded files</div>
+            <div class="tiny" style="margin-top:6px;">
+              ${(current.uploads||[]).length ? (current.uploads||[]).map(u=>`• ${esc(u.name)}`).join("<br/>") : "None yet."}
+            </div>
+          </div>
+
+          <div class="tiny" style="margin-top:10px;">
+            Demo tip: add <b>?autoVerify=1</b> to auto-verify during signup.
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      <div class="field">
-        <label>Full name</label>
-        <input id="lpName" placeholder="Full name" />
-      </div>
-      <div class="field">
-        <label>Email</label>
-        <input id="lpEmail" placeholder="name@email.com" />
-      </div>
-    </div>
-
-    <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      <div class="field">
-        <label>Phone (optional)</label>
-        <input id="lpPhone" placeholder="(optional)" />
-      </div>
-      <div class="field">
-        <label>Relationship</label>
-        <select id="lpRel">
-          <option value="">Select…</option>
-          <option>Owner</option>
-          <option>Property Manager</option>
-          <option>Agent</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="field" style="margin-top:10px;">
-      <label>Property address(es) (one per line) OR landlord entity name</label>
-      <textarea id="lpProps" placeholder="123 Main St, Brooklyn&#10;88 Water St, New York"></textarea>
-    </div>
-
-    <div class="field" style="margin-top:10px;">
-      <label>Entity name (LLC / management company) (optional)</label>
-      <input id="lpEntity" placeholder="Example: Northside Properties LLC" />
-    </div>
-
-    <div class="box" style="margin-top:12px;">
-      <div style="font-weight:1000;">Accepted proof documents</div>
-      <div class="tiny" style="margin-top:6px;">
-        • Deed / property tax bill<br/>
-        • Utility bill tied to property/entity<br/>
-        • Lease agreement showing landlord/entity (redaction OK)<br/>
-        • Management agreement<br/>
-        • Business registration showing entity + address<br/>
-        • City registration / licensing screenshots (where applicable)
-      </div>
-    </div>
-
-    <div class="field" style="margin-top:12px;">
-      <label>Upload documents (required, 2+). PDF/JPG/PNG.</label>
-      <input id="lpUploads" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
-    </div>
-
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:12px; flex-wrap:wrap;">
-      <button class="btn btn--primary" id="lpSubmit">Submit for verification</button>
-    </div>
-
-    <div class="tiny" style="margin-top:10px;">
-      Demo toggle: add <b>?autoVerify=1</b> to the URL to auto-verify.
-    </div>
+      ${renderFooter()}
+    </section>
   `;
+
+  $("#lpSubmitVerify").onclick = () => {
+    const uploads = $("#lpUploads").files ? Array.from($("#lpUploads").files) : [];
+    if (uploads.length < 1) return toast("Upload at least 1 document.");
+
+    const fresh = loadDB();
+    const acc = fresh.landlordAccounts.find(a => a.id === current.id);
+    if (!acc) return toast("Session expired.");
+
+    acc.uploads = uploads.map(f => ({ name: f.name, type: f.type, size: f.size }));
+    acc.verificationStatus = AUTO_VERIFY ? "verified" : "pending";
+    acc.verificationReason = null;
+
+    saveDB(fresh);
+    toast(AUTO_VERIFY ? "Verified (AUTO_VERIFY)" : "Submitted — pending review.");
+    location.hash = "#/landlord-portal/dashboard";
+  };
 }
 
-function landlordPortalDashboard(acc, snapshot){
-  const statusBadge = acc.verificationStatus === "verified"
-    ? `<span class="badge badge--verified">Verified Landlord</span>`
-    : `<span class="badge">Verification pending</span>`;
-
-  return `
-    <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center;">
-      <div>
-        <div style="font-weight:1000;">${esc(acc.fullName)} ${statusBadge}</div>
-        <div class="tiny">${esc(acc.email)} • ${esc(acc.relationship)}</div>
-      </div>
-      <button class="btn btn--ghost" id="lpLogout">Log out</button>
-    </div>
-
-    <div class="box" style="margin-top:12px;">
-      <div style="font-weight:1000;">Verification status</div>
-      ${
-        acc.verificationStatus === "verified"
-          ? `<div class="tiny" style="margin-top:6px;">You can claim profiles and respond to reviews.</div>`
-          : `<div class="tiny" style="margin-top:6px;">
-              Verification pending. For now, responses are disabled until verified.
-              ${AUTO_VERIFY ? "" : " (Demo: you can mark verified below.)"}
-            </div>`
-      }
-    </div>
-
-    <div class="box" style="margin-top:12px;">
-      <div style="font-weight:1000;">Documents uploaded</div>
-      <div class="tiny" style="margin-top:6px;">
-        ${(acc.uploads||[]).map(u=>`• ${esc(u.name)}`).join("<br/>") || "—"}
-      </div>
-    </div>
-
-    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn--primary" id="lpClaimBtn" ${acc.verificationStatus !== "verified" ? "disabled" : ""}>
-        Claim a landlord profile
-      </button>
-      ${
-        acc.verificationStatus !== "verified"
-          ? `<button class="btn btn--ghost" id="lpAutoVerifyBtn">Demo: mark verified</button>`
-          : ``
-      }
-    </div>
-
-    <div class="tiny" style="margin-top:10px;">
-      Once claimed + verified, you’ll see “Respond” buttons under reviews on that profile page.
-    </div>
-  `;
+function statusLabel(status) {
+  if (status === "not_submitted") return "Not Submitted";
+  if (status === "pending") return "Pending";
+  if (status === "verified") return "Verified";
+  if (status === "rejected") return "Rejected";
+  return status || "—";
 }
 
-/* Static pages */
-function renderGuidelines(){
+function openClaimModal(current) {
+  openModal(
+    "Claim a landlord profile",
+    `
+      <div class="tiny">Search and claim a profile. Only verified landlords can claim.</div>
+      <div class="field" style="margin-top:10px;">
+        <label>Search by landlord name / entity</label>
+        <input id="claimSearch" placeholder="Type to search…" autocomplete="off" />
+      </div>
+      <div class="box" style="margin-top:10px;" id="claimResults">
+        <div class="tiny">Type to see matches…</div>
+      </div>
+    `,
+    `<button class="btn btn--ghost" id="cancelClaim">Close</button>`
+  );
+
+  $("#cancelClaim").onclick = closeModal;
+
+  const input = $("#claimSearch");
+  const resultsBox = $("#claimResults");
+
+  input.addEventListener("input", () => {
+    const q = (input.value || "").trim().toLowerCase();
+    if (!q) {
+      resultsBox.innerHTML = `<div class="tiny">Type to see matches…</div>`;
+      return;
+    }
+
+    const matches = loadDB().landlords
+      .filter(l => landlordHay(l).includes(q))
+      .slice(0, 8);
+
+    if (!matches.length) {
+      resultsBox.innerHTML = `<div class="tiny">No matches.</div>`;
+      return;
+    }
+
+    resultsBox.innerHTML = matches.map(l => `
+      <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(35,24,16,.08);">
+        <div style="min-width:0;">
+          <div style="font-weight:1000;">${esc(l.name)}</div>
+          <div class="tiny">${esc(l.entityName || "")}</div>
+        </div>
+        <button class="btn btn--primary" data-claim="${esc(l.id)}">Claim</button>
+      </div>
+    `).join("");
+
+    resultsBox.querySelectorAll("button[data-claim]").forEach(btn => {
+      btn.onclick = () => {
+        const lid = btn.getAttribute("data-claim");
+        const fresh = loadDB();
+        const acc = fresh.landlordAccounts.find(a => a.id === current.id);
+        if (!acc) return toast("Session expired.");
+        if (acc.verificationStatus !== "verified") return toast("Verification pending. Cannot claim yet.");
+
+        const landlord = fresh.landlords.find(x => x.id === lid);
+        if (!landlord) return toast("Not found.");
+
+        landlord.claimedByLandlordId = acc.id;
+        landlord.updatedAt = new Date().toISOString();
+        saveDB(fresh);
+
+        closeModal();
+        toast("Profile claimed.");
+        location.hash = `#/landlord/${lid}`;
+      };
+    });
+  });
+}
+
+/* ------------------------------------------------------
+   STATIC PAGES
+------------------------------------------------------ */
+function renderHowItWorks() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card">
         <div class="hd">
           <div>
-            <div class="kicker">Posting Guidelines</div>
-            <div class="tiny">Keep it factual. Timelines > ranting.</div>
+            <div class="kicker">How it works</div>
+            <div class="tiny">Search → Review → Improve</div>
           </div>
           <a class="btn btn--ghost" href="#/">← Home</a>
         </div>
         <div class="bd">
           <div class="box">
-            <div style="font-weight:1000;">Rules</div>
-            <div class="tiny" style="margin-top:8px;">
-              • Factual statements only (dates, work orders, outcomes).<br/>
-              • No threats, harassment, or discriminatory content.<br/>
-              • Timelines beat venting: “3/2 reported, 3/9 fixed.”<br/>
-              • Optional evidence is fine (don’t dox anyone).<br/>
-              • Avoid personal info: phone numbers, emails, full names of private individuals.<br/>
-              • If mentioning an address, keep it general where possible.
-            </div>
+            <div style="font-weight:1000;">1) Search</div>
+            <div class="tiny" style="margin-top:6px;">Search landlord, management company, or address.</div>
+          </div>
+          <div class="box" style="margin-top:10px;">
+            <div style="font-weight:1000;">2) Review</div>
+            <div class="tiny" style="margin-top:6px;">No account required. You receive a private edit link after posting.</div>
+          </div>
+          <div class="box" style="margin-top:10px;">
+            <div style="font-weight:1000;">3) Improve</div>
+            <div class="tiny" style="margin-top:6px;">Anyone can improve landlord profiles. Verified landlords can respond publicly.</div>
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 }
-function renderHow(){
+
+function renderTrustSafety() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card">
         <div class="hd">
-          <div><div class="kicker">How it works</div></div>
+          <div>
+            <div class="kicker">Trust & Safety</div>
+            <div class="tiny">Moderation, reporting, and verification</div>
+          </div>
           <a class="btn btn--ghost" href="#/">← Home</a>
         </div>
+
         <div class="bd">
           <div class="box">
-            <div style="font-weight:1000;">1) Look up</div>
-            <div class="tiny" style="margin-top:6px;">Search by landlord/entity or by address.</div>
+            <div style="font-weight:1000;">What you can post</div>
+            <div class="tiny" style="margin-top:8px; line-height:1.55;">
+              • Factual statements (dates, work orders, outcomes)<br/>
+              • Your experience as a tenant<br/>
+              • General building/management behavior
+            </div>
           </div>
-          <div class="box" style="margin-top:10px;">
-            <div style="font-weight:1000;">2) Review</div>
-            <div class="tiny" style="margin-top:6px;">No account. You get an edit link token after posting.</div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">What you can’t post</div>
+            <div class="tiny" style="margin-top:8px; line-height:1.55;">
+              • Personal info (phone, email, SSN, etc.)<br/>
+              • Threats, harassment, discriminatory content<br/>
+              • Doxxing or targeted intimidation
+            </div>
           </div>
-          <div class="box" style="margin-top:10px;">
-            <div style="font-weight:1000;">3) Improve</div>
-            <div class="tiny" style="margin-top:6px;">Anyone can correct landlord profiles (names/LLCs/buildings).</div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Reporting & moderation</div>
+            <div class="tiny" style="margin-top:8px; line-height:1.55;">
+              Reviews can be reported for spam/harassment/personal info/fake/irrelevant.<br/>
+              If a review reaches <b>${REPORT_HIDE_THRESHOLD}</b> reports or matches doxxing keywords, it is hidden pending moderation.
+            </div>
           </div>
-          <div class="box" style="margin-top:10px;">
-            <div style="font-weight:1000;">Landlord responses</div>
-            <div class="tiny" style="margin-top:6px;">Only verified landlords can claim and respond.</div>
+
+          <div class="box" style="margin-top:12px;">
+            <div style="font-weight:1000;">Landlord verification</div>
+            <div class="tiny" style="margin-top:8px; line-height:1.55;">
+              Landlords can create accounts in the Landlord Portal only.<br/>
+              Verification requires proof docs. Verified landlords can claim profiles and respond publicly.
+            </div>
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 }
-function renderAbout(){
+
+function renderAbout() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card">
@@ -1648,10 +2090,13 @@ function renderAbout(){
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 }
-function renderContact(){
+
+function renderContact() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card">
@@ -1663,10 +2108,13 @@ function renderContact(){
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 }
-function renderPrivacy(){
+
+function renderPrivacy() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card">
@@ -1675,15 +2123,18 @@ function renderPrivacy(){
           <div class="box">
             <div style="font-weight:1000;">Privacy</div>
             <div class="tiny" style="margin-top:8px;">
-              Demo version stores data locally in your browser. Add hosted backend later for shared data.
+              Demo version stores data locally in your browser. Add a hosted backend later for shared data.
             </div>
           </div>
         </div>
       </div>
+
+      ${renderFooter()}
     </section>
   `;
 }
-function renderNotFound(){
+
+function renderNotFound() {
   $("#app").innerHTML = `
     <section class="section">
       <div class="card"><div class="pad">
@@ -1694,40 +2145,3 @@ function renderNotFound(){
     </section>
   `;
 }
-
-/* Helpers */
-function parseHash(){
-  const h = location.hash.replace(/^#/, "") || "/";
-  const path = h.startsWith("/review/edit/") ? "/review/edit"
-    : h.startsWith("/landlord/") ? "/landlord"
-    : h.startsWith("/edit-landlord/") ? "/edit-landlord"
-    : h.startsWith("/review/new/") ? "/review/new"
-    : (h.startsWith("/") ? h.split("?")[0] : `/${h.split("?")[0]}`);
-
-  const full = h.startsWith("/") ? h : `/${h}`;
-  const qs = full.includes("?") ? full.split("?")[1] : "";
-  const params = new URLSearchParams(qs);
-
-  const token = h.startsWith("/review/edit/") ? h.split("/review/edit/")[1] : null;
-  const landlordIdFromPath = h.startsWith("/landlord/") ? h.split("/landlord/")[1] : null;
-  const editLandlordIdFromPath = h.startsWith("/edit-landlord/") ? h.split("/edit-landlord/")[1] : null;
-  const reviewNewLandlordIdFromPath = h.startsWith("/review/new/") ? h.split("/review/new/")[1] : null;
-
-  return { path, params, token, landlordIdFromPath, editLandlordIdFromPath, reviewNewLandlordIdFromPath };
-}
-
-/* --- Acceptance checklist mapping ---
-✅ create review no login -> yes
-✅ edit via edit link -> yes (#/review/edit/<token>)
-✅ add/edit landlords no login -> yes
-✅ no reviewer login -> yes (menu has no login)
-✅ navbar Landlord Portal -> yes
-✅ landlord verification docs + status -> yes (2 uploads required + pending/verified)
-✅ only verified landlords respond -> yes (verified + claimed + session)
-✅ homepage no 3 pills -> yes
-✅ dual search -> yes
-✅ 1/2/3 clickable instructional -> yes
-✅ example preview card -> yes
-✅ grain/noise -> yes
-✅ autosuggest -> yes
------------------------------------- */
