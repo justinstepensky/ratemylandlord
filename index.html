@@ -2,61 +2,62 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <!-- iPhone-friendly viewport -->
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#6d28d9" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-
-  <title>RateMyLandlord</title>
+  <meta name="theme-color" content="#F3EBDD" />
+  <title>Casa</title>
 
   <style>
     :root{
-      --bg:#f6f7fb;
-      --panel:#ffffff;
-      --panel2:#f7f7fb;
-      --border:#e7e7ef;
-      --text:#0f172a;
-      --muted:#667085;
-      --muted2:#98a2b3;
-      --accent:#6d28d9;
-      --accent2:#7c3aed;
-      --good:#16a34a;
-      --warn:#f59e0b;
-      --bad:#ef4444;
-      --shadow: 0 18px 45px rgba(17, 24, 39, .10);
-      --radius:18px;
-      --focus: 0 0 0 4px rgba(124,58,237,.18);
+      /* Beige / neutral palette */
+      --bg: #F6F0E6;
+      --panel: #FFF9F0;
+      --panel2: #F3EBDD;
+      --border: rgba(35, 24, 16, .10);
+      --text: #231810;
+      --muted: rgba(35, 24, 16, .62);
+      --muted2: rgba(35, 24, 16, .46);
+
+      /* Accent: warm ink / espresso */
+      --ink: #1E140D;
+      --accent: #2A1B12;     /* deep brown */
+      --accent2: #3A261A;    /* slightly lighter */
+      --shadow: 0 18px 45px rgba(35, 24, 16, .10);
+      --radius: 18px;
+      --focus: 0 0 0 4px rgba(58,38,26,.18);
+
+      /* Lobster star colors */
+      --lobsterOn: #2A1B12;
+      --lobsterOff: rgba(42,27,18,.18);
     }
+
     *{ box-sizing:border-box; }
-    html{ -webkit-text-size-adjust: 100%; }
+    html, body{ height:100%; }
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       color:var(--text);
       background:
-        radial-gradient(1200px 800px at 10% 0%, rgba(124,58,237,.10), transparent 55%),
-        radial-gradient(1000px 700px at 90% 10%, rgba(99,102,241,.12), transparent 60%),
+        radial-gradient(1200px 800px at 10% 0%, rgba(58,38,26,.08), transparent 55%),
+        radial-gradient(900px 650px at 92% 8%, rgba(42,27,18,.06), transparent 60%),
         var(--bg);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
     a{ color:inherit; text-decoration:none; }
-    .wrap{ max-width: 1060px; margin: 0 auto; padding: 0 18px; }
+    .wrap{ max-width: 1040px; margin: 0 auto; padding: 0 16px; }
 
-    /* Top Nav */
+    /* Top bar */
     .nav{
       position: sticky;
       top:0;
       z-index:10;
       backdrop-filter: blur(10px);
-      background: rgba(246,247,251,.78);
-      border-bottom:1px solid rgba(231,231,239,.7);
-      -webkit-transform: translateZ(0);
-      transform: translateZ(0);
+      background: rgba(246,240,230,.78);
+      border-bottom: 1px solid rgba(35,24,16,.08);
+      padding-top: env(safe-area-inset-top);
     }
     .nav .wrap{
-      height:68px;
+      height:64px;
       display:flex;
       align-items:center;
       justify-content:space-between;
@@ -64,221 +65,292 @@
     }
     .brand{
       display:flex; align-items:center; gap:12px;
-      font-weight:900;
-      letter-spacing:.2px;
-    }
-    .logo{
-      width:34px; height:34px;
-      border-radius:12px;
-      background: linear-gradient(135deg, #4f46e5, #9333ea);
-      box-shadow: 0 10px 25px rgba(79,70,229,.25);
-    }
-    .nav-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .pill{
-      padding: 8px 12px;
-      border-radius: 999px;
-      border:1px solid var(--border);
-      background: rgba(255,255,255,.92);
       font-weight: 900;
-      font-size: 12.5px;
-      color:#111827;
-      white-space:nowrap;
+      letter-spacing: .2px;
     }
-    .pill.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
-    .pill.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
-    .pill.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
+    .brandName{
+      display:flex;
+      flex-direction:column;
+      line-height:1.1;
+    }
+    .brandName .top{
+      font-size: 16px;
+      font-weight: 1000;
+      letter-spacing: .2px;
+    }
+    .brandName .sub{
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+    }
 
-    /* Buttons */
+    .logoMark{
+      width:40px; height:40px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,249,240,.9), rgba(243,235,221,.9));
+      border: 1px solid rgba(35,24,16,.10);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 12px 30px rgba(35,24,16,.10);
+      flex: 0 0 auto;
+    }
+
+    /* Buttons / controls */
     .btn{
-      border:1px solid var(--border);
-      background:#fff;
-      color:#111827;
-      padding:12px 16px;
+      border:1px solid rgba(35,24,16,.14);
+      background: rgba(255,249,240,.9);
+      color: var(--ink);
+      padding: 10px 14px;
       border-radius: 999px;
-      font-weight:800;
+      font-weight: 900;
       cursor:pointer;
       display:inline-flex;
       align-items:center;
       gap:8px;
       white-space:nowrap;
-      min-height: 44px; /* iPhone tap target */
-      touch-action: manipulation;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn:hover{ box-shadow: 0 10px 22px rgba(17,24,39,.08); }
+    .btn:hover{ box-shadow: 0 10px 22px rgba(35,24,16,.08); }
+    .btn:focus{ outline:none; box-shadow: var(--focus); }
     .btn.primary{
-      border:none;
+      border: 1px solid rgba(35,24,16,.18);
       background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color:#fff;
+      color:#FFF9F0;
     }
-    .btn.danger{
-      border:1px solid rgba(239,68,68,.35);
-      background: rgba(239,68,68,.08);
-      color:#7f1d1d;
+    .btn.ghost{
+      background: transparent;
+      border:1px solid rgba(35,24,16,.12);
+      color: var(--ink);
     }
-    .btn:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-      box-shadow:none;
+    .pill{
+      padding: 8px 12px;
+      border-radius: 999px;
+      border:1px solid rgba(35,24,16,.12);
+      background: rgba(255,249,240,.85);
+      font-weight: 900;
+      font-size: 12px;
+      color: var(--ink);
+      max-width: 44vw;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
     }
 
-    /* Cards / Layout */
-    .hero{ padding: 40px 0 16px; }
+    .navRight{ display:flex; align-items:center; gap:10px; }
+
+    /* Dropdown menu */
+    .menuWrap{ position:relative; }
+    .menu{
+      position:absolute;
+      right:0;
+      top: calc(100% + 10px);
+      width: 260px;
+      background: rgba(255,249,240,.98);
+      border: 1px solid rgba(35,24,16,.12);
+      border-radius: 16px;
+      box-shadow: 0 26px 70px rgba(35,24,16,.18);
+      padding: 10px;
+      display:none;
+      z-index:999;
+    }
+    .menu.open{ display:block; }
+    .menu .item{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 10px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 900;
+      color: var(--ink);
+      border: 1px solid transparent;
+    }
+    .menu .item:hover{
+      background: rgba(243,235,221,.75);
+      border-color: rgba(35,24,16,.08);
+    }
+    .menu .mutedItem{
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height:1.3;
+    }
+    .menu .hr{
+      height:1px;
+      background: rgba(35,24,16,.10);
+      margin: 8px 0;
+    }
+
+    /* Layout */
+    .hero{
+      padding: 26px 0 12px;
+    }
     h1{
-      margin: 0 0 8px;
-      font-size: 46px;
-      line-height: 1.03;
+      margin: 0 0 10px;
+      font-size: 42px;
+      line-height: 1.04;
       letter-spacing: -1px;
     }
     .hero p{
-      margin: 0 0 18px;
+      margin: 0 0 16px;
       color: var(--muted);
       max-width: 80ch;
-      font-weight: 600;
+      font-weight: 700;
     }
 
-    .searchRow{
+    .toolbar{
       display:flex;
       gap:10px;
       align-items:center;
       flex-wrap:wrap;
+      margin-top: 12px;
     }
     .search{
       flex: 1 1 520px;
       display:flex;
       align-items:center;
       gap:10px;
-      background:#fff;
-      border:1px solid var(--border);
+      background: rgba(255,249,240,.92);
+      border:1px solid rgba(35,24,16,.12);
       border-radius: 999px;
       padding: 12px 14px;
-      box-shadow: 0 10px 30px rgba(17,24,39,.06);
+      box-shadow: 0 10px 30px rgba(35,24,16,.06);
     }
     .search input{
       border:none;
       outline:none;
       width:100%;
-      font-size: 16px; /* prevents iOS zoom */
-      color:#111827;
-      touch-action: manipulation;
+      font-size: 15px;
+      color: var(--ink);
+      background: transparent;
     }
-    .tiny{ font-size: 12.5px; color: var(--muted2); font-weight: 700; }
-    .muted{ color: var(--muted); }
 
-    .chipRow{
+    .select{
       display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:14px;
-    }
-    .chip{
-      border:1px solid var(--border);
-      background: rgba(255,255,255,.85);
-      padding: 10px 12px;
-      border-radius: 999px;
-      font-weight: 900;
-      font-size: 13px;
-      color:#374151;
-      cursor:pointer;
-      touch-action: manipulation;
-      min-height: 44px;
-      display:inline-flex;
       align-items:center;
+      gap:8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border:1px solid rgba(35,24,16,.12);
+      background: rgba(255,249,240,.92);
+      font-weight: 900;
+      color: var(--ink);
+      box-shadow: 0 10px 30px rgba(35,24,16,.06);
     }
-    .chip.active{
-      border-color: rgba(124,58,237,.35);
-      background: rgba(124,58,237,.12);
-      color: #4c1d95;
+    .select select{
+      border:none;
+      outline:none;
+      background: transparent;
+      font-weight: 900;
+      color: var(--ink);
+      cursor:pointer;
     }
 
     .grid{
       display:grid;
-      grid-template-columns: 1.3fr .7fr;
-      gap: 18px;
-      margin: 18px 0 40px;
-    }
-    @media (max-width: 980px){
-      .grid{ grid-template-columns: 1fr; }
-      h1{ font-size: 38px; }
+      grid-template-columns: 1.25fr .75fr;
+      gap: 16px;
+      margin: 14px 0 40px;
     }
 
     .card{
-      background: var(--panel);
-      border:1px solid var(--border);
+      background: rgba(255,249,240,.92);
+      border:1px solid rgba(35,24,16,.12);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
+      overflow:hidden;
     }
     .hd{
-      padding: 18px 18px 10px;
+      padding: 16px 16px 10px;
       display:flex;
       align-items:flex-start;
       justify-content:space-between;
       gap:12px;
     }
-    .bd{ padding: 10px 18px 18px; }
+    .bd{ padding: 10px 16px 16px; }
 
-    /* List items */
+    .tiny{ font-size: 12.5px; color: var(--muted2); font-weight: 800; }
+    .muted{ color: var(--muted); }
+
+    /* Result row */
     .rowCard{
       display:flex;
-      gap:14px;
+      gap:12px;
       align-items:stretch;
       padding: 14px;
-      border:1px solid var(--border);
+      border:1px solid rgba(35,24,16,.10);
       border-radius: 16px;
-      background: #fff;
-      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+      background: rgba(255,249,240,.96);
+      box-shadow: 0 10px 22px rgba(35,24,16,.06);
       cursor:pointer;
       margin-top: 12px;
-      touch-action: manipulation;
+      transition: transform .08s ease;
     }
-    .rowCard:hover{ outline: 3px solid rgba(124,58,237,.12); }
-
-    .scoreBox{
-      width: 88px;
-      min-width: 88px;
-      border-radius: 16px;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
+    .rowCard:hover{ transform: translateY(-1px); }
+    .rowMain{ flex:1; min-width:0; }
+    .rowTitle{
+      font-size: 16px;
       font-weight: 1000;
-      gap:2px;
-      border:1px solid rgba(22,163,74,.25);
-      background: rgba(22,163,74,.10);
+      margin: 0 0 6px;
+      color: var(--ink);
+      line-height:1.2;
     }
-    .scoreBox.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
-    .scoreBox.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
-    .scoreNum{ font-size: 32px; line-height: 1; }
-    .scoreText{ font-size: 12px; font-weight: 900; }
+    .rowSub{
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
 
-    .rowMain{ flex:1; }
-    .rowTitle{ font-size: 18px; font-weight: 1000; margin: 2px 0 2px; }
-    .rowSub{ color: var(--muted); font-weight: 800; font-size: 13px; margin-bottom: 10px; }
-    .badgeRow{ display:flex; flex-wrap:wrap; gap:8px; }
-    .badge{
+    .lobsterRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom: 6px;
+    }
+    .lobsterStars{
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .lobster{
+      width: 18px;
+      height: 18px;
+      display:block;
+    }
+    .scoreText{
+      font-weight: 1000;
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    .tagRow{ display:flex; flex-wrap:wrap; gap:8px; }
+    .tag{
       padding: 6px 10px;
       border-radius: 999px;
       font-weight: 900;
       font-size: 12px;
-      border:1px solid var(--border);
-      background: #fff;
+      border:1px solid rgba(35,24,16,.10);
+      background: rgba(243,235,221,.65);
+      color: rgba(35,24,16,.82);
     }
-    .badge.good{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.10); }
-    .badge.warn{ border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.12); }
-    .badge.bad{ border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.10); }
 
     /* Sidebar */
-    .side{ padding: 18px; }
+    .side{ padding: 16px; }
     .box{
-      border:1px dashed rgba(124,58,237,.35);
-      background: rgba(124,58,237,.06);
+      border:1px dashed rgba(35,24,16,.18);
+      background: rgba(243,235,221,.55);
       padding: 12px;
       border-radius: 14px;
     }
     ul{ margin: 12px 0 0 18px; padding:0; }
-    li{ margin: 8px 0; color:#344054; font-weight: 700; }
+    li{ margin: 8px 0; color: rgba(35,24,16,.78); font-weight: 800; }
 
-    /* Profile view */
-    #profileView{ display:none; padding: 18px 0 40px; }
+    /* Profile */
+    #profileView{ display:none; padding: 12px 0 40px; }
     .profileTop{
       display:flex;
       justify-content:space-between;
@@ -287,31 +359,34 @@
       flex-wrap:wrap;
       width:100%;
     }
+    h2{
+      margin:0 0 6px;
+      font-size: 28px;
+      letter-spacing: -.5px;
+      color: var(--ink);
+    }
     .profileActions{ display:flex; gap:10px; flex-wrap:wrap; }
-    h2{ margin: 0 0 6px; font-size: 30px; letter-spacing: -.5px; }
     .statsRow{
       display:grid;
       grid-template-columns: 360px 1fr;
-      gap: 18px;
+      gap: 16px;
       align-items:start;
     }
-    @media (max-width: 980px){
-      .statsRow{ grid-template-columns: 1fr; }
-    }
     .bigScore{
-      border:1px solid var(--border);
+      border:1px solid rgba(35,24,16,.12);
       border-radius: 18px;
-      background: #fff;
-      padding: 16px;
-      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+      background: rgba(255,249,240,.96);
+      padding: 14px;
+      box-shadow: 0 10px 22px rgba(35,24,16,.06);
     }
     .bigScore .num{
-      font-size: 54px;
+      font-size: 40px;
       font-weight: 1000;
-      line-height: 1;
+      line-height:1;
+      color: var(--ink);
     }
     .bigScore .sub{
-      margin-top:6px;
+      margin-top:8px;
       color: var(--muted);
       font-weight: 900;
       font-size: 13px;
@@ -321,27 +396,26 @@
       grid-template-columns: 1fr 1fr;
       gap:12px;
     }
-    @media (max-width: 720px){ .barGrid{ grid-template-columns: 1fr; } }
     .bar{
-      border:1px solid var(--border);
+      border:1px solid rgba(35,24,16,.12);
       border-radius: 16px;
       padding: 12px;
-      background: #fff;
-      box-shadow: 0 10px 22px rgba(17,24,39,.06);
+      background: rgba(255,249,240,.96);
+      box-shadow: 0 10px 22px rgba(35,24,16,.06);
     }
     .barTop{
       display:flex; justify-content:space-between; align-items:center;
       font-weight: 1000;
       font-size: 13px;
-      color:#344054;
+      color: rgba(35,24,16,.82);
       margin-bottom: 8px;
     }
     .track{
       height: 10px;
       border-radius: 999px;
-      background: #eef2ff;
+      background: rgba(35,24,16,.08);
       overflow:hidden;
-      border:1px solid rgba(79,70,229,.12);
+      border:1px solid rgba(35,24,16,.08);
     }
     .fill{
       height:100%;
@@ -350,19 +424,21 @@
       border-radius: 999px;
     }
 
-    /* Owner response box */
+    /* Owner response */
     .ownerResp{
       margin-top:12px;
       padding:12px;
-      border:1px solid rgba(124,58,237,.35);
-      background: rgba(124,58,237,.06);
+      border:1px solid rgba(35,24,16,.12);
+      background: rgba(243,235,221,.55);
       border-radius: 14px;
     }
     .ownerRespTitle{
       font-weight: 1000;
       font-size: 12px;
-      color: #5b3fd7;
+      color: rgba(35,24,16,.85);
       margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
     }
     .ownerRespDate{
       font-size: 12px;
@@ -371,25 +447,13 @@
       font-weight: 800;
     }
 
-    /* Portal card */
+    /* Portal */
     .portalCard{
       margin-top:14px;
       padding: 14px;
       border-radius: 16px;
-      border:1px solid rgba(124,58,237,.20);
-      background: rgba(124,58,237,.05);
-    }
-    .portalTop{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .portalTitle{
-      font-weight: 1000;
-      font-size: 14px;
-      color:#2e1065;
+      border:1px solid rgba(35,24,16,.12);
+      background: rgba(243,235,221,.55);
     }
 
     /* Modal */
@@ -397,125 +461,68 @@
       display:none;
       position:fixed;
       inset:0;
-      background: rgba(15, 23, 42, .55);
+      background: rgba(35, 24, 16, .45);
       z-index: 999;
-      padding: 22px;
+      padding: 18px;
+      padding-top: calc(18px + env(safe-area-inset-top));
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
     }
     .modal{
-      max-width: 650px;
+      max-width: 620px;
       margin: 0 auto;
-      background:#fff;
+      background: rgba(255,249,240,.98);
       border-radius: 20px;
       overflow:hidden;
-      border:1px solid var(--border);
-      box-shadow: 0 30px 80px rgba(0,0,0,.25);
-      width: 100%;
+      border:1px solid rgba(35,24,16,.12);
+      box-shadow: 0 30px 80px rgba(0,0,0,.20);
     }
-    .modalHd{ padding: 16px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
-    .modalBd{ padding: 16px 18px; }
-    .modalFt{ padding: 14px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+    .modalHd{
+      padding: 14px 16px;
+      border-bottom:1px solid rgba(35,24,16,.10);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .modalBd{ padding: 14px 16px; }
+    .modalFt{
+      padding: 12px 16px;
+      border-top:1px solid rgba(35,24,16,.10);
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      flex-wrap:wrap;
+    }
 
-    .field label{ font-size: 13px; font-weight: 1000; color:#344054; }
+    .field label{ font-size: 13px; font-weight: 1000; color: rgba(35,24,16,.82); }
     .field input, .field textarea, .field select{
       margin-top:6px;
       width:100%;
-      padding: 12px 12px;
+      padding: 10px 12px;
       border-radius: 14px;
-      border:1px solid var(--border);
+      border:1px solid rgba(35,24,16,.12);
       outline:none;
-      font-size: 16px; /* prevents iOS zoom */
-      touch-action: manipulation;
+      font-size: 14px;
+      background: rgba(255,249,240,.95);
+      color: var(--ink);
     }
-    .field input:focus, .field textarea:focus, .field select:focus{ box-shadow: var(--focus); border-color: rgba(124,58,237,.35); }
+    .field input:focus, .field textarea:focus, .field select:focus{ box-shadow: var(--focus); border-color: rgba(35,24,16,.20); }
     textarea{ resize: vertical; min-height: 90px; }
 
-    .hr{ height:1px; background: var(--border); margin: 12px 0; }
-
-    /* Toast */
-    .toastWrap{
-      position: fixed;
-      left: 0; right: 0;
-      bottom: 12px;
-      padding: 0 12px env(safe-area-inset-bottom);
-      z-index: 1001;
-      display:flex;
-      justify-content:center;
-      pointer-events:none;
-    }
-    .toast{
-      pointer-events:auto;
-      max-width: 720px;
-      width: fit-content;
-      background: rgba(17,24,39,.92);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 14px;
-      padding: 10px 12px;
-      font-weight: 800;
-      font-size: 13px;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      box-shadow: 0 18px 60px rgba(0,0,0,.25);
-    }
-    .toast .tag{
-      border-radius:999px;
-      padding: 4px 8px;
-      font-size: 12px;
-      font-weight: 1000;
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.12);
-    }
-    .toast button{
-      border: none;
-      background: rgba(255,255,255,.12);
-      color:#fff;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-weight: 900;
-      cursor:pointer;
-      min-height: 36px;
-      touch-action: manipulation;
-    }
-
-    /* =========================
-       iPhone / Mobile polish
-       ========================= */
-    button, a, input, select, textarea { touch-action: manipulation; }
-
-    @media (max-width: 720px) {
-      .wrap{ padding: 0 14px; }
-      .nav .wrap{ height:auto; padding: 10px 14px; align-items:flex-start; }
-      .nav-actions{ width:100%; gap: 8px; }
-      .nav-actions .btn{ flex: 1 1 auto; justify-content:center; }
-      h1{ font-size: 34px; }
-      .hero{ padding: 26px 0 10px; }
-      .searchRow{ flex-direction:column; align-items:stretch; }
-      .searchRow .btn{ width:100%; justify-content:center; }
+    /* Mobile */
+    @media (max-width: 980px){
       .grid{ grid-template-columns: 1fr; }
+      h1{ font-size: 34px; }
       .statsRow{ grid-template-columns: 1fr; }
       .barGrid{ grid-template-columns: 1fr; }
-      .rowCard{ padding: 12px; }
-      .scoreBox{ width: 78px; min-width: 78px; }
     }
-
-    /* Mobile modal becomes a bottom sheet */
     @media (max-width: 520px){
-      #modalBackdrop{ padding: 0; display:none; align-items: flex-end; }
-      #modalBackdrop[style*="display: block"]{ display:flex !important; }
-      .modal{
-        max-width: 100%;
-        border-radius: 18px 18px 0 0;
-        max-height: 92vh;
-      }
-      .modalBd{
-        max-height: calc(92vh - 120px);
-        overflow:auto;
-        -webkit-overflow-scrolling: touch;
-      }
-    }
-    @supports (height: 100dvh){
-      #modalBackdrop{ min-height: 100dvh; }
+      .nav .wrap{ height:60px; }
+      .pill{ display:none; } /* reduce clutter on small phones */
+      .btn{ padding: 10px 12px; }
+      .menu{ width: 92vw; max-width: 340px; }
+      .rowCard{ padding: 12px; }
+      .search{ padding: 11px 12px; }
     }
   </style>
 </head>
@@ -524,21 +531,63 @@
   <div class="nav">
     <div class="wrap">
       <a class="brand" href="#" onclick="goHome(); return false;">
-        <div class="logo"></div>
-        <span>RateMyLandlord</span>
+        <div class="logoMark" aria-hidden="true">
+          <!-- Chevron/lines-inspired mark -->
+          <svg width="26" height="22" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M2 6 L13 12 L24 6" stroke="#1E140D" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+            <path d="M2 10 L13 16 L24 10" stroke="#1E140D" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+            <path d="M2 14 L13 20 L24 14" stroke="#1E140D" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/>
+          </svg>
+        </div>
+        <div class="brandName">
+          <div class="top">Casa</div>
+          <div class="sub">landlord reviews</div>
+        </div>
       </a>
-      <div class="nav-actions">
-        <span id="modePill" class="pill warn" style="display:none;"></span>
+
+      <div class="navRight">
         <span id="userPill" class="pill" style="display:none;"></span>
 
-        <button class="btn" id="authBtn" onclick="openModal('auth')">Log in</button>
-        <button class="btn" id="logoutBtn" style="display:none;" onclick="logout()">Log out</button>
+        <div class="menuWrap">
+          <button class="btn" id="menuBtn" onclick="toggleMenu()">☰ Menu</button>
+          <div class="menu" id="menu">
+            <div class="mutedItem" id="modeNote">Checking backend…</div>
+            <div class="hr"></div>
 
-        <button class="btn" onclick="openModal('addLandlord')">Add Landlord</button>
-        <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
-        <button class="btn" onclick="syncNow()">Sync</button>
+            <div class="item" onclick="openModal('addLandlord')">
+              <span>Add landlord</span><span>＋</span>
+            </div>
+            <div class="item" onclick="openModal('addReview')">
+              <span>Write review</span><span>✎</span>
+            </div>
+            <div class="item" onclick="syncNow()">
+              <span>Sync</span><span>↻</span>
+            </div>
 
-        <button class="btn" id="adminBtn" style="display:none;" onclick="openModal('adminClaims')">Admin</button>
+            <div class="hr"></div>
+
+            <div class="item" id="authItem" onclick="openModal('auth')">
+              <span>Log in</span><span>→</span>
+            </div>
+            <div class="item" id="logoutItem" style="display:none;" onclick="logout()">
+              <span>Log out</span><span>⎋</span>
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="item" onclick="exportData()">
+              <span>Export data</span><span>⤓</span>
+            </div>
+            <div class="item" onclick="openModal('importData')">
+              <span>Import data</span><span>⤒</span>
+            </div>
+            <div class="item" onclick="resetAllData()">
+              <span>Reset local data</span><span>⚠︎</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn primary" onclick="openModal('addReview')">Write</button>
       </div>
     </div>
   </div>
@@ -547,28 +596,34 @@
     <!-- HOME VIEW -->
     <section id="homeView">
       <div class="hero">
-        <h1>Look up a landlord. Add reviews. Share your experience.</h1>
+        <h1>Find a landlord.<br/>Leave a review.</h1>
         <p>
-          This runs in two modes:
-          <b>Local Dev</b> (full backend) and <b>GitHub Pages Demo</b> (stores data in your browser).
+          Casa keeps reviews simple and factual. Landlords can respond once verified (local dev),
+          and GitHub Pages runs in “demo mode” using local storage.
         </p>
 
-        <div class="searchRow">
+        <div class="toolbar">
           <div class="search">
-            <span class="tiny">🔎</span>
-            <input id="searchInput" placeholder="Search by landlord / neighborhood / city..." oninput="renderHome()" />
+            <span class="tiny">⌕</span>
+            <input id="searchInput" placeholder="Search by landlord / neighborhood / city…" oninput="renderHome()" />
           </div>
-          <button class="btn" onclick="exportData()">Export</button>
-          <button class="btn" onclick="openModal('importData')">Import</button>
-        </div>
 
-        <div class="chipRow">
-          <div class="chip active" data-chip="overall" onclick="toggleSort('overall')">Sort: Overall</div>
-          <div class="chip" data-chip="repairs" onclick="toggleSort('repairs')">Sort: Repairs</div>
-          <div class="chip" data-chip="responsiveness" onclick="toggleSort('responsiveness')">Sort: Responsive</div>
-          <div class="chip" data-chip="deposits" onclick="toggleSort('deposits')">Sort: Deposits</div>
-          <div class="chip" data-chip="conditions" onclick="toggleSort('conditions')">Sort: Conditions</div>
-          <div class="chip" data-chip="communication" onclick="toggleSort('communication')">Sort: Comms</div>
+          <div class="select" title="Sort">
+            <span class="tiny">Sort</span>
+            <select id="sortSelect" onchange="onSortChange()">
+              <option value="overall_desc">Overall (high → low)</option>
+              <option value="overall_asc">Overall (low → high)</option>
+              <option value="repairs_desc">Repairs (high → low)</option>
+              <option value="responsiveness_desc">Responsiveness (high → low)</option>
+              <option value="deposits_desc">Deposits (high → low)</option>
+              <option value="conditions_desc">Conditions (high → low)</option>
+              <option value="communication_desc">Communication (high → low)</option>
+              <option value="reviews_desc">Most reviews</option>
+              <option value="new_desc">Newest landlord added</option>
+            </select>
+          </div>
+
+          <button class="btn ghost" onclick="exportData()">Export</button>
         </div>
       </div>
 
@@ -577,8 +632,8 @@
           <div class="card">
             <div class="hd">
               <div>
-                <h3 style="margin:0;">Results</h3>
-                <div class="tiny">Click a card to view details.</div>
+                <div style="font-weight:1000;">Results</div>
+                <div class="tiny">Tap a landlord to view details.</div>
               </div>
               <div class="tiny" id="resultCount"></div>
             </div>
@@ -587,8 +642,8 @@
         </div>
 
         <aside class="card side">
-          <h3 style="margin-top:0;">Posting guidelines</h3>
-          <div class="box">
+          <div style="font-weight:1000;">Posting guidelines</div>
+          <div class="box" style="margin-top:10px;">
             <div class="tiny">
               Keep it factual. Avoid personal info. No threats/harassment.
             </div>
@@ -597,13 +652,13 @@
             <li>Use dates (“work order 5/3, fixed 5/20”).</li>
             <li>No phone numbers/emails/SSNs.</li>
             <li>No threats, harassment, or discriminatory content.</li>
-            <li>If you mention an address, keep it general (street + neighborhood is safest).</li>
+            <li>Keep addresses general (street + neighborhood is safest).</li>
           </ul>
           <div style="margin-top:12px;">
             <button class="btn primary" style="width:100%; justify-content:center;" onclick="openModal('addLandlord')">Add a landlord</button>
           </div>
           <div style="margin-top:10px;">
-            <button class="btn" style="width:100%; justify-content:center;" onclick="resetAllData()">Reset all local data</button>
+            <button class="btn" style="width:100%; justify-content:center;" onclick="openModal('importData')">Import JSON</button>
           </div>
         </aside>
       </div>
@@ -620,7 +675,7 @@
             </div>
             <div class="profileActions">
               <button class="btn" onclick="goHome()">← Back</button>
-              <button class="btn primary" onclick="openModal('addReview')">Write Review</button>
+              <button class="btn primary" onclick="openModal('addReview')">Write review</button>
               <button class="btn" onclick="openModal('claimLandlord')">Claim</button>
             </div>
           </div>
@@ -629,9 +684,11 @@
         <div class="bd">
           <div class="statsRow">
             <div class="bigScore">
-              <div class="num" id="profileOverall">—</div>
+              <div class="lobsterRow">
+                <div class="lobsterStars" id="profileLobsters"></div>
+                <div class="scoreText"><span id="profileOverall">—</span></div>
+              </div>
               <div class="sub"><span id="profileReviewCount">0</span> reviews • Overall</div>
-              <div style="margin-top:10px;" class="badgeRow" id="profileTags"></div>
 
               <div id="portalArea" class="portalCard" style="display:none;"></div>
             </div>
@@ -639,9 +696,9 @@
             <div class="barGrid" id="profileBars"></div>
           </div>
 
-          <div style="margin-top:18px;">
+          <div style="margin-top:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-              <h3 style="margin:0;">Reviews</h3>
+              <div style="font-weight:1000;">Reviews</div>
               <div class="tiny muted" id="profileReviewHint"></div>
             </div>
             <div id="profileReviews" style="margin-top:10px;"></div>
@@ -666,247 +723,77 @@
     </div>
   </div>
 
-  <!-- TOAST -->
-  <div class="toastWrap" id="toastWrap" style="display:none;">
-    <div class="toast" id="toast">
-      <span class="tag" id="toastTag">INFO</span>
-      <span id="toastMsg">—</span>
-      <button onclick="hideToast()">OK</button>
-    </div>
-  </div>
-
 <script>
-  /**********************
-   * MODE DETECTION
-   * - GitHub Pages cannot call localhost backend.
-   * - So on github.io we run DEMO mode using LocalStorage.
-   **********************/
-  const IS_GH_PAGES = location.hostname.endsWith("github.io");
-  const DEMO = IS_GH_PAGES;
+  /***********************
+   * Casa (single-file)
+   * - Uses backend if reachable (local dev)
+   * - Falls back to localStorage on GitHub Pages
+   ***********************/
 
-  // Backend endpoints (used only when DEMO=false)
+  // If you're running locally, keep these as-is:
   const API_BASE = "http://localhost:8787";
-  const API_DB   = `${API_BASE}/db`;
+  const API_DB = `${API_BASE}/db`;
 
-  // LocalStorage keys (used when DEMO=true)
-  const LS_DB_KEY = "rml_db_v1";
-  const LS_AUTH_KEY = "rml_user_v1";
-  const LS_CLAIMS_KEY = "rml_claims_v1";
-  const LS_RESP_KEY = "rml_responses_v1"; // map key landlordId:reviewId => response
+  // LocalStorage key for GitHub Pages demo mode
+  const LS_KEY = "casa_db_v1";
 
-  // Data in memory
+  // In-memory data
   let db = { version: 1, landlords: [], reports: [] };
+
+  // Backend mode flags
+  let backendOnline = false;
+
+  // Auth state (only meaningful when backendOnline)
   let currentUser = null;
-  let myClaims = []; // [{id, landlord_id, user_id/email, status, proof_text, created_at}]
+  let myClaims = [];
 
   // UI state
   const state = {
     view: "home",
     selectedLandlordId: null,
     sortKey: "overall",
-    sortDir: "desc"
+    sortDir: "desc",
+    sortMode: "overall_desc"
   };
 
   // Modal state
   let currentModal = { type: null };
 
-  /**********************
-   * TOAST (no blocking alerts)
-   **********************/
-  function showToast(msg, tag="INFO"){
-    const wrap = document.getElementById("toastWrap");
-    const ttag = document.getElementById("toastTag");
-    const tmsg = document.getElementById("toastMsg");
-    ttag.textContent = tag;
-    tmsg.textContent = msg;
-    wrap.style.display = "flex";
+  /* ========= SVG helpers ========= */
+  function lobsterSVG(on=true){
+    const stroke = on ? "var(--lobsterOn)" : "var(--lobsterOff)";
+    return `
+      <svg class="lobster" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M22 20c-6-8-14-6-14 0 0 4 3 8 8 9" stroke="${stroke}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M42 20c6-8 14-6 14 0 0 4-3 8-8 9" stroke="${stroke}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M25 30c-5-4-10-4-14 0" stroke="${stroke}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M39 30c5-4 10-4 14 0" stroke="${stroke}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M32 18c-8 0-14 7-14 16 0 6 3 11 8 14v8c0 3 3 6 6 6s6-3 6-6v-8c5-3 8-8 8-14 0-9-6-16-14-16Z" stroke="${stroke}" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M26 40h12" stroke="${stroke}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M26 48h12" stroke="${stroke}" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+      </svg>
+    `;
   }
-  function hideToast(){
-    document.getElementById("toastWrap").style.display = "none";
-  }
-
-  /**********************
-   * DEMO STORAGE HELPERS
-   **********************/
-  function lsGet(key, fallback){
-    try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return fallback;
-      return JSON.parse(raw);
-    }catch{
-      return fallback;
+  function renderLobsterStars(score){
+    // score: 0..5 (may be null)
+    if(score === null || score === undefined) return `<span class="tiny muted">No reviews</span>`;
+    const filled = Math.round(score); // simple + clean
+    let out = "";
+    for(let i=1;i<=5;i++){
+      out += lobsterSVG(i <= filled);
     }
-  }
-  function lsSet(key, val){
-    localStorage.setItem(key, JSON.stringify(val));
+    return out;
   }
 
-  function demoEnsure(){
-    // DB
-    const existing = lsGet(LS_DB_KEY, null);
-    if(!existing){
-      lsSet(LS_DB_KEY, { version: 1, landlords: [], reports: [] });
-    }
-    // Claims
-    const c = lsGet(LS_CLAIMS_KEY, null);
-    if(!c) lsSet(LS_CLAIMS_KEY, []);
-    // Responses
-    const r = lsGet(LS_RESP_KEY, null);
-    if(!r) lsSet(LS_RESP_KEY, {});
+  /* ========= Basic utils ========= */
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
-
-  /**********************
-   * BACKEND I/O (LOCAL DEV)
-   **********************/
-  async function loadDB_backend(){
-    const res = await fetch(API_DB, { credentials: "include" });
-    if(!res.ok) throw new Error("Backend not reachable.");
-    db = await res.json();
-    db.version = db.version || 1;
-    db.landlords = db.landlords || [];
-    db.reports = db.reports || [];
-  }
-  async function saveDB_backend(){
-    const res = await fetch(API_DB, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(db)
-    });
-    if(!res.ok) throw new Error("Save failed.");
-  }
-  async function loadMe_backend(){
-    const r = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
-    const data = await r.json().catch(()=> ({}));
-    currentUser = data.user || null;
-  }
-  async function loadMyClaims_backend(){
-    myClaims = [];
-    if(!currentUser) return;
-    const r = await fetch(`${API_BASE}/claims/mine`, { credentials: "include" });
-    const data = await r.json().catch(()=> ({}));
-    if(r.ok && Array.isArray(data.claims)) myClaims = data.claims;
-  }
-
-  /**********************
-   * DEMO I/O (GITHUB PAGES)
-   **********************/
-  async function loadDB_demo(){
-    demoEnsure();
-    db = lsGet(LS_DB_KEY, { version: 1, landlords: [], reports: [] });
-    // Attach responses into db reviews (same shape as backend)
-    const respMap = lsGet(LS_RESP_KEY, {});
-    for(const l of (db.landlords || [])){
-      l.reviews = l.reviews || [];
-      for(const rv of l.reviews){
-        const key = `${l.id}:${rv.id}`;
-        if(respMap[key]) rv.response = respMap[key];
-      }
-    }
-  }
-  async function saveDB_demo(){
-    // strip attached response objects before saving (we store responses separately)
-    const clean = structuredClone(db);
-    for(const l of (clean.landlords || [])){
-      l.reviews = l.reviews || [];
-      for(const rv of l.reviews){
-        if(rv.response) delete rv.response;
-      }
-    }
-    lsSet(LS_DB_KEY, clean);
-  }
-  async function loadMe_demo(){
-    currentUser = lsGet(LS_AUTH_KEY, null);
-  }
-  async function loadMyClaims_demo(){
-    myClaims = [];
-    if(!currentUser) return;
-    const all = lsGet(LS_CLAIMS_KEY, []);
-    myClaims = all.filter(c => c.user_id === currentUser.id);
-  }
-
-  /**********************
-   * UNIFIED I/O
-   **********************/
-  async function loadAll(){
-    if(DEMO){
-      await loadMe_demo();
-      await loadMyClaims_demo();
-      await loadDB_demo();
-    }else{
-      await loadMe_backend();
-      await loadMyClaims_backend();
-      await loadDB_backend();
-    }
-  }
-  async function saveDB(){
-    if(DEMO) return saveDB_demo();
-    return saveDB_backend();
-  }
-
-  async function syncNow(){
-    try{
-      await loadAll();
-      renderModePill();
-      renderAuthPill();
-      renderAdminBtn();
-      if(state.view === "profile" && state.selectedLandlordId){
-        openProfile(state.selectedLandlordId);
-      }else{
-        renderHome();
-      }
-      if(DEMO){
-        // no “fail to fetch” popups on GH pages
-      }
-    }catch(err){
-      showToast(err.message || "Sync failed.", "ERROR");
-    }
-  }
-
-  /**********************
-   * UI PILL RENDERING
-   **********************/
-  function renderModePill(){
-    const pill = document.getElementById("modePill");
-    if(!DEMO){
-      pill.style.display = "none";
-      return;
-    }
-    pill.style.display = "inline-flex";
-    pill.className = "pill warn";
-    pill.textContent = "Demo Mode (GitHub Pages)";
-  }
-
-  function renderAuthPill(){
-    const pill = document.getElementById("userPill");
-    const authBtn = document.getElementById("authBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    if(!currentUser){
-      pill.style.display = "none";
-      authBtn.style.display = "inline-flex";
-      logoutBtn.style.display = "none";
-      return;
-    }
-
-    pill.style.display = "inline-flex";
-    pill.textContent = `${currentUser.email} • ${currentUser.role}`;
-    authBtn.style.display = "none";
-    logoutBtn.style.display = "inline-flex";
-  }
-
-  function renderAdminBtn(){
-    const btn = document.getElementById("adminBtn");
-    if(currentUser && currentUser.role === "admin"){
-      btn.style.display = "inline-flex";
-    }else{
-      btn.style.display = "none";
-    }
-  }
-
-  /**********************
-   * HELPERS
-   **********************/
   function avg(nums){
     if(!nums.length) return null;
     return nums.reduce((a,b)=>a+b,0) / nums.length;
@@ -914,6 +801,12 @@
   function fmtScore(x){
     if(x === null || x === undefined) return "—";
     return (Math.round(x*10)/10).toFixed(1);
+  }
+  function matchesQuery(l, q){
+    if(!q) return true;
+    q = q.toLowerCase();
+    const hay = [l.name, l.neighborhood, l.city].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
   }
   function landlordStats(l){
     const rs = l.reviews || [];
@@ -924,45 +817,167 @@
     }
     return out;
   }
-  function scoreLabel(score){
-    if(score === null) return { text:"No Reviews", cls:"warn" };
-    if(score >= 4.0) return { text:"Excellent", cls:"good" };
-    if(score >= 3.0) return { text:"Okay", cls:"warn" };
-    return { text:"Avoid", cls:"bad" };
-  }
   function tagsFromStats(stats){
     const tags = [];
-    if(!stats.count) return [{ t:"No Reviews Yet", cls:"warn" }];
-    if(stats.repairs >= 4.2) tags.push({ t:"Fast Repairs", cls:"good" });
-    if(stats.responsiveness >= 4.2) tags.push({ t:"Very Responsive", cls:"good" });
-    if(stats.deposits <= 2.5) tags.push({ t:"Deposit Issues", cls:"bad" });
-    if(stats.conditions <= 2.8) tags.push({ t:"Poor Conditions", cls:"bad" });
-    if(stats.communication >= 4.0) tags.push({ t:"Good Communication", cls:"good" });
-    if(!tags.length) tags.push({ t:"Mixed Reviews", cls:"warn" });
-    return tags.slice(0, 3);
+    if(!stats.count) return ["No reviews yet"];
+    if(stats.repairs >= 4.2) tags.push("Fast repairs");
+    if(stats.responsiveness >= 4.2) tags.push("Responsive");
+    if(stats.communication >= 4.0) tags.push("Clear communication");
+    if(stats.conditions <= 2.8) tags.push("Condition issues");
+    if(stats.deposits <= 2.5) tags.push("Deposit issues");
+    if(!tags.length) tags.push("Mixed experiences");
+    return tags.slice(0,3);
   }
-  function matchesQuery(l, q){
-    if(!q) return true;
-    q = q.toLowerCase();
-    const hay = [l.name, l.neighborhood, l.city].filter(Boolean).join(" ").toLowerCase();
-    return hay.includes(q);
+
+  function uuid(){
+    if(crypto?.randomUUID) return crypto.randomUUID();
+    return "id-" + Math.random().toString(16).slice(2) + Date.now().toString(16);
   }
-  function escapeHtml(s){
-    return String(s ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+
+  /* ========= Storage layer ========= */
+  function readLocalDB(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(!raw) return { version: 1, landlords: [], reports: [] };
+      const parsed = JSON.parse(raw);
+      parsed.version = parsed.version || 1;
+      parsed.landlords = parsed.landlords || [];
+      parsed.reports = parsed.reports || [];
+      return parsed;
+    }catch{
+      return { version: 1, landlords: [], reports: [] };
+    }
   }
+  function writeLocalDB(obj){
+    localStorage.setItem(LS_KEY, JSON.stringify(obj));
+  }
+
+  async function probeBackend(){
+    // We mark backendOnline true if /db responds with JSON
+    try{
+      const r = await fetch(API_DB, { credentials:"include", cache:"no-store" });
+      if(!r.ok) return false;
+      await r.json();
+      return true;
+    }catch{
+      return false;
+    }
+  }
+
+  async function loadDB(){
+    if(backendOnline){
+      const res = await fetch(API_DB, { credentials:"include", cache:"no-store" });
+      if(!res.ok) throw new Error("Backend not reachable");
+      db = await res.json();
+      db.version = db.version || 1;
+      db.landlords = db.landlords || [];
+      db.reports = db.reports || [];
+      return;
+    }
+    db = readLocalDB();
+  }
+
+  async function saveDB(){
+    if(backendOnline){
+      await fetch(API_DB, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(db)
+      });
+      return;
+    }
+    writeLocalDB(db);
+  }
+
+  async function loadMe(){
+    currentUser = null;
+    if(!backendOnline) return;
+    try{
+      const r = await fetch(`${API_BASE}/auth/me`, { credentials:"include", cache:"no-store" });
+      const data = await r.json().catch(()=> ({}));
+      currentUser = data.user || null;
+    }catch{
+      currentUser = null;
+    }
+  }
+
+  async function loadMyClaims(){
+    myClaims = [];
+    if(!backendOnline) return;
+    if(!currentUser) return;
+    try{
+      const r = await fetch(`${API_BASE}/claims/mine`, { credentials:"include", cache:"no-store" });
+      const data = await r.json().catch(()=> ({}));
+      if(r.ok && Array.isArray(data.claims)) myClaims = data.claims;
+    }catch{
+      myClaims = [];
+    }
+  }
+
+  /* ========= Menu / Auth pill ========= */
+  function toggleMenu(){
+    const m = document.getElementById("menu");
+    m.classList.toggle("open");
+  }
+  function closeMenu(){
+    document.getElementById("menu").classList.remove("open");
+  }
+
+  function renderAuthPill(){
+    const pill = document.getElementById("userPill");
+    const authItem = document.getElementById("authItem");
+    const logoutItem = document.getElementById("logoutItem");
+    const modeNote = document.getElementById("modeNote");
+
+    if(!backendOnline){
+      pill.style.display = "inline-flex";
+      pill.textContent = "Demo mode (GitHub Pages)";
+      authItem.style.display = "none";
+      logoutItem.style.display = "none";
+      modeNote.textContent = "Backend is offline here. Using local storage.";
+      return;
+    }
+
+    modeNote.textContent = "Backend online (local dev).";
+    authItem.style.display = "flex";
+
+    if(!currentUser){
+      pill.style.display = "none";
+      logoutItem.style.display = "none";
+      return;
+    }
+
+    pill.style.display = "inline-flex";
+    pill.textContent = `${currentUser.email} • ${currentUser.role}`;
+    logoutItem.style.display = "flex";
+  }
+
   function myClaimForLandlord(landlordId){
     if(!currentUser) return null;
     return myClaims.find(c => String(c.landlord_id) === String(landlordId)) || null;
   }
 
-  /**********************
-   * HOME RENDER
-   **********************/
+  /* ========= Home rendering ========= */
+  function onSortChange(){
+    const v = document.getElementById("sortSelect").value;
+    state.sortMode = v;
+
+    // Map to key/dir
+    const [key, dir] = v.split("_").slice(0,2);
+    if(key === "reviews"){
+      state.sortKey = "count";
+      state.sortDir = "desc";
+    }else if(key === "new"){
+      state.sortKey = "created_at";
+      state.sortDir = "desc";
+    }else{
+      state.sortKey = key;
+      state.sortDir = (dir === "asc") ? "asc" : "desc";
+    }
+    renderHome();
+  }
+
   function renderHome(){
     const q = (document.getElementById("searchInput").value || "").trim();
     const list = document.getElementById("landlordList");
@@ -973,8 +988,21 @@
       .map(l => ({ l, stats: landlordStats(l) }));
 
     landlords.sort((a,b) => {
-      const ka = a.stats[state.sortKey];
-      const kb = b.stats[state.sortKey];
+      const mode = state.sortMode;
+
+      if(mode === "reviews_desc"){
+        return (b.stats.count || 0) - (a.stats.count || 0);
+      }
+      if(mode === "new_desc"){
+        const ta = Date.parse(a.l.created_at || a.l.createdAt || 0) || 0;
+        const tb = Date.parse(b.l.created_at || b.l.createdAt || 0) || 0;
+        return tb - ta;
+      }
+
+      const key = state.sortKey;
+      const ka = (key === "count") ? a.stats.count : a.stats[key];
+      const kb = (key === "count") ? b.stats.count : b.stats[key];
+
       if(ka === null && kb === null) return 0;
       if(ka === null) return 1;
       if(kb === null) return -1;
@@ -985,28 +1013,23 @@
     list.innerHTML = "";
 
     landlords.forEach(({l, stats}) => {
-      const score = stats.overall;
-      const lbl = scoreLabel(score);
-      const tags = tagsFromStats(stats);
-      const reviewCount = stats.count;
-
       const card = document.createElement("div");
       card.className = "rowCard";
       card.onclick = () => openProfile(l.id);
 
+      const location = [l.neighborhood, l.city].filter(Boolean).join(" • ") || "—";
+      const tags = tagsFromStats(stats);
+
       card.innerHTML = `
-        <div class="scoreBox ${lbl.cls}">
-          <div class="scoreNum">${fmtScore(score)}</div>
-          <div class="scoreText">${lbl.text}</div>
-        </div>
         <div class="rowMain">
-          <div class="rowTitle">${escapeHtml(l.name)}</div>
-          <div class="rowSub">
-            ${escapeHtml([l.neighborhood, l.city].filter(Boolean).join(" • ") || "—")}
-            • ${reviewCount} review${reviewCount===1?"":"s"}
+          <div class="rowTitle">${escapeHtml(l.name || "—")}</div>
+          <div class="lobsterRow">
+            <div class="lobsterStars">${renderLobsterStars(stats.overall)}</div>
+            <div class="scoreText">${fmtScore(stats.overall)}</div>
           </div>
-          <div class="badgeRow">
-            ${tags.map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("")}
+          <div class="rowSub">${escapeHtml(location)} • ${stats.count} review${stats.count===1?"":"s"}</div>
+          <div class="tagRow">
+            ${tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("")}
           </div>
         </div>
       `;
@@ -1014,22 +1037,7 @@
     });
   }
 
-  function toggleSort(key){
-    if(state.sortKey === key){
-      state.sortDir = state.sortDir === "desc" ? "asc" : "desc";
-    }else{
-      state.sortKey = key;
-      state.sortDir = "desc";
-    }
-    document.querySelectorAll(".chipRow .chip").forEach(el=>{
-      el.classList.toggle("active", el.dataset.chip === state.sortKey);
-    });
-    renderHome();
-  }
-
-  /**********************
-   * PROFILE VIEW
-   **********************/
+  /* ========= Profile rendering ========= */
   function openProfile(id){
     state.view = "profile";
     state.selectedLandlordId = id;
@@ -1038,7 +1046,8 @@
     document.getElementById("profileView").style.display = "block";
 
     const l = db.landlords.find(x => x.id === id);
-    if(!l){ showToast("Landlord not found.", "ERROR"); return; }
+    if(!l){ alert("Landlord not found."); return; }
+
     const stats = landlordStats(l);
 
     document.getElementById("profileName").textContent = l.name || "—";
@@ -1046,8 +1055,7 @@
     document.getElementById("profileOverall").textContent = fmtScore(stats.overall);
     document.getElementById("profileReviewCount").textContent = stats.count;
 
-    const tags = tagsFromStats(stats);
-    document.getElementById("profileTags").innerHTML = tags.map(t => `<span class="badge ${t.cls}">${escapeHtml(t.t)}</span>`).join("");
+    document.getElementById("profileLobsters").innerHTML = renderLobsterStars(stats.overall);
 
     const barKeys = [
       ["repairs","Repairs"],
@@ -1089,7 +1097,7 @@
         ? `
           <div class="ownerResp">
             <div class="ownerRespTitle">Landlord response</div>
-            <div style="white-space:pre-wrap; font-weight:750; color:#344054;">
+            <div style="white-space:pre-wrap; font-weight:800; color:rgba(35,24,16,.82);">
               ${escapeHtml(resp.text || "")}
             </div>
             <div class="ownerRespDate">
@@ -1100,14 +1108,14 @@
         : "";
 
       d.innerHTML = `
-        <div class="scoreBox ${scoreLabel(r.ratings?.overall ?? null).cls}">
-          <div class="scoreNum">${fmtScore(r.ratings?.overall ?? null)}</div>
-          <div class="scoreText">Overall</div>
-        </div>
         <div class="rowMain">
           <div class="rowTitle">${escapeHtml(r.title || "Review")}</div>
-          <div class="rowSub">${created}</div>
-          <div style="font-weight:750; color:#344054; white-space:pre-wrap;">
+          <div class="lobsterRow" style="margin-top:-2px;">
+            <div class="lobsterStars">${renderLobsterStars(r.ratings?.overall ?? null)}</div>
+            <div class="scoreText">${fmtScore(r.ratings?.overall ?? null)}</div>
+            <div class="tiny muted" style="margin-left:auto;">${escapeHtml(created)}</div>
+          </div>
+          <div style="font-weight:800; color:rgba(35,24,16,.78); white-space:pre-wrap; margin-top:6px;">
             ${escapeHtml(r.text || "")}
           </div>
           ${respHtml}
@@ -1119,52 +1127,47 @@
 
   function renderPortalForLandlord(l){
     const portal = document.getElementById("portalArea");
-    portal.style.display = "none";
+    portal.style.display = "block";
     portal.innerHTML = "";
 
-    if(!currentUser) return;
-
-    const claim = myClaimForLandlord(l.id);
-    let statusPill = "";
-    if(claim){
-      const cls = claim.status === "approved" ? "good" : (claim.status === "denied" ? "bad" : "warn");
-      statusPill = `<span class="pill ${cls}">Claim: ${escapeHtml(claim.status)}</span>`;
-    }else{
-      statusPill = `<span class="pill warn">Not claimed</span>`;
+    if(!backendOnline){
+      portal.innerHTML = `
+        <div style="font-weight:1000;">Owner portal</div>
+        <div class="tiny muted" style="margin-top:6px;">
+          On GitHub Pages, the backend isn’t running — so claim/verification and landlord responses are disabled here.
+          Use your local backend to test those features.
+        </div>
+      `;
+      return;
     }
 
-    portal.style.display = "block";
+    if(!currentUser){
+      portal.innerHTML = `
+        <div style="font-weight:1000;">Owner portal</div>
+        <div class="tiny muted" style="margin-top:6px;">Log in to claim this listing and respond to reviews.</div>
+      `;
+      return;
+    }
+
+    const claim = myClaimForLandlord(l.id);
+    let status = claim ? claim.status : "not claimed";
+
     const canRespond = (claim && claim.status === "approved") || (currentUser.role === "admin");
 
     portal.innerHTML = `
-      <div class="portalTop">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
         <div>
-          <div class="portalTitle">Landlord portal</div>
-          <div class="tiny muted">To respond, you must be verified for this listing.</div>
+          <div style="font-weight:1000;">Owner portal</div>
+          <div class="tiny muted" style="margin-top:4px;">Claim status: <b>${escapeHtml(status)}</b></div>
         </div>
-        <div>${statusPill}</div>
+        <button class="btn" onclick="openModal('claimLandlord')">Claim</button>
       </div>
 
-      <div class="hr"></div>
-
-      <div>
-        <div class="tiny muted" style="margin-bottom:6px;">
-          Claim this listing (submit proof for admin review):
-        </div>
-        <button class="btn" onclick="openModal('claimLandlord')">Request verification</button>
-      </div>
-
-      <div class="hr"></div>
-
-      <div>
-        <div class="tiny muted" style="margin-bottom:6px;">
-          Respond to a review (approved owners only):
-        </div>
-        ${canRespond ? `
-          <button class="btn primary" onclick="openModal('respondReview')">Write a response</button>
-        ` : `
-          <span class="tiny muted">You must be approved before you can respond.</span>
-        `}
+      <div style="margin-top:10px;">
+        ${canRespond
+          ? `<button class="btn primary" onclick="openModal('respondReview')">Respond to a review</button>`
+          : `<div class="tiny muted">You must be approved before you can respond.</div>`
+        }
       </div>
     `;
   }
@@ -1177,41 +1180,43 @@
     renderHome();
   }
 
-  /**********************
-   * MODALS
-   **********************/
+  /* ========= Modals ========= */
   function openModal(type){
+    closeMenu();
     currentModal.type = type;
+
     const title = document.getElementById("modalTitle");
     const body = document.getElementById("modalBody");
     const submitBtn = document.getElementById("modalSubmitBtn");
     submitBtn.style.display = "inline-flex";
-    submitBtn.disabled = false;
 
     if(type === "auth"){
       title.textContent = "Log in / Sign up";
-      body.innerHTML = `
-        <div class="field">
-          <label>Email</label>
-          <input id="m_auth_email" placeholder="you@email.com" autocapitalize="none" autocomplete="email" />
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <label>Password</label>
-          <input id="m_auth_pw" type="password" placeholder="••••••••" autocomplete="current-password" />
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <label>I am a...</label>
-          <select id="m_auth_role">
-            <option value="tenant">Tenant</option>
-            <option value="landlord">Landlord</option>
-          </select>
-        </div>
-        <div class="tiny muted" style="margin-top:10px;">
-          ${DEMO
-            ? "Demo Mode: account is stored on this device only."
-            : "Local Dev: first-ever user becomes admin on the backend."}
-        </div>
-      `;
+      if(!backendOnline){
+        body.innerHTML = `<div class="tiny muted">Login requires the backend. On GitHub Pages this runs in demo mode.</div>`;
+        submitBtn.style.display = "none";
+      }else{
+        body.innerHTML = `
+          <div class="field">
+            <label>Email</label>
+            <input id="m_auth_email" placeholder="you@email.com" />
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Password</label>
+            <input id="m_auth_pw" type="password" placeholder="••••••••" />
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>I am a…</label>
+            <select id="m_auth_role">
+              <option value="tenant">Tenant</option>
+              <option value="landlord">Landlord</option>
+            </select>
+          </div>
+          <div class="tiny muted" style="margin-top:10px;">
+            If login fails, we auto-create your account (signup). First ever user becomes admin.
+          </div>
+        `;
+      }
     }
 
     if(type === "addLandlord"){
@@ -1235,7 +1240,7 @@
     if(type === "addReview"){
       title.textContent = "Write a review";
       if(!state.selectedLandlordId){
-        body.innerHTML = `<div class="tiny muted">First, click a landlord from Results. Then hit “Write Review.”</div>`;
+        body.innerHTML = `<div class="tiny muted">Open a landlord profile first, then write a review.</div>`;
         submitBtn.style.display = "none";
       }else{
         body.innerHTML = `
@@ -1245,7 +1250,7 @@
           </div>
           <div class="field" style="margin-top:10px;">
             <label>Your review</label>
-            <textarea id="m_review_text" rows="5" placeholder="Keep it factual..."></textarea>
+            <textarea id="m_review_text" rows="5" placeholder="Keep it factual…"></textarea>
           </div>
           <div class="field" style="margin-top:10px;">
             <label>Overall (1–5)</label>
@@ -1270,14 +1275,17 @@
           <textarea id="m_import_json" rows="10" placeholder='{"version":1,"landlords":[...]}'></textarea>
         </div>
         <div class="tiny muted" style="margin-top:8px;">
-          This will overwrite your current data.
+          This overwrites current data (local demo data or backend data).
         </div>
       `;
     }
 
     if(type === "claimLandlord"){
       title.textContent = "Request verification (claim listing)";
-      if(!currentUser){
+      if(!backendOnline){
+        body.innerHTML = `<div class="tiny muted">Claiming requires the backend. This page is in demo mode.</div>`;
+        submitBtn.style.display = "none";
+      }else if(!currentUser){
         body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
         submitBtn.style.display = "none";
       }else if(!state.selectedLandlordId){
@@ -1289,25 +1297,17 @@
         const statusLine = claim ? `<div class="tiny muted">Current claim status: <b>${escapeHtml(claim.status)}</b></div>` : "";
 
         body.innerHTML = `
-          <div class="tiny muted">
-            You’re requesting permission to respond as the verified owner/manager for:
-          </div>
+          <div class="tiny muted">You’re requesting verification for:</div>
           <div style="font-weight:1000; margin-top:6px;">${escapeHtml(l?.name || "—")}</div>
           <div class="tiny muted" style="margin-top:10px;">${statusLine}</div>
 
           <div class="field" style="margin-top:12px;">
             <label>Proof (type it here)</label>
             <textarea id="m_claim_proof" placeholder="Examples:
-• Link to management site showing your name
-• Business email domain used for leasing
+• Link to management website showing your name
+• Business email used for leasing
 • Lease header info (no personal tenant info)
 • Any context for the admin"></textarea>
-          </div>
-
-          <div class="tiny muted" style="margin-top:10px;">
-            ${DEMO
-              ? "Demo Mode: approvals happen inside this page via Admin (if you’re admin)."
-              : "Local Dev: admin approves claims via Admin UI (or curl)."}
           </div>
         `;
       }
@@ -1315,7 +1315,10 @@
 
     if(type === "respondReview"){
       title.textContent = "Respond to a review";
-      if(!currentUser){
+      if(!backendOnline){
+        body.innerHTML = `<div class="tiny muted">Responding requires the backend. This page is in demo mode.</div>`;
+        submitBtn.style.display = "none";
+      }else if(!currentUser){
         body.innerHTML = `<div class="tiny muted">Please log in first.</div>`;
         submitBtn.style.display = "none";
       }else if(!state.selectedLandlordId){
@@ -1350,47 +1353,9 @@
       }
     }
 
-    if(type === "adminClaims"){
-      title.textContent = "Admin: Pending claims";
-      if(!currentUser || currentUser.role !== "admin"){
-        body.innerHTML = `<div class="tiny muted">Admin only.</div>`;
-        submitBtn.style.display = "none";
-      }else{
-        submitBtn.textContent = "Close";
-        submitBtn.onclick = () => closeModal();
-
-        // Render list
-        const pending = getPendingClaims();
-        body.innerHTML = `
-          <div class="tiny muted" style="margin-bottom:10px;">
-            Approve/deny landlord verification requests.
-          </div>
-          ${pending.length ? pending.map(c => `
-            <div class="rowCard" style="cursor:default;">
-              <div class="rowMain">
-                <div class="rowTitle">${escapeHtml(c.landlord_name || c.landlord_id)}</div>
-                <div class="rowSub">${escapeHtml(c.email || "—")} • ${new Date(c.created_at).toLocaleString()}</div>
-                <div style="white-space:pre-wrap; font-weight:750; color:#344054;">
-                  ${escapeHtml(c.proof_text || "")}
-                </div>
-                <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-                  <button class="btn primary" onclick="adminApprove('${escapeHtml(c.id)}')">Approve</button>
-                  <button class="btn danger" onclick="adminDeny('${escapeHtml(c.id)}')">Deny</button>
-                </div>
-              </div>
-            </div>
-          `).join("") : `<div class="tiny muted">No pending claims.</div>`}
-        `;
-      }
-    }
-
-    // show modal
-    const backdrop = document.getElementById("modalBackdrop");
-    backdrop.style.display = "block";
-    backdrop.style.pointerEvents = "auto";
-
+    document.getElementById("modalBackdrop").style.display = "block";
     setTimeout(()=>{
-      const first = document.getElementById("modalBody").querySelector("input,select,textarea");
+      const first = body.querySelector("input,select,textarea");
       if(first) first.focus();
     }, 30);
   }
@@ -1407,326 +1372,195 @@
   }
 
   function closeModal(){
-    const backdrop = document.getElementById("modalBackdrop");
-    backdrop.style.display = "none";
-    // Safety: if iOS gets weird, ensure hidden backdrop never blocks taps
-    backdrop.style.pointerEvents = "none";
-    setTimeout(() => { backdrop.style.pointerEvents = "auto"; }, 0);
-
+    document.getElementById("modalBackdrop").style.display = "none";
     document.getElementById("modalSubmitBtn").style.display = "inline-flex";
-    document.getElementById("modalSubmitBtn").disabled = false;
-    document.getElementById("modalSubmitBtn").textContent = "Save";
-    document.getElementById("modalSubmitBtn").onclick = () => handleModalSubmit();
     currentModal.type = null;
   }
 
   async function handleModalSubmit(){
     const t = currentModal.type;
-    const submitBtn = document.getElementById("modalSubmitBtn");
-    submitBtn.disabled = true;
 
-    try{
-      if(t === "auth"){
-        const email = (document.getElementById("m_auth_email").value || "").trim().toLowerCase();
-        const password = (document.getElementById("m_auth_pw").value || "").trim();
-        const role = document.getElementById("m_auth_role").value;
+    if(t === "auth"){
+      const email = (document.getElementById("m_auth_email").value || "").trim();
+      const password = (document.getElementById("m_auth_pw").value || "").trim();
+      const role = document.getElementById("m_auth_role").value;
 
-        if(!email || !password) { submitBtn.disabled=false; return showToast("Enter email + password.", "WARN"); }
+      if(!email || !password) return alert("Enter email + password.");
 
-        if(DEMO){
-          // Demo: create user locally; first user becomes admin
-          const existing = lsGet(LS_AUTH_KEY, null);
-          const isFirst = !existing && !lsGet("rml_any_user_exists", false);
-          const finalRole = isFirst ? "admin" : (role === "landlord" ? "landlord" : "tenant");
-          const user = { id: crypto.randomUUID(), email, role: finalRole };
-          lsSet(LS_AUTH_KEY, user);
-          lsSet("rml_any_user_exists", true);
-          currentUser = user;
-          await loadMyClaims_demo();
-          renderAuthPill(); renderAdminBtn();
-          closeModal();
-          showToast(`Logged in: ${currentUser.role}`, "OK");
-          if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-          return;
-        }
+      let r = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
-        // Local dev: login first; if fails, signup
-        let r = await fetch(`${API_BASE}/auth/login`, {
+      if(!r.ok){
+        r = await fetch(`${API_BASE}/auth/signup`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password, role })
         });
-
-        if(!r.ok){
-          r = await fetch(`${API_BASE}/auth/signup`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, role })
-          });
-        }
-
-        const data = await r.json().catch(()=> ({}));
-        if(!r.ok) { submitBtn.disabled=false; return showToast(data.error || "Auth failed", "ERROR"); }
-
-        currentUser = data.user || null;
-        await loadMyClaims_backend().catch(()=>{});
-        renderAuthPill(); renderAdminBtn();
-        closeModal();
-        showToast(`Logged in: ${currentUser.role}`, "OK");
-        if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-        return;
       }
 
-      if(t === "addLandlord"){
-        const name = (document.getElementById("m_landlord_name").value || "").trim();
-        const neighborhood = (document.getElementById("m_landlord_neighborhood").value || "").trim();
-        const city = (document.getElementById("m_landlord_city").value || "").trim();
-        if(name.length < 2){ submitBtn.disabled=false; return showToast("Please enter a landlord name.", "WARN"); }
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Auth failed");
 
-        db.landlords.unshift({
-          id: crypto.randomUUID(),
-          name,
-          neighborhood: neighborhood || null,
-          city: city || null,
-          created_at: new Date().toISOString(),
-          reviews: []
-        });
-
-        await saveDB();
-        closeModal();
-        renderHome();
-        openProfile(db.landlords[0].id);
-        showToast("Landlord saved.", "OK");
-        return;
-      }
-
-      if(t === "addReview"){
-        if(!state.selectedLandlordId){ submitBtn.disabled=false; return; }
-        const l = db.landlords.find(x => x.id === state.selectedLandlordId);
-        if(!l){ submitBtn.disabled=false; return showToast("Landlord not found.", "ERROR"); }
-
-        const title = (document.getElementById("m_review_title").value || "").trim();
-        const text = (document.getElementById("m_review_text").value || "").trim();
-        if(text.length < 10){ submitBtn.disabled=false; return showToast("Write a bit more detail (10+ chars).", "WARN"); }
-
-        const ratings = {
-          overall: Number(document.getElementById("m_overall").value),
-          repairs: Number(document.getElementById("m_repairs").value),
-          responsiveness: Number(document.getElementById("m_responsiveness").value),
-          deposits: Number(document.getElementById("m_deposits").value),
-          conditions: Number(document.getElementById("m_conditions").value),
-          communication: Number(document.getElementById("m_communication").value),
-        };
-
-        l.reviews = l.reviews || [];
-        l.reviews.push({
-          id: crypto.randomUUID(),
-          title,
-          text,
-          ratings,
-          createdAt: new Date().toISOString()
-        });
-
-        await saveDB();
-        closeModal();
-        openProfile(l.id);
-        showToast("Review posted.", "OK");
-        return;
-      }
-
-      if(t === "importData"){
-        const raw = (document.getElementById("m_import_json").value || "").trim();
-        if(!raw){ submitBtn.disabled=false; return showToast("Paste your JSON export.", "WARN"); }
-        try{
-          const parsed = JSON.parse(raw);
-          if(!parsed || !Array.isArray(parsed.landlords)) throw new Error("Invalid format.");
-          db = parsed;
-          db.version = db.version || 1;
-          db.landlords = db.landlords || [];
-          db.reports = db.reports || [];
-          await saveDB();
-          closeModal();
-          goHome();
-          showToast("Imported successfully.", "OK");
-        }catch(e){
-          submitBtn.disabled=false;
-          showToast("Import failed: " + e.message, "ERROR");
-        }
-        return;
-      }
-
-      if(t === "claimLandlord"){
-        if(!currentUser){ submitBtn.disabled=false; return showToast("Log in first.", "WARN"); }
-        if(!state.selectedLandlordId){ submitBtn.disabled=false; return; }
-
-        const proofText = (document.getElementById("m_claim_proof").value || "").trim();
-
-        if(DEMO){
-          const all = lsGet(LS_CLAIMS_KEY, []);
-          const id = crypto.randomUUID();
-          const l = db.landlords.find(x => x.id === state.selectedLandlordId);
-          all.push({
-            id,
-            landlord_id: state.selectedLandlordId,
-            landlord_name: l?.name || state.selectedLandlordId,
-            user_id: currentUser.id,
-            email: currentUser.email,
-            status: "pending",
-            proof_text: proofText.slice(0, 4000),
-            created_at: new Date().toISOString()
-          });
-          lsSet(LS_CLAIMS_KEY, all);
-          await loadMyClaims_demo();
-          closeModal();
-          showToast("Claim submitted (pending).", "OK");
-          openProfile(state.selectedLandlordId);
-          return;
-        }
-
-        const r = await fetch(`${API_BASE}/claims/request`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ landlordId: state.selectedLandlordId, proofText })
-        });
-        const data = await r.json().catch(()=> ({}));
-        if(!r.ok){ submitBtn.disabled=false; return showToast(data.error || "Claim request failed", "ERROR"); }
-
-        await loadMyClaims_backend().catch(()=>{});
-        closeModal();
-        showToast("Claim submitted (pending).", "OK");
-        openProfile(state.selectedLandlordId);
-        return;
-      }
-
-      if(t === "respondReview"){
-        const reviewId = (document.getElementById("m_resp_reviewId").value || "").trim();
-        const text = (document.getElementById("m_resp_text").value || "").trim();
-        if(!reviewId){ submitBtn.disabled=false; return showToast("Pick a review.", "WARN"); }
-        if(text.length < 5){ submitBtn.disabled=false; return showToast("Write a little more.", "WARN"); }
-
-        if(DEMO){
-          const claim = myClaimForLandlord(state.selectedLandlordId);
-          const canRespond = (claim && claim.status === "approved") || (currentUser.role === "admin");
-          if(!canRespond){ submitBtn.disabled=false; return showToast("Not verified for this listing.", "ERROR"); }
-
-          const respMap = lsGet(LS_RESP_KEY, {});
-          respMap[`${state.selectedLandlordId}:${reviewId}`] = { text, createdAt: new Date().toISOString() };
-          lsSet(LS_RESP_KEY, respMap);
-
-          closeModal();
-          await syncNow();
-          showToast("Response posted.", "OK");
-          return;
-        }
-
-        const r = await fetch(`${API_BASE}/reviews/respond`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ landlordId: state.selectedLandlordId, reviewId, text })
-        });
-        const data = await r.json().catch(()=> ({}));
-        if(!r.ok){ submitBtn.disabled=false; return showToast(data.error || "Response failed", "ERROR"); }
-
-        closeModal();
-        await syncNow();
-        showToast("Response posted.", "OK");
-        return;
-      }
-
-      // Default: close
+      currentUser = data.user || null;
+      await loadMyClaims().catch(()=>{});
+      renderAuthPill();
       closeModal();
-    } finally {
-      // Only re-enable if modal is still open
-      const backdrop = document.getElementById("modalBackdrop");
-      if(backdrop.style.display === "block"){
-        submitBtn.disabled = false;
+      alert(`Logged in as ${currentUser.email} (${currentUser.role})`);
+      if(state.view === "profile" && state.selectedLandlordId){
+        openProfile(state.selectedLandlordId);
       }
-    }
-  }
-
-  /**********************
-   * ADMIN (demo + local)
-   **********************/
-  function getPendingClaims(){
-    if(!currentUser || currentUser.role !== "admin") return [];
-    if(DEMO){
-      const all = lsGet(LS_CLAIMS_KEY, []);
-      const pending = all.filter(c => c.status === "pending");
-      return pending;
-    }
-    // Local backend: we fetch live
-    // NOTE: for simplicity we do an on-demand fetch when opening modal
-    return [];
-  }
-
-  async function adminApprove(id){
-    if(!currentUser || currentUser.role !== "admin") return;
-    if(DEMO){
-      const all = lsGet(LS_CLAIMS_KEY, []);
-      const c = all.find(x => x.id === id);
-      if(c) c.status = "approved";
-      lsSet(LS_CLAIMS_KEY, all);
-      await loadMyClaims_demo();
-      openModal("adminClaims"); // refresh view
-      showToast("Approved.", "OK");
       return;
     }
-    // Local backend: needs claimId numeric from backend list.
-    // If you want this fully wired locally, tell me and I’ll plug in /claims/pending fetch + approve/deny.
-    showToast("Local admin UI needs backend /claims/pending wired. (Say: 'wire local admin ui')", "INFO");
-  }
 
-  async function adminDeny(id){
-    if(!currentUser || currentUser.role !== "admin") return;
-    if(DEMO){
-      const all = lsGet(LS_CLAIMS_KEY, []);
-      const c = all.find(x => x.id === id);
-      if(c) c.status = "denied";
-      lsSet(LS_CLAIMS_KEY, all);
-      await loadMyClaims_demo();
-      openModal("adminClaims");
-      showToast("Denied.", "OK");
+    if(t === "addLandlord"){
+      const name = (document.getElementById("m_landlord_name").value || "").trim();
+      const neighborhood = (document.getElementById("m_landlord_neighborhood").value || "").trim();
+      const city = (document.getElementById("m_landlord_city").value || "").trim();
+      if(name.length < 2) return alert("Please enter a landlord name.");
+
+      db.landlords.unshift({
+        id: uuid(),
+        name,
+        neighborhood: neighborhood || null,
+        city: city || null,
+        created_at: new Date().toISOString(),
+        reviews: []
+      });
+
+      await saveDB();
+      closeModal();
+      renderHome();
+      openProfile(db.landlords[0].id);
       return;
     }
-    showToast("Local admin UI needs backend /claims/pending wired. (Say: 'wire local admin ui')", "INFO");
+
+    if(t === "addReview"){
+      if(!state.selectedLandlordId) return;
+
+      const l = db.landlords.find(x => x.id === state.selectedLandlordId);
+      if(!l) return alert("Landlord not found.");
+
+      const title = (document.getElementById("m_review_title").value || "").trim();
+      const text = (document.getElementById("m_review_text").value || "").trim();
+      if(text.length < 10) return alert("Please write a bit more detail (10+ chars).");
+
+      const ratings = {
+        overall: Number(document.getElementById("m_overall").value),
+        repairs: Number(document.getElementById("m_repairs").value),
+        responsiveness: Number(document.getElementById("m_responsiveness").value),
+        deposits: Number(document.getElementById("m_deposits").value),
+        conditions: Number(document.getElementById("m_conditions").value),
+        communication: Number(document.getElementById("m_communication").value),
+      };
+
+      l.reviews = l.reviews || [];
+      l.reviews.push({
+        id: uuid(),
+        title,
+        text,
+        ratings,
+        createdAt: new Date().toISOString()
+      });
+
+      await saveDB();
+      closeModal();
+      await syncNow(); // ensures responses attached in backend mode
+      openProfile(l.id);
+      return;
+    }
+
+    if(t === "importData"){
+      const raw = (document.getElementById("m_import_json").value || "").trim();
+      if(!raw) return alert("Paste your JSON export.");
+      try{
+        const parsed = JSON.parse(raw);
+        if(!parsed || !Array.isArray(parsed.landlords)) throw new Error("Invalid format.");
+        db = parsed;
+        db.version = db.version || 1;
+        db.landlords = db.landlords || [];
+        db.reports = db.reports || [];
+        await saveDB();
+        closeModal();
+        goHome();
+        alert("Imported successfully.");
+      }catch(e){
+        alert("Import failed: " + e.message);
+      }
+      return;
+    }
+
+    if(t === "claimLandlord"){
+      if(!backendOnline) return;
+      if(!currentUser) return;
+      if(!state.selectedLandlordId) return;
+
+      const proofText = (document.getElementById("m_claim_proof").value || "").trim();
+
+      const r = await fetch(`${API_BASE}/claims/request`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ landlordId: state.selectedLandlordId, proofText })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Claim request failed");
+
+      await loadMyClaims().catch(()=>{});
+      closeModal();
+      alert("Claim submitted! Waiting for admin approval.");
+      openProfile(state.selectedLandlordId);
+      return;
+    }
+
+    if(t === "respondReview"){
+      if(!backendOnline) return;
+      const reviewId = (document.getElementById("m_resp_reviewId").value || "").trim();
+      const text = (document.getElementById("m_resp_text").value || "").trim();
+      if(!reviewId) return alert("Pick a review.");
+      if(text.length < 5) return alert("Write a little more.");
+
+      const r = await fetch(`${API_BASE}/reviews/respond`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ landlordId: state.selectedLandlordId, reviewId, text })
+      });
+      const data = await r.json().catch(()=> ({}));
+      if(!r.ok) return alert(data.error || "Response failed");
+
+      closeModal();
+      await syncNow();
+      alert("Response posted.");
+      return;
+    }
   }
 
-  /**********************
-   * LOGOUT
-   **********************/
   async function logout(){
-    try{
-      if(DEMO){
-        lsSet(LS_AUTH_KEY, null);
-        currentUser = null;
-        myClaims = [];
-      }else{
-        await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
-        currentUser = null;
-        myClaims = [];
-      }
-      renderAuthPill(); renderAdminBtn();
-      showToast("Logged out.", "OK");
-      if(state.view === "profile" && state.selectedLandlordId) openProfile(state.selectedLandlordId);
-    }catch{
-      showToast("Logout failed.", "ERROR");
+    if(backendOnline){
+      await fetch(`${API_BASE}/auth/logout`, { method:"POST", credentials:"include" }).catch(()=>{});
+    }
+    currentUser = null;
+    myClaims = [];
+    renderAuthPill();
+    alert("Logged out.");
+    if(state.view === "profile" && state.selectedLandlordId){
+      openProfile(state.selectedLandlordId);
     }
   }
 
-  /**********************
-   * EXPORT / RESET
-   **********************/
+  /* ========= Export / Reset ========= */
   function exportData(){
     const payload = JSON.stringify(db, null, 2);
     const blob = new Blob([payload], { type:"application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ratemylandlord_export.json";
+    a.download = "casa_export.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1734,44 +1568,60 @@
   }
 
   async function resetAllData(){
-    const ok = confirm("This will erase all landlords/reviews in your local data for this browser. Continue?");
-    if(!ok) return;
+    if(!confirm("This will erase data for this app in your current mode. Continue?")) return;
     db = { version: 1, landlords: [], reports: [] };
-    if(DEMO){
-      lsSet(LS_DB_KEY, db);
-      lsSet(LS_CLAIMS_KEY, []);
-      lsSet(LS_RESP_KEY, {});
-    }else{
-      await saveDB().catch(()=>{});
-    }
+    await saveDB();
     goHome();
-    showToast("Reset complete.", "OK");
   }
 
-  /**********************
-   * MODAL CLOSE HELPERS
-   **********************/
+  /* ========= Sync ========= */
+  async function syncNow(){
+    // Detect backend each sync (useful if you open locally vs github pages)
+    backendOnline = await probeBackend();
+
+    await loadMe().catch(()=>{});
+    await loadMyClaims().catch(()=>{});
+    await loadDB().catch(()=>{});
+
+    renderAuthPill();
+
+    if(state.view === "profile" && state.selectedLandlordId){
+      openProfile(state.selectedLandlordId);
+    }else{
+      renderHome();
+    }
+  }
+
+  /* ========= Global event wiring ========= */
   document.getElementById("modalBackdrop").addEventListener("click", (e)=>{
     if(e.target.id === "modalBackdrop") closeModal();
   });
   document.addEventListener("keydown", (e)=>{
-    if(e.key === "Escape") closeModal();
+    if(e.key === "Escape") {
+      closeModal();
+      closeMenu();
+    }
+  });
+  document.addEventListener("click", (e)=>{
+    // close menu when clicking outside
+    const menu = document.getElementById("menu");
+    const btn = document.getElementById("menuBtn");
+    if(menu.classList.contains("open")){
+      if(!menu.contains(e.target) && !btn.contains(e.target)){
+        closeMenu();
+      }
+    }
   });
 
-  /**********************
-   * INIT
-   **********************/
+  /* ========= Init ========= */
   (async function init(){
-    renderModePill();
-    // If on GitHub Pages, do NOT show scary “failed to fetch” popups
-    if(DEMO){
-      demoEnsure();
+    try{
+      // Ensure sort select matches default
+      document.getElementById("sortSelect").value = "overall_desc";
       await syncNow();
-      showToast("Demo mode: data saves in this browser.", "INFO");
-      return;
+    }catch(err){
+      alert(err.message || "Failed to start.");
     }
-    // Local dev
-    await syncNow();
   })();
 </script>
 </body>
