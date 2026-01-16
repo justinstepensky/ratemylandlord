@@ -238,9 +238,10 @@ function modalClose(){
 }
 function wireModal(){
   $("#modalClose")?.addEventListener("click", modalClose);
-  $("#modalBackdrop")?.addEventListener("click", (e) => {
-    if (e.target.id === "modalBackdrop") modalClose();
-  });
+$("#modalBackdrop")?.addEventListener("click", (e) => {
+  // close only when clicking the dim backdrop, not the modal
+  if (e.target === $("#modalBackdrop")) modalClose();
+});
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") modalClose();
   });
