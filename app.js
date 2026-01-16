@@ -6,6 +6,8 @@
    - Recent highlights carousel w/ dots only (max 5)
    - mobile drawer works
    - review modal fixed (z-index + layout)
+   - FIX: rating is now clickable stars w/ HALF-star support
+   - FIX: badges paths corrected + fail-safe if missing
 */
 
 /* -----------------------------
@@ -94,13 +96,16 @@ function fmtDate(ts) {
   return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
-function round1(n) {
-  return Math.round(n * 10) / 10;
+function slugify(s) {
+  return String(s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
-function starStaticHTML(value, sizePx = 16) {
-  const v = Math.max(0, Math.min(5, Number(value) || 0));
-  return `<span class="starStatic" style="--rating:${v};--starSize:${sizePx}px"></span>`;
+function round1(n) {
+  return Math.round(n * 10) / 10;
 }
 
 /* Recency-weighted average:
@@ -114,7 +119,7 @@ function weightedAverageStars(reviews) {
   for (const r of reviews) {
     const ageDays = Math.max(0, (now - r.createdAt) / (1000*60*60*24));
     const w = Math.pow(0.5, ageDays / halfLifeDays);
-    num += Number(r.stars) * w;
+    num += r.stars * w;
     den += w;
   }
   if (!den) return null;
@@ -122,9 +127,7 @@ function weightedAverageStars(reviews) {
 }
 
 function landlordReviews(landlordId) {
-  return DB.reviews
-    .filter(r => r.landlordId === landlordId)
-    .sort((a,b)=>b.createdAt-a.createdAt);
+  return DB.reviews.filter(r => r.landlordId === landlordId).sort((a,b)=>b.createdAt-a.createdAt);
 }
 
 function ratingStats(landlordId) {
@@ -134,19 +137,27 @@ function ratingStats(landlordId) {
   const avg = weightedAverageStars(rs);
   const avgRounded = round1(avg);
   const dist = [0,0,0,0,0]; // 1..5
-  for (const r of rs) {
-    const s = Math.round(Number(r.stars) || 0);
-    if (s >= 1 && s <= 5) dist[s - 1] += 1;
-  }
+  for (const r of rs) dist[r.stars - 1] += 1;
   return { count, avg, avgRounded, dist };
 }
 
+function starsVisual(avgRounded) {
+  if (avgRounded == null) return "★★★★★";
+  const full = Math.floor(avgRounded);
+  const half = (avgRounded - full) >= 0.5 ? 1 : 0;
+  const empty = 5 - full - half;
+  return "★".repeat(full) + (half ? "★" : "") + "☆".repeat(empty);
+}
+
 function cardTier(avgRounded, reviewCount) {
+  // If 0 reviews: no special coloring
   if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
-  const r = avgRounded;
+
+  const r = avgRounded; // IMPORTANT: classification uses the rounded rating
   if (r >= 1.0 && r <= 2.99) return { tier: "red", label: "Low Rating", pillClass: "pill--red" };
   if (r > 2.99 && r <= 3.99) return { tier: "yellow", label: "Mixed Reviews", pillClass: "pill--yellow" };
   if (r >= 4.0 && r <= 5.0) return { tier: "green", label: "Highly Rated", pillClass: "pill--green" };
+
   return { tier: "none", label: "Unrated", pillClass: "" };
 }
 
@@ -157,24 +168,29 @@ function casaCredential(landlordId) {
   const total = rs.length;
   const in12 = last12mo.length;
 
+  // CASA Rated = 10+ total AND 3+ last 12 months
   if (total === 0) return "Unrated";
   if (!(total >= 10 && in12 >= 3)) return "Not yet CASA Rated — needs more reviews";
   return "CASA Rated";
 }
 
-/* Badges: path + fallback for GH Pages quirks */
-function badgeImg(src, alt, title){
-  const safeAlt = esc(alt);
-  const safeTitle = esc(title);
-  const safeSrc = esc(src);
-  const fallback = safeSrc.startsWith("./") ? safeSrc.slice(2) : "./" + safeSrc;
-  return `<img class="badgeImg" src="${safeSrc}" alt="${safeAlt}" title="${safeTitle}" onerror="this.onerror=null;this.src='${fallback}'"/>`;
-}
-
+/* FIX: badge paths per your theme spec:
+   assets/badge-verified.png
+   assets/badge-top.png
+   + if missing, remove instead of broken icon
+*/
 function badgesHTML(l) {
   const parts = [];
-  if (l.verified) parts.push(badgeImg("assets/badge-verified.png","Verified","Verified Landlord (ownership verified)"));
-  if (l.top) parts.push(badgeImg("assets/badge-top.png","Top","Top Landlord (high rating + consistent performance)"));
+  if (l.verified) {
+    parts.push(
+      `<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)" onerror="this.remove()"/>`
+    );
+  }
+  if (l.top) {
+    parts.push(
+      `<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)" onerror="this.remove()"/>`
+    );
+  }
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
@@ -189,16 +205,16 @@ function initDrawer() {
   const closeBtn = $("#drawerClose");
 
   function open() {
-    drawer?.classList.add("isOpen");
-    overlay?.classList.add("isOpen");
-    drawer?.setAttribute("aria-hidden", "false");
-    overlay?.setAttribute("aria-hidden", "false");
+    drawer.classList.add("isOpen");
+    overlay.classList.add("isOpen");
+    drawer.setAttribute("aria-hidden", "false");
+    overlay.setAttribute("aria-hidden", "false");
   }
   function close() {
-    drawer?.classList.remove("isOpen");
-    overlay?.classList.remove("isOpen");
-    drawer?.setAttribute("aria-hidden", "true");
-    overlay?.setAttribute("aria-hidden", "true");
+    drawer.classList.remove("isOpen");
+    overlay.classList.remove("isOpen");
+    drawer.setAttribute("aria-hidden", "true");
+    overlay.setAttribute("aria-hidden", "true");
   }
 
   btn?.addEventListener("click", open);
@@ -210,6 +226,7 @@ function initDrawer() {
     if (a) close();
   });
 
+  // If someone resizes to desktop, close drawer automatically
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 981) close();
   });
@@ -220,7 +237,11 @@ function initDrawer() {
 ------------------------------ */
 function openModal(innerHTML) {
   const overlay = $("#modalOverlay");
-  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerHTML}</div>`;
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      ${innerHTML}
+    </div>
+  `;
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
@@ -286,6 +307,8 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
   const avgText = (avg == null) ? "—" : avg.toFixed(1);
+  const starVis = (avg == null) ? "☆☆☆☆☆" : (avg >= 4 ? "★★★★☆" : avg >= 3 ? "★★★☆☆" : avg >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+
   const addr = `${esc(l.address.line1)} • ${esc(l.address.city)} • ${esc(l.address.state)} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
 
   return `
@@ -298,11 +321,13 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
         <div class="lcMeta">${esc(addr)}</div>
 
         <div class="lcRow">
-          ${avg == null ? `<span class="muted">Unrated</span>` : starStaticHTML(avg, 16)}
+          <span class="stars">${starVis}</span>
           <span class="ratingNum">${avgText}</span>
           <span class="muted">(${count} review${count===1?"":"s"})</span>
           <span class="muted">Rating reflects review recency.</span>
         </div>
+
+        <div class="smallNote"></div>
       </div>
 
       <div class="lcRight">
@@ -314,29 +339,45 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   `;
 }
 
-/* Recent highlights */
+/* Recent highlights:
+   - up to 5 most recent reviews (across all landlords)
+   - dots count matches slides
+   - auto-advance
+*/
 let carouselTimer = null;
 
 function highlightsData() {
-  return DB.reviews
+  const items = DB.reviews
     .slice()
     .sort((a,b)=>b.createdAt-a.createdAt)
     .slice(0, 5)
-    .map(r => ({ r, l: DB.landlords.find(x => x.id === r.landlordId) }))
+    .map(r => {
+      const l = DB.landlords.find(x => x.id === r.landlordId);
+      return { r, l };
+    })
     .filter(x => x.l);
+  return items;
 }
 
 function renderHighlightsCarousel() {
   const items = highlightsData();
   if (items.length === 0) {
-    return `<div class="carousel"><div class="carouselSlide"><div class="muted">No highlights yet.</div></div></div>`;
+    return `
+      <div class="carousel">
+        <div class="carouselSlide">
+          <div class="muted">No highlights yet.</div>
+        </div>
+      </div>
+    `;
   }
 
   const slides = items.map(({r,l}) => {
     const st = ratingStats(l.id);
     const tier = cardTier(st.avgRounded ?? 0, st.count);
     const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+
     const avgText = (st.avgRounded == null) ? "—" : st.avgRounded.toFixed(1);
+    const starVis = (st.avgRounded == null) ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
     return `
       <div class="carouselSlide">
@@ -349,12 +390,13 @@ function renderHighlightsCarousel() {
             <div class="lcMeta">${fmtDate(r.createdAt)}</div>
 
             <div class="lcRow">
-              ${st.avgRounded == null ? `<span class="muted">Unrated</span>` : starStaticHTML(st.avgRounded, 16)}
+              <span class="stars">${starVis}</span>
               <span class="ratingNum">${avgText}</span>
               <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
             </div>
 
             <div class="smallNote">${esc(r.text)}</div>
+            <div class="smallNote">Rating reflects review recency.</div>
           </div>
           <div class="lcRight">
             ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
@@ -365,7 +407,7 @@ function renderHighlightsCarousel() {
     `;
   }).join("");
 
-  const dots = items.map((_, i) => `<span class="dot ${i===0?"isActive":""}" data-dot="${i}"></span>`).join("");
+  const dots = items.map((_, i) => `<span class="dot ${i===0?"isActive":""}" data-dot="${i}" aria-label="Go to slide ${i+1}"></span>`).join("");
 
   return `
     <div class="carousel" id="highCarousel">
@@ -390,8 +432,11 @@ function setupCarousel() {
     dots.forEach((d, i) => d.classList.toggle("isActive", i === idx));
   }
 
-  dots.forEach((d) => d.addEventListener("click", () => go(Number(d.dataset.dot))));
+  dots.forEach((d) => {
+    d.addEventListener("click", () => go(Number(d.dataset.dot)));
+  });
 
+  // auto-advance
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(() => go(idx + 1), 4500);
 }
@@ -428,22 +473,28 @@ function renderHome() {
           <a class="btn" href="#/add">Add a landlord</a>
         </div>
 
-        <div class="muted" style="text-align:center;margin-top:10px;">
+        <div class="muted" style="text-align:center;margin-top:10px;font-size:13px;">
           No account required to review. Verified landlords can respond.
         </div>
 
         <div class="tileRow">
           <div class="tile" data-home-tile="search">
             <div class="tile__icon">⌕</div>
-            <div><div class="tile__label">Search</div></div>
+            <div>
+              <div class="tile__label">Search</div>
+            </div>
           </div>
           <div class="tile" data-home-tile="review">
             <div class="tile__icon">★</div>
-            <div><div class="tile__label">Review</div></div>
+            <div>
+              <div class="tile__label">Review</div>
+            </div>
           </div>
           <div class="tile tile--disabled">
             <div class="tile__icon">⌂</div>
-            <div><div class="tile__label">Rent</div></div>
+            <div>
+              <div class="tile__label">Rent</div>
+            </div>
           </div>
         </div>
         <div class="tilePanel" id="tilePanel" style="display:none"></div>
@@ -451,7 +502,7 @@ function renderHome() {
     </section>
 
     <section class="splitRow">
-      <div class="card card--highlights">
+      <div class="card">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -461,11 +512,12 @@ function renderHome() {
             </div>
             <a class="btn miniBtn" href="#/search">Browse all</a>
           </div>
+
           ${renderHighlightsCarousel()}
         </div>
       </div>
 
-      <div class="card card--map">
+      <div class="card">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -485,14 +537,14 @@ function renderHome() {
   `;
   renderShell(content);
 
+  // tile copy
   const tilePanel = $("#tilePanel");
   document.querySelectorAll("[data-home-tile]").forEach(el => {
     el.addEventListener("click", () => {
       const k = el.dataset.homeTile;
       tilePanel.style.display = "block";
-      tilePanel.textContent = (k === "search")
-        ? "Search by name, entity or address"
-        : "Leave a rating based on select categories";
+      if (k === "search") tilePanel.textContent = "Search by name, entity or address";
+      if (k === "review") tilePanel.textContent = "Leave a rating based on select categories";
     });
   });
 
@@ -501,6 +553,7 @@ function renderHome() {
     location.hash = `#/search?q=${encodeURIComponent(q)}`;
   });
 
+  // Map
   setTimeout(() => {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
@@ -554,6 +607,7 @@ function renderSearch() {
           <button class="btn btn--primary" id="doSearch">Search</button>
         </div>
 
+        <!-- MAP ON TOP (like before) -->
         <div class="mapBox" style="margin-top:14px;">
           <div class="map" id="searchMap" style="height:320px;"></div>
         </div>
@@ -585,6 +639,7 @@ function renderSearch() {
       ? list.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
       : `<div class="muted">No results.</div>`;
 
+    // map + markers
     const mapEl = $("#searchMap");
     mapEl.innerHTML = "";
     const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
@@ -599,6 +654,7 @@ function renderSearch() {
       }
     }
 
+    // center on map buttons
     document.querySelectorAll("[data-center]").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.center;
@@ -613,6 +669,7 @@ function renderSearch() {
   $("#doSearch").addEventListener("click", () => {
     const query = qEl.value.trim();
     location.hash = `#/search?q=${encodeURIComponent(query)}`;
+    // keep borough selection without putting in URL (simple)
     run();
   });
 
@@ -718,7 +775,7 @@ function renderAdd() {
       name,
       entity,
       address: { line1, unit, city, state },
-      borough: "",
+      borough: "", // no borough field on add page
       lat: picked?.lat ?? 40.73,
       lng: picked?.lng ?? -73.95,
       verified: false,
@@ -728,12 +785,13 @@ function renderAdd() {
 
     DB.landlords.unshift(l);
     saveDB(DB);
+
     location.hash = `#/landlord/${id}`;
   });
 }
 
 function renderHow() {
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -755,11 +813,12 @@ function renderHow() {
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
 }
 
 function renderTrust() {
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -781,7 +840,8 @@ function renderTrust() {
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
 }
 
 function renderPortal() {
@@ -797,7 +857,7 @@ function renderPortal() {
           <a class="btn" href="#/">Home</a>
         </div>
 
-        <div class="twoCol">
+        <div class="portalGrid">
           <div class="card" style="box-shadow:none;">
             <div class="pad">
               <div class="kicker">Sign in</div>
@@ -815,12 +875,19 @@ function renderPortal() {
 
               <div class="tiny" style="text-align:center;margin-top:12px;">or continue with</div>
 
-              <div class="field" style="margin-top:10px;">
-                <button class="btn btn--block" id="oauthGoogle">Continue with Google</button>
-                <div style="height:10px"></div>
-                <button class="btn btn--block" id="oauthApple">Continue with Apple</button>
-                <div style="height:10px"></div>
-                <button class="btn btn--block" id="oauthMicrosoft">Continue with Microsoft</button>
+              <div class="oauth">
+                <button class="oauthBtn" id="oauthGoogle">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
+                  Continue with Google
+                </button>
+                <button class="oauthBtn" id="oauthApple">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
+                  Continue with Apple
+                </button>
+                <button class="oauthBtn" id="oauthMicrosoft">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
+                  Continue with Microsoft
+                </button>
               </div>
             </div>
           </div>
@@ -840,12 +907,34 @@ function renderPortal() {
 
               <div class="field">
                 <label>Verification document (demo)</label>
-                <input class="input" id="doc" type="file" />
-                <div class="tiny" style="margin-top:8px;">Deed, tax bill, management agreement, utility statement, etc.</div>
+
+                <div class="fileRow">
+                  <div class="fileName" id="fileName">No file chosen</div>
+                  <label class="filePick" for="doc">Choose file</label>
+                  <input id="doc" type="file" />
+                </div>
+
+                <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
+              </div>
+
+              <div class="tiny" style="text-align:center;margin-top:10px;">or continue with</div>
+              <div class="oauth" style="margin-top:10px;">
+                <button class="oauthBtn" id="oauthGoogle2">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
+                  Continue with Google
+                </button>
+                <button class="oauthBtn" id="oauthApple2">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
+                  Continue with Apple
+                </button>
+                <button class="oauthBtn" id="oauthMicrosoft2">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
+                  Continue with Microsoft
+                </button>
               </div>
 
               <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
+              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
             </div>
           </div>
         </div>
@@ -864,101 +953,113 @@ function renderPortal() {
   `;
   renderShell(content);
 
-  const demo = (label) => alert(`${label} (demo)`);
-  ["oauthGoogle","oauthApple","oauthMicrosoft","psignin","signup"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener("click", () => demo(id));
+  // file name
+  const doc = $("#doc");
+  const fileName = $("#fileName");
+  doc.addEventListener("change", () => {
+    fileName.textContent = doc.files?.[0]?.name || "No file chosen";
   });
+
+  // demo auth
+  const demo = (label) => alert(`${label} (demo)`);
+  ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2"].forEach(id=>{
+    $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
+  });
+  $("#psignin").addEventListener("click", ()=>demo("Sign in"));
+  $("#signup").addEventListener("click", ()=>demo("Create account"));
 }
 
-/* -----------------------------
-   Landlord page
------------------------------- */
 function renderLandlord(id) {
   const l = DB.landlords.find(x => x.id === id);
-  if (!l) {
-    renderShell(`
-      <section class="pageCard card">
-        <div class="pad">
-          <div class="kicker">Not found</div>
-          <div class="pageTitle">Landlord not found</div>
-          <div class="pageSub">This landlord may have been removed.</div>
-          <div style="margin-top:14px;">
-            <a class="btn btn--primary" href="#/search">Back to search</a>
-          </div>
-        </div>
-      </section>
-    `);
-    return;
-  }
+  if (!l) return renderHome();
 
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-  const tier = cardTier(st.avgRounded ?? 0, st.count);
+  const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
-  const addr = `${esc(l.address.line1)}${l.address.unit ? " • " + esc(l.address.unit) : ""} • ${esc(l.address.city)} • ${esc(l.address.state)}${l.borough ? " • " + esc(l.borough) : ""}`;
-  const credential = casaCredential(l.id);
-  const rs = landlordReviews(l.id);
+  const cred = casaCredential(l.id);
+  const badgeRow = badgesHTML(l);
 
+  const distTotal = st.dist.reduce((a,b)=>a+b,0);
   const content = `
     <section class="pageCard card">
       <div class="pad">
-        <div class="topRow">
+        <div class="profileHead">
           <div>
             <div class="kicker">Landlord</div>
-            <div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <div class="pageTitle" style="margin:0">${esc(l.name)}</div>
-                ${badgesHTML(l)}
-              </div>
+            <div class="profileNameRow">
+              <h1 class="profileName">${esc(l.name)}</h1>
+              ${badgeRow}
+            </div>
 
-              <div class="lcRow" style="margin-top:10px">
-                ${st.avgRounded == null ? `<span class="muted">Unrated</span>` : starStaticHTML(st.avgRounded, 18)}
-                <span class="ratingNum" style="font-size:18px;">${avgText}</span>
-                <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
-                ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
-              </div>
+            <div class="profileStats">
+              <span class="stars">${starVis}</span>
+              <span class="ratingNum">${avgText}</span>
+              <span class="muted">${st.count ? `${st.count} review${st.count===1?"":"s"}` : "No ratings"}</span>
+              <span class="muted">Rating reflects review recency.</span>
+              <span class="pill">${esc(cred === "CASA Rated" ? "CASA Rated" : (st.count ? "Not yet CASA Rated" : "Unrated"))}</span>
+            </div>
 
-              <div class="muted" style="margin-top:10px">${esc(addr)}</div>
-              <div class="muted" style="margin-top:10px;">
-                <b>${esc(credential)}</b> • Rating reflects review recency.
-              </div>
+            <div class="addrLine">
+              ${esc(l.address.line1)}${l.address.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address.city)}, ${esc(l.address.state)}
             </div>
           </div>
 
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;gap:10px;align-items:center">
             <a class="btn" href="#/search">Back</a>
-            <button class="btn btn--primary" id="leaveReview">Leave a review</button>
+            <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
           </div>
         </div>
 
-        <div class="twoCol" style="margin-top:14px;">
-          <div>
-            <div class="kicker">Rating distribution</div>
-            ${renderHistogram(st)}
-            <div class="hr"></div>
+        <div class="hr"></div>
 
-            <div class="kicker">Reviews</div>
-            <div class="list" id="reviewList">
-              ${rs.length ? rs.map(r => reviewCardHTML(r)).join("") : `<div class="muted">No reviews yet.</div>`}
+        <div class="twoCol">
+          <div>
+            <div class="kicker">Location</div>
+            <div class="mapBox" style="margin-top:10px;">
+              <div class="map" id="profileMap" style="height:280px;"></div>
+            </div>
+            <button class="btn" style="margin-top:10px;" id="centerProfile">Center on map</button>
+
+            <div class="histo">
+              <div class="kicker" style="margin-top:18px;">Rating distribution</div>
+              ${[5,4,3,2,1].map(star=>{
+                const count = st.dist[star-1] || 0;
+                const pct = distTotal ? Math.round((count/distTotal)*100) : 0;
+                return `
+                  <div class="hRow">
+                    <div class="muted">${star}★</div>
+                    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+                    <div class="muted">${count}</div>
+                  </div>
+                `;
+              }).join("")}
             </div>
           </div>
 
           <div>
-            <div class="kicker">Map</div>
-            <div class="mapBox" style="margin-top:10px;">
-              <div class="map" id="landlordMap" style="height:320px;"></div>
+            <div class="kicker">Reviews</div>
+            <div class="list" style="margin-top:10px;">
+              ${
+                landlordReviews(l.id).length
+                ? landlordReviews(l.id).map(r => `
+                  <div class="lc" style="background:rgba(255,255,255,.72)">
+                    <div class="lcLeft">
+                      <div class="lcRow">
+                        <span class="stars">${"★".repeat(r.stars)}${"☆".repeat(5-r.stars)}</span>
+                        <span class="ratingNum">${r.stars}/5</span>
+                      </div>
+                      <div class="smallNote" style="margin-top:10px;font-size:14px;font-weight:700;color:rgba(21,17,14,.78)">
+                        ${esc(r.text)}
+                      </div>
+                      <button class="btn miniBtn" style="margin-top:10px;" data-report="${esc(r.id)}">Report</button>
+                    </div>
+                    <div class="muted">${fmtDate(r.createdAt)}</div>
+                  </div>
+                `).join("")
+                : `<div class="muted">No reviews yet. Be the first.</div>`
+              }
             </div>
-
-            <div class="hr"></div>
-
-            <div class="kicker">Trust & Safety</div>
-            <div class="muted" style="font-weight:700;line-height:1.55;margin-top:8px;">
-              Keep reviews factual. No phone numbers, emails, or private info.
-            </div>
-
-            <button class="btn" style="margin-top:12px;" id="reportBtn">Report this listing</button>
           </div>
         </div>
       </div>
@@ -966,131 +1067,124 @@ function renderLandlord(id) {
   `;
   renderShell(content);
 
+  // Map
   setTimeout(() => {
-    const mapEl = $("#landlordMap");
-    if (!mapEl) return;
-    const lat = typeof l.lat === "number" ? l.lat : 40.73;
-    const lng = typeof l.lng === "number" ? l.lng : -73.95;
-    const map = initLeafletMap(mapEl, [lat, lng], 13);
-    L.marker([lat, lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b>`);
+    const map = initLeafletMap($("#profileMap"), [l.lat ?? 40.73, l.lng ?? -73.95], 12);
+    let marker = null;
+    if (typeof l.lat === "number" && typeof l.lng === "number") {
+      marker = L.marker([l.lat, l.lng]).addTo(map);
+    }
+    $("#centerProfile").addEventListener("click", () => {
+      map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
+      marker?.openPopup?.();
+    });
   }, 0);
 
-  $("#leaveReview").addEventListener("click", () => openReviewModal(l.id));
-  $("#reportBtn").addEventListener("click", () => openReportModal(l.id));
-
-  document.querySelectorAll("[data-report-review]").forEach(btn => {
-    btn.addEventListener("click", () => openReportModal(l.id, btn.dataset.reportReview));
+  // Report
+  document.querySelectorAll("[data-report]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alert("Report submitted (demo).");
+    });
   });
-}
 
-function renderHistogram(st) {
-  const total = st.count || 0;
-  const dist = st.dist || [0,0,0,0,0]; // 1..5
-  const rows = [5,4,3,2,1].map((star) => {
-    const n = dist[star - 1] || 0;
-    const pct = total ? Math.round((n / total) * 100) : 0;
-    return `
-      <div class="hRow">
-        <div style="font-weight:900;">${star}</div>
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div style="font-weight:900;text-align:right;">${n}</div>
-      </div>
-    `;
-  }).join("");
-  return `<div class="histo">${rows}</div>`;
-}
-
-function reviewCardHTML(r) {
-  const v = Number(r.stars) || 0;
-  return `
-    <div class="lc" style="align-items:flex-start;">
-      <div class="lcLeft">
-        <div class="lcRow">
-          ${starStaticHTML(v, 16)}
-          <span class="ratingNum">${v.toFixed(1)}/5</span>
-          <span class="muted">${fmtDate(r.createdAt)}</span>
-        </div>
-        <div class="smallNote">${esc(r.text)}</div>
-      </div>
-      <div class="lcRight">
-        <button class="btn miniBtn" data-report-review="${esc(r.id)}">Report</button>
-      </div>
-    </div>
-  `;
+  // Review modal (fixed so map never blocks it)
+  $("#rateBtn").addEventListener("click", () => openReviewModal(l.id));
 }
 
 /* -----------------------------
-   Review Modal (stars with half-star)
+   Star picker (HALF star)
 ------------------------------ */
-function openReviewModal(landlordId) {
-  let rating = 5.0;
+function starPickerHTML(defaultValue = 5) {
+  // value is 0.5 increments from 0.5..5
+  const v = Number(defaultValue) || 5;
+  return `
+    <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
+      ${[1,2,3,4,5].map(i => {
+        return `
+          <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
+            <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
+            <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
+            ★
+          </button>
+        `;
+      }).join("")}
+      <span class="starValue" id="starValue">${v.toFixed(1)}</span>
+      <input type="hidden" id="mStars" value="${v}">
+    </div>
+    <div class="tiny" style="margin-top:6px;">Half-stars supported.</div>
+  `;
+}
 
+function applyStarPickerVisual(value) {
+  const v = Number(value) || 0;
+  const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
+  btns.forEach(btn => {
+    const s = Number(btn.dataset.star);
+    btn.classList.toggle("isFull", v >= s);
+    btn.classList.toggle("isHalf", v === (s - 0.5));
+  });
+  const out = $("#starValue");
+  if (out) out.textContent = v.toFixed(1);
+  const hidden = $("#mStars");
+  if (hidden) hidden.value = String(v);
+}
+
+function bindStarPicker(defaultValue = 5) {
+  let current = Number(defaultValue) || 5;
+  applyStarPickerVisual(current);
+
+  // hover preview
+  document.querySelectorAll("#starPicker .hit").forEach(hit => {
+    hit.addEventListener("mouseenter", () => applyStarPickerVisual(hit.dataset.value));
+  });
+  $("#starPicker").addEventListener("mouseleave", () => applyStarPickerVisual(current));
+
+  // click set
+  document.querySelectorAll("#starPicker .hit").forEach(hit => {
+    hit.addEventListener("click", () => {
+      current = Number(hit.dataset.value);
+      applyStarPickerVisual(current);
+    });
+  });
+}
+
+/* Review modal (NOW stars + halves) */
+function openReviewModal(landlordId) {
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">Leave a review</div>
       <button class="iconBtn" id="mClose" aria-label="Close">×</button>
     </div>
-
     <div class="modalBody">
       <div class="field">
         <label>Rating</label>
-
-        <div class="starPicker" id="starPicker" aria-label="Star rating">
-          ${[1,2,3,4,5].map(i => `
-            <button class="starBtn isFull" type="button" data-star="${i}" aria-label="${i} stars">
-              <span class="hit hitL" data-value="${i - 0.5}"></span>
-              <span class="hit hitR" data-value="${i}"></span>
-            </button>
-          `).join("")}
-          <div class="tiny" id="starLabel" style="margin-left:10px;font-weight:900;">5.0 / 5</div>
-        </div>
-
-        <div class="tiny" style="margin-top:8px;">Tip: click the left half for half-stars.</div>
+        ${starPickerHTML(5)}
       </div>
 
       <div class="field">
         <label>What happened?</label>
-        <textarea class="input" id="mText" placeholder="Keep it factual and specific."></textarea>
+        <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
         <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
-
     <div class="modalFoot">
       <button class="btn" id="mCancel">Cancel</button>
       <button class="btn btn--primary" id="mSubmit">Submit</button>
     </div>
   `);
 
-  const close = () => closeModal();
-  $("#mClose").addEventListener("click", close);
-  $("#mCancel").addEventListener("click", close);
+  $("#mClose").addEventListener("click", closeModal);
+  $("#mCancel").addEventListener("click", closeModal);
 
-  const picker = $("#starPicker");
-  const label = $("#starLabel");
-
-  function paintStars(val) {
-    rating = Math.max(0.5, Math.min(5, Number(val) || 5));
-    label.textContent = `${rating.toFixed(1)} / 5`;
-
-    const stars = Array.from(picker.querySelectorAll(".starBtn"));
-    stars.forEach((btn, idx) => {
-      const starNum = idx + 1;
-      btn.classList.remove("isFull", "isHalf");
-      if (rating >= starNum) btn.classList.add("isFull");
-      else if (rating >= starNum - 0.5) btn.classList.add("isHalf");
-    });
-  }
-
-  picker.addEventListener("click", (e) => {
-    const v = e.target?.dataset?.value;
-    if (!v) return;
-    paintStars(Number(v));
-  });
-
-  paintStars(5);
+  // init star picker
+  bindStarPicker(5);
 
   $("#mSubmit").addEventListener("click", () => {
+    // store as integer 1..5 (your DB is integer-based)
+    const raw = Number($("#mStars").value); // 0.5 increments
+    const starsInt = Math.max(1, Math.min(5, Math.round(raw))); // round halves to nearest whole for storage
     const text = $("#mText").value.trim();
+
     if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
       return;
@@ -1099,72 +1193,18 @@ function openReviewModal(landlordId) {
     DB.reviews.push({
       id: "r" + Math.random().toString(16).slice(2),
       landlordId,
-      stars: rating,
+      stars: starsInt,
       text,
       createdAt: Date.now()
     });
     saveDB(DB);
 
     closeModal();
+    // re-render landlord page
     route();
   });
 }
 
 /* -----------------------------
-   Report Modal (listing or review)
+   Boot
 ------------------------------ */
-function openReportModal(landlordId, reviewId = null) {
-  openModal(`
-    <div class="modalHead">
-      <div class="modalTitle">Report</div>
-      <button class="iconBtn" id="rClose" aria-label="Close">×</button>
-    </div>
-
-    <div class="modalBody">
-      <div class="field">
-        <label>Reason</label>
-        <select class="input" id="rReason">
-          <option value="spam">Spam / promotion</option>
-          <option value="harassment">Harassment / hate</option>
-          <option value="privacy">Personal info / doxxing</option>
-          <option value="inaccurate">Inaccurate listing</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Details (optional)</label>
-        <textarea class="input" id="rText" placeholder="Briefly explain what’s wrong."></textarea>
-      </div>
-
-      <div class="tiny">Reports are reviewed. Do not include private information.</div>
-    </div>
-
-    <div class="modalFoot">
-      <button class="btn" id="rCancel">Cancel</button>
-      <button class="btn btn--primary" id="rSubmit">Submit report</button>
-    </div>
-  `);
-
-  const close = () => closeModal();
-  $("#rClose").addEventListener("click", close);
-  $("#rCancel").addEventListener("click", close);
-
-  $("#rSubmit").addEventListener("click", () => {
-    const reason = $("#rReason").value;
-    const details = $("#rText").value.trim();
-
-    DB.flags.push({
-      id: "f" + Math.random().toString(16).slice(2),
-      landlordId,
-      reviewId,
-      reason,
-      details,
-      createdAt: Date.now()
-    });
-    saveDB(DB);
-
-    closeModal();
-    alert("Report submitted. Thank you.");
-  });
-}
