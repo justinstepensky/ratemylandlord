@@ -481,23 +481,23 @@ textarea{ resize: vertical; min-height: 90px; }
 /* Modal */
 .modalBackdrop{
   display:none;
-  position: fixed;
+  position:fixed;
   inset:0;
+  z-index:9999;
   background: rgba(35,24,16,.45);
-  z-index: 50;
 
-  /* center modal */
-  display: none;
-  align-items: center;
-  justify-content: center;
+  /* CENTER THE MODAL */
+  align-items:center;
+  justify-content:center;
 
-  padding: 18px;
-  padding-top: calc(18px + env(safe-area-inset-top));
-  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  /* consistent spacing on all screens */
+  padding: 24px;
+  padding-top: calc(24px + env(safe-area-inset-top));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
 }
 .modalBackdrop.open{ display:flex; }
-
 .modal{
+  margin: 0 !important;
   width: min(720px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 32px));
   overflow: hidden;
@@ -506,9 +506,7 @@ textarea{ resize: vertical; min-height: 90px; }
   border-radius: 20px;
   border:1px solid rgba(35,24,16,.12);
   box-shadow: 0 30px 80px rgba(0,0,0,.20);
-
   /* ensure it never “drifts” */
-  margin: 0;
 }
 
 .modal__head{
