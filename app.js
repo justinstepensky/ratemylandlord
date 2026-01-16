@@ -94,14 +94,6 @@ function fmtDate(ts) {
   return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
-function slugify(s) {
-  return String(s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 function round1(n) {
   return Math.round(n * 10) / 10;
 }
@@ -149,23 +141,12 @@ function ratingStats(landlordId) {
   return { count, avg, avgRounded, dist };
 }
 
-function starsVisual(avgRounded) {
-  if (avgRounded == null) return "★★★★★";
-  const full = Math.floor(avgRounded);
-  const half = (avgRounded - full) >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return "★".repeat(full) + (half ? "★" : "") + "☆".repeat(empty);
-}
-
 function cardTier(avgRounded, reviewCount) {
-  // If 0 reviews: no special coloring
   if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
-
-  const r = avgRounded; // IMPORTANT: classification uses the rounded rating
+  const r = avgRounded;
   if (r >= 1.0 && r <= 2.99) return { tier: "red", label: "Low Rating", pillClass: "pill--red" };
   if (r > 2.99 && r <= 3.99) return { tier: "yellow", label: "Mixed Reviews", pillClass: "pill--yellow" };
   if (r >= 4.0 && r <= 5.0) return { tier: "green", label: "Highly Rated", pillClass: "pill--green" };
-
   return { tier: "none", label: "Unrated", pillClass: "" };
 }
 
@@ -176,21 +157,24 @@ function casaCredential(landlordId) {
   const total = rs.length;
   const in12 = last12mo.length;
 
-  // Your latest thresholds (from your spec): CASA Rated = 10+ total AND 3+ last 12 months
   if (total === 0) return "Unrated";
   if (!(total >= 10 && in12 >= 3)) return "Not yet CASA Rated — needs more reviews";
   return "CASA Rated";
 }
 
-/* FIX: correct badge paths to match your actual assets */
+/* Badges: path + fallback for GH Pages quirks */
+function badgeImg(src, alt, title){
+  const safeAlt = esc(alt);
+  const safeTitle = esc(title);
+  const safeSrc = esc(src);
+  const fallback = safeSrc.startsWith("./") ? safeSrc.slice(2) : "./" + safeSrc;
+  return `<img class="badgeImg" src="${safeSrc}" alt="${safeAlt}" title="${safeTitle}" onerror="this.onerror=null;this.src='${fallback}'"/>`;
+}
+
 function badgesHTML(l) {
   const parts = [];
-  if (l.verified) {
-    parts.push(`<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
-  }
-  if (l.top) {
-    parts.push(`<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
-  }
+  if (l.verified) parts.push(badgeImg("assets/badge-verified.png","Verified","Verified Landlord (ownership verified)"));
+  if (l.top) parts.push(badgeImg("assets/badge-top.png","Top","Top Landlord (high rating + consistent performance)"));
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
@@ -205,16 +189,16 @@ function initDrawer() {
   const closeBtn = $("#drawerClose");
 
   function open() {
-    drawer.classList.add("isOpen");
-    overlay.classList.add("isOpen");
-    drawer.setAttribute("aria-hidden", "false");
-    overlay.setAttribute("aria-hidden", "false");
+    drawer?.classList.add("isOpen");
+    overlay?.classList.add("isOpen");
+    drawer?.setAttribute("aria-hidden", "false");
+    overlay?.setAttribute("aria-hidden", "false");
   }
   function close() {
-    drawer.classList.remove("isOpen");
-    overlay.classList.remove("isOpen");
-    drawer.setAttribute("aria-hidden", "true");
-    overlay.setAttribute("aria-hidden", "true");
+    drawer?.classList.remove("isOpen");
+    overlay?.classList.remove("isOpen");
+    drawer?.setAttribute("aria-hidden", "true");
+    overlay?.setAttribute("aria-hidden", "true");
   }
 
   btn?.addEventListener("click", open);
@@ -226,7 +210,6 @@ function initDrawer() {
     if (a) close();
   });
 
-  // If someone resizes to desktop, close drawer automatically
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 981) close();
   });
@@ -237,11 +220,7 @@ function initDrawer() {
 ------------------------------ */
 function openModal(innerHTML) {
   const overlay = $("#modalOverlay");
-  overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true">
-      ${innerHTML}
-    </div>
-  `;
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerHTML}</div>`;
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
@@ -307,7 +286,6 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
   const avgText = (avg == null) ? "—" : avg.toFixed(1);
-
   const addr = `${esc(l.address.line1)} • ${esc(l.address.city)} • ${esc(l.address.state)} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
 
   return `
@@ -320,13 +298,11 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
         <div class="lcMeta">${esc(addr)}</div>
 
         <div class="lcRow">
-          ${avg == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(avg, 16)}
+          ${avg == null ? `<span class="muted">Unrated</span>` : starStaticHTML(avg, 16)}
           <span class="ratingNum">${avgText}</span>
           <span class="muted">(${count} review${count===1?"":"s"})</span>
           <span class="muted">Rating reflects review recency.</span>
         </div>
-
-        <div class="smallNote"></div>
       </div>
 
       <div class="lcRight">
@@ -338,43 +314,28 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   `;
 }
 
-/* Recent highlights:
-   - up to 5 most recent reviews (across all landlords)
-   - dots count matches slides
-   - auto-advance
-*/
+/* Recent highlights */
 let carouselTimer = null;
 
 function highlightsData() {
-  const items = DB.reviews
+  return DB.reviews
     .slice()
     .sort((a,b)=>b.createdAt-a.createdAt)
     .slice(0, 5)
-    .map(r => {
-      const l = DB.landlords.find(x => x.id === r.landlordId);
-      return { r, l };
-    })
+    .map(r => ({ r, l: DB.landlords.find(x => x.id === r.landlordId) }))
     .filter(x => x.l);
-  return items;
 }
 
 function renderHighlightsCarousel() {
   const items = highlightsData();
   if (items.length === 0) {
-    return `
-      <div class="carousel">
-        <div class="carouselSlide">
-          <div class="muted">No highlights yet.</div>
-        </div>
-      </div>
-    `;
+    return `<div class="carousel"><div class="carouselSlide"><div class="muted">No highlights yet.</div></div></div>`;
   }
 
   const slides = items.map(({r,l}) => {
     const st = ratingStats(l.id);
     const tier = cardTier(st.avgRounded ?? 0, st.count);
     const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
-
     const avgText = (st.avgRounded == null) ? "—" : st.avgRounded.toFixed(1);
 
     return `
@@ -388,13 +349,12 @@ function renderHighlightsCarousel() {
             <div class="lcMeta">${fmtDate(r.createdAt)}</div>
 
             <div class="lcRow">
-              ${st.avgRounded == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(st.avgRounded, 16)}
+              ${st.avgRounded == null ? `<span class="muted">Unrated</span>` : starStaticHTML(st.avgRounded, 16)}
               <span class="ratingNum">${avgText}</span>
               <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
             </div>
 
             <div class="smallNote">${esc(r.text)}</div>
-            <div class="smallNote">Rating reflects review recency.</div>
           </div>
           <div class="lcRight">
             ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
@@ -405,7 +365,7 @@ function renderHighlightsCarousel() {
     `;
   }).join("");
 
-  const dots = items.map((_, i) => `<span class="dot ${i===0?"isActive":""}" data-dot="${i}" aria-label="Go to slide ${i+1}"></span>`).join("");
+  const dots = items.map((_, i) => `<span class="dot ${i===0?"isActive":""}" data-dot="${i}"></span>`).join("");
 
   return `
     <div class="carousel" id="highCarousel">
@@ -430,11 +390,8 @@ function setupCarousel() {
     dots.forEach((d, i) => d.classList.toggle("isActive", i === idx));
   }
 
-  dots.forEach((d) => {
-    d.addEventListener("click", () => go(Number(d.dataset.dot)));
-  });
+  dots.forEach((d) => d.addEventListener("click", () => go(Number(d.dataset.dot))));
 
-  // auto-advance
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(() => go(idx + 1), 4500);
 }
@@ -471,28 +428,22 @@ function renderHome() {
           <a class="btn" href="#/add">Add a landlord</a>
         </div>
 
-        <div class="muted" style="text-align:center;margin-top:10px;font-size:13px;">
+        <div class="muted" style="text-align:center;margin-top:10px;">
           No account required to review. Verified landlords can respond.
         </div>
 
         <div class="tileRow">
           <div class="tile" data-home-tile="search">
             <div class="tile__icon">⌕</div>
-            <div>
-              <div class="tile__label">Search</div>
-            </div>
+            <div><div class="tile__label">Search</div></div>
           </div>
           <div class="tile" data-home-tile="review">
             <div class="tile__icon">★</div>
-            <div>
-              <div class="tile__label">Review</div>
-            </div>
+            <div><div class="tile__label">Review</div></div>
           </div>
           <div class="tile tile--disabled">
             <div class="tile__icon">⌂</div>
-            <div>
-              <div class="tile__label">Rent</div>
-            </div>
+            <div><div class="tile__label">Rent</div></div>
           </div>
         </div>
         <div class="tilePanel" id="tilePanel" style="display:none"></div>
@@ -500,7 +451,7 @@ function renderHome() {
     </section>
 
     <section class="splitRow">
-      <div class="card">
+      <div class="card card--highlights">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -510,12 +461,11 @@ function renderHome() {
             </div>
             <a class="btn miniBtn" href="#/search">Browse all</a>
           </div>
-
           ${renderHighlightsCarousel()}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card--map">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -535,14 +485,14 @@ function renderHome() {
   `;
   renderShell(content);
 
-  // tile copy
   const tilePanel = $("#tilePanel");
   document.querySelectorAll("[data-home-tile]").forEach(el => {
     el.addEventListener("click", () => {
       const k = el.dataset.homeTile;
       tilePanel.style.display = "block";
-      if (k === "search") tilePanel.textContent = "Search by name, entity or address";
-      if (k === "review") tilePanel.textContent = "Leave a rating based on select categories";
+      tilePanel.textContent = (k === "search")
+        ? "Search by name, entity or address"
+        : "Leave a rating based on select categories";
     });
   });
 
@@ -551,7 +501,6 @@ function renderHome() {
     location.hash = `#/search?q=${encodeURIComponent(q)}`;
   });
 
-  // Map
   setTimeout(() => {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
@@ -605,7 +554,6 @@ function renderSearch() {
           <button class="btn btn--primary" id="doSearch">Search</button>
         </div>
 
-        <!-- MAP ON TOP (like before) -->
         <div class="mapBox" style="margin-top:14px;">
           <div class="map" id="searchMap" style="height:320px;"></div>
         </div>
@@ -637,7 +585,6 @@ function renderSearch() {
       ? list.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
       : `<div class="muted">No results.</div>`;
 
-    // map + markers
     const mapEl = $("#searchMap");
     mapEl.innerHTML = "";
     const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
@@ -652,7 +599,6 @@ function renderSearch() {
       }
     }
 
-    // center on map buttons
     document.querySelectorAll("[data-center]").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.center;
@@ -667,7 +613,6 @@ function renderSearch() {
   $("#doSearch").addEventListener("click", () => {
     const query = qEl.value.trim();
     location.hash = `#/search?q=${encodeURIComponent(query)}`;
-    // keep borough selection without putting in URL (simple)
     run();
   });
 
@@ -773,7 +718,7 @@ function renderAdd() {
       name,
       entity,
       address: { line1, unit, city, state },
-      borough: "", // no borough field on add page
+      borough: "",
       lat: picked?.lat ?? 40.73,
       lng: picked?.lng ?? -73.95,
       verified: false,
@@ -783,13 +728,12 @@ function renderAdd() {
 
     DB.landlords.unshift(l);
     saveDB(DB);
-
     location.hash = `#/landlord/${id}`;
   });
 }
 
 function renderHow() {
-  const content = `
+  renderShell(`
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -811,12 +755,11 @@ function renderHow() {
         </div>
       </div>
     </section>
-  `;
-  renderShell(content);
+  `);
 }
 
 function renderTrust() {
-  const content = `
+  renderShell(`
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -838,8 +781,7 @@ function renderTrust() {
         </div>
       </div>
     </section>
-  `;
-  renderShell(content);
+  `);
 }
 
 function renderPortal() {
@@ -855,7 +797,7 @@ function renderPortal() {
           <a class="btn" href="#/">Home</a>
         </div>
 
-        <div class="portalGrid">
+        <div class="twoCol">
           <div class="card" style="box-shadow:none;">
             <div class="pad">
               <div class="kicker">Sign in</div>
@@ -873,19 +815,12 @@ function renderPortal() {
 
               <div class="tiny" style="text-align:center;margin-top:12px;">or continue with</div>
 
-              <div class="oauth">
-                <button class="oauthBtn" id="oauthGoogle">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
-                  Continue with Google
-                </button>
-                <button class="oauthBtn" id="oauthApple">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
-                  Continue with Apple
-                </button>
-                <button class="oauthBtn" id="oauthMicrosoft">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
-                  Continue with Microsoft
-                </button>
+              <div class="field" style="margin-top:10px;">
+                <button class="btn btn--block" id="oauthGoogle">Continue with Google</button>
+                <div style="height:10px"></div>
+                <button class="btn btn--block" id="oauthApple">Continue with Apple</button>
+                <div style="height:10px"></div>
+                <button class="btn btn--block" id="oauthMicrosoft">Continue with Microsoft</button>
               </div>
             </div>
           </div>
@@ -905,34 +840,12 @@ function renderPortal() {
 
               <div class="field">
                 <label>Verification document (demo)</label>
-
-                <div class="fileRow">
-                  <div class="fileName" id="fileName">No file chosen</div>
-                  <label class="filePick" for="doc">Choose file</label>
-                  <input id="doc" type="file" />
-                </div>
-
-                <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
-              </div>
-
-              <div class="tiny" style="text-align:center;margin-top:10px;">or continue with</div>
-              <div class="oauth" style="margin-top:10px;">
-                <button class="oauthBtn" id="oauthGoogle2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
-                  Continue with Google
-                </button>
-                <button class="oauthBtn" id="oauthApple2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
-                  Continue with Apple
-                </button>
-                <button class="oauthBtn" id="oauthMicrosoft2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
-                  Continue with Microsoft
-                </button>
+                <input class="input" id="doc" type="file" />
+                <div class="tiny" style="margin-top:8px;">Deed, tax bill, management agreement, utility statement, etc.</div>
               </div>
 
               <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
+              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
             </div>
           </div>
         </div>
@@ -951,21 +864,14 @@ function renderPortal() {
   `;
   renderShell(content);
 
-  // file name
-  const doc = $("#doc");
-  const fileName = $("#fileName");
-  doc.addEventListener("change", () => {
-    fileName.textContent = doc.files?.[0]?.name || "No file chosen";
-  });
-
-  // demo auth
   const demo = (label) => alert(`${label} (demo)`);
-  ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2","psignin","signup"].forEach((id) => {
+  ["oauthGoogle","oauthApple","oauthMicrosoft","psignin","signup"].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener("click", () => demo(id));
   });
 }
+
 /* -----------------------------
    Landlord page
 ------------------------------ */
@@ -990,14 +896,10 @@ function renderLandlord(id) {
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
   const tier = cardTier(st.avgRounded ?? 0, st.count);
-  const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
   const addr = `${esc(l.address.line1)}${l.address.unit ? " • " + esc(l.address.unit) : ""} • ${esc(l.address.city)} • ${esc(l.address.state)}${l.borough ? " • " + esc(l.borough) : ""}`;
-
   const credential = casaCredential(l.id);
   const rs = landlordReviews(l.id);
-
-  const histo = renderHistogram(st);
 
   const content = `
     <section class="pageCard card">
@@ -1005,39 +907,36 @@ function renderLandlord(id) {
         <div class="topRow">
           <div>
             <div class="kicker">Landlord</div>
-            <div class="profileHead">
-              <div>
-                <div class="profileNameRow">
-                  <h1 class="profileName">${esc(l.name)}</h1>
-                  ${badgesHTML(l)}
-                </div>
-
-                <div class="profileStats">
-                  ${st.avgRounded == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(st.avgRounded, 18)}
-                  <span class="ratingNum" style="font-size:18px;">${avgText}</span>
-                  <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
-                  ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
-                </div>
-
-                <div class="addrLine">${esc(addr)}</div>
-                <div class="muted" style="margin-top:10px;">
-                  <b>${esc(credential)}</b> • Rating reflects review recency.
-                </div>
+            <div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <div class="pageTitle" style="margin:0">${esc(l.name)}</div>
+                ${badgesHTML(l)}
               </div>
 
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <a class="btn" href="#/search">Back</a>
-                <button class="btn btn--primary" id="leaveReview">Leave a review</button>
+              <div class="lcRow" style="margin-top:10px">
+                ${st.avgRounded == null ? `<span class="muted">Unrated</span>` : starStaticHTML(st.avgRounded, 18)}
+                <span class="ratingNum" style="font-size:18px;">${avgText}</span>
+                <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
+                ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
+              </div>
+
+              <div class="muted" style="margin-top:10px">${esc(addr)}</div>
+              <div class="muted" style="margin-top:10px;">
+                <b>${esc(credential)}</b> • Rating reflects review recency.
               </div>
             </div>
           </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <a class="btn" href="#/search">Back</a>
+            <button class="btn btn--primary" id="leaveReview">Leave a review</button>
+          </div>
         </div>
 
-        <div class="twoCol">
+        <div class="twoCol" style="margin-top:14px;">
           <div>
             <div class="kicker">Rating distribution</div>
-            ${histo}
-
+            ${renderHistogram(st)}
             <div class="hr"></div>
 
             <div class="kicker">Reviews</div>
@@ -1067,7 +966,6 @@ function renderLandlord(id) {
   `;
   renderShell(content);
 
-  // map
   setTimeout(() => {
     const mapEl = $("#landlordMap");
     if (!mapEl) return;
@@ -1080,19 +978,14 @@ function renderLandlord(id) {
   $("#leaveReview").addEventListener("click", () => openReviewModal(l.id));
   $("#reportBtn").addEventListener("click", () => openReportModal(l.id));
 
-  // attach report handlers on review cards
   document.querySelectorAll("[data-report-review]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const rid = btn.dataset.reportReview;
-      openReportModal(l.id, rid);
-    });
+    btn.addEventListener("click", () => openReportModal(l.id, btn.dataset.reportReview));
   });
 }
 
 function renderHistogram(st) {
   const total = st.count || 0;
   const dist = st.dist || [0,0,0,0,0]; // 1..5
-  // Show 5..1 rows
   const rows = [5,4,3,2,1].map((star) => {
     const n = dist[star - 1] || 0;
     const pct = total ? Math.round((n / total) * 100) : 0;
@@ -1104,17 +997,17 @@ function renderHistogram(st) {
       </div>
     `;
   }).join("");
-
   return `<div class="histo">${rows}</div>`;
 }
 
 function reviewCardHTML(r) {
+  const v = Number(r.stars) || 0;
   return `
     <div class="lc" style="align-items:flex-start;">
       <div class="lcLeft">
         <div class="lcRow">
-          ${starStaticHTML(r.stars, 16)}
-          <span class="ratingNum">${Number(r.stars).toFixed(1)}/5</span>
+          ${starStaticHTML(v, 16)}
+          <span class="ratingNum">${v.toFixed(1)}/5</span>
           <span class="muted">${fmtDate(r.createdAt)}</span>
         </div>
         <div class="smallNote">${esc(r.text)}</div>
@@ -1157,7 +1050,7 @@ function openReviewModal(landlordId) {
 
       <div class="field">
         <label>What happened?</label>
-        <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
+        <textarea class="input" id="mText" placeholder="Keep it factual and specific."></textarea>
         <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
@@ -1188,7 +1081,6 @@ function openReviewModal(landlordId) {
     });
   }
 
-  // delegate clicks (left half / right half)
   picker.addEventListener("click", (e) => {
     const v = e.target?.dataset?.value;
     if (!v) return;
@@ -1199,7 +1091,6 @@ function openReviewModal(landlordId) {
 
   $("#mSubmit").addEventListener("click", () => {
     const text = $("#mText").value.trim();
-
     if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
       return;
@@ -1208,7 +1099,7 @@ function openReviewModal(landlordId) {
     DB.reviews.push({
       id: "r" + Math.random().toString(16).slice(2),
       landlordId,
-      stars: rating, // half-star supported
+      stars: rating,
       text,
       createdAt: Date.now()
     });
@@ -1243,7 +1134,7 @@ function openReportModal(landlordId, reviewId = null) {
 
       <div class="field">
         <label>Details (optional)</label>
-        <textarea class="textarea" id="rText" placeholder="Briefly explain what’s wrong."></textarea>
+        <textarea class="input" id="rText" placeholder="Briefly explain what’s wrong."></textarea>
       </div>
 
       <div class="tiny">Reports are reviewed. Do not include private information.</div>
