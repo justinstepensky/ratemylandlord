@@ -576,11 +576,11 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
     flex:1 !important;
     height: 100% !important;
     min-height: 240px !important;
-  }
 }
-/* Force original CASA logo font */
+/* adidas "club"-style logo font */
 .brand__name{
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif !important;
-  font-weight:700 !important;
-  letter-spacing:.2px !important;
+  font-family: "Bodoni Moda", ui-serif, Georgia, "Times New Roman", serif !important;
+  font-style: italic !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
 }
