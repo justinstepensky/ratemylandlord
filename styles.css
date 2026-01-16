@@ -738,3 +738,15 @@ textarea{ resize: vertical; min-height: 90px; }
   color: rgba(35,24,16,.88);
   font-weight: 850;
 }
+.mapWrap{
+  margin-top: 14px;
+  border: 1px solid rgba(35,24,16,.10);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255,249,240,.90);
+  box-shadow: 0 18px 45px rgba(35,24,16,.08);
+}
+#map{
+  height: 420px;
+  width: 100%;
+}
