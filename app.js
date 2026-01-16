@@ -1,10 +1,5 @@
 /* =========================================================
    casa — app.js (FULL FILE)
-   - Hash-router SPA for GitHub Pages
-   - Pages: Home, Search (filters + map), Add, How, Trust, Portal,
-            Landlord profile, Write review (demo)
-   - NO reviewer accounts
-   - Landlord Portal is demo-only (email + password + OAuth buttons)
    ========================================================= */
 
 const $ = (sel) => document.querySelector(sel);
@@ -16,14 +11,6 @@ function esc(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-}
-
-function setActiveNav() {
-  const h = location.hash || "#/";
-  document.querySelectorAll(".nav__link, .navDrawer__link").forEach((a) => {
-    const href = a.getAttribute("href") || "";
-    a.classList.toggle("isActive", href && h.startsWith(href));
-  });
 }
 
 function toast(msg) {
@@ -58,14 +45,8 @@ function starsRow(score) {
   return out;
 }
 
-/* ---------- Bubble icons (no emojis) ---------- */
-function bubble(tip) {
-  return `<span class="bubbleIcon" data-tip="${esc(tip)}" aria-label="${esc(tip)}"></span>`;
-}
-
 /* =========================================================
    Demo dataset (in-memory)
-   Each landlord needs: id, name, addr, borough, lat, lng, score, date, text
    ========================================================= */
 const landlords = [
   {
@@ -104,6 +85,83 @@ const landlords = [
 ];
 
 /* =========================================================
+   MAP (Leaflet) helpers
+   - Works only if Leaflet is loaded (index.html)
+   ========================================================= */
+let __homeMap = null;
+let __homeLayer = null;
+
+let __searchMap = null;
+let __searchLayer = null;
+
+function leafletOK() {
+  return typeof window.L !== "undefined" && typeof window.L.map === "function";
+}
+
+function initMap(elId, which) {
+  if (!leafletOK()) return null;
+
+  const m = window.L.map(elId, { scrollWheelZoom: false }).setView([40.73, -73.97], 11);
+
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap",
+  }).addTo(m);
+
+  const layer = window.L.layerGroup().addTo(m);
+
+  if (which === "home") {
+    __homeMap = m;
+    __homeLayer = layer;
+  } else {
+    __searchMap = m;
+    __searchLayer = layer;
+  }
+
+  return m;
+}
+
+function setMarkers(which, list) {
+  if (!leafletOK()) return;
+
+  const map = which === "home" ? __homeMap : __searchMap;
+  const layer = which === "home" ? __homeLayer : __searchLayer;
+
+  if (!map || !layer) return;
+
+  layer.clearLayers();
+  const pts = [];
+
+  list.forEach((x) => {
+    if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
+
+    const m = window.L.marker([x.lat, x.lng]).addTo(layer);
+
+    m.bindPopup(`
+      <div style="min-width:220px;">
+        <div style="font-weight:1000;">${esc(x.name)}</div>
+        <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
+        <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.addr)}</div>
+        <div style="margin-top:8px;">${starsRow(x.score)}</div>
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <a class="btn btn--primary" style="text-decoration:none;" href="#/landlord/${esc(x.id)}">View</a>
+          <a class="btn btn--outline" style="text-decoration:none;" href="#/review/${esc(x.id)}">Review</a>
+        </div>
+      </div>
+    `);
+
+    pts.push([x.lat, x.lng]);
+  });
+
+  if (pts.length) {
+    const bounds = window.L.latLngBounds(pts);
+    map.fitBounds(bounds.pad(0.18));
+  } else {
+    map.setView([40.73, -73.97], 11);
+  }
+}
+
+/* =========================================================
    HOME
    ========================================================= */
 function renderHome() {
@@ -124,7 +182,6 @@ function renderHome() {
             <div class="heroSearch">
               <div class="heroSearch__bar">
                 <input id="homeQ" placeholder="Search landlord name, management company, or address..." />
-                <div class="suggest" id="homeSuggest"></div>
               </div>
               <button class="btn btn--primary" id="homeGo">Search</button>
               <a class="btn btn--outline" href="#/add">Add a landlord</a>
@@ -132,58 +189,42 @@ function renderHome() {
 
             <div class="trustLine">No account required to review. Verified landlords can respond.</div>
 
+            <!-- Tiles -->
             <div class="cards3" style="margin-top:14px;">
-              <div class="xCard">
+              <div class="xCard" role="button" tabindex="0">
                 <div class="xCard__top">
-                  <div class="xCard__title"><span class="xCard__icon">1</span> Look Up</div>
+                  <div class="xCard__title">
+                    <span class="xCard__icon">⌕</span> Search
+                  </div>
                   <span class="badge">Tap</span>
                 </div>
-                <div class="xCard__body">
-                  Search by name, entity, or address.
-                  <div class="tiny" style="margin-top:8px;">Examples: “ABC Management”, “123 Main St”, “John Doe”</div>
-                </div>
+                <div class="xCard__body">Search by name, entity or address</div>
               </div>
 
-              <div class="xCard">
+              <div class="xCard" role="button" tabindex="0">
                 <div class="xCard__top">
-                  <div class="xCard__title"><span class="xCard__icon">2</span> Review</div>
-                  <span class="badge">No sign-up needed</span>
+                  <div class="xCard__title">
+                    <span class="xCard__icon">★</span> Review
+                  </div>
+                  <span class="badge">Tap</span>
                 </div>
-                <div class="xCard__body">
-                  Pick a landlord → rate categories → write what happened → submit.
-                  <div class="tiny" style="margin-top:8px;">You’ll receive an edit link after posting.</div>
-                </div>
+                <div class="xCard__body">leave a rating based on select categories</div>
               </div>
 
-              <div class="xCard">
+              <div class="xCard xCard--locked" aria-disabled="true">
                 <div class="xCard__top">
-                  <div class="xCard__title"><span class="xCard__icon">3</span> Improve</div>
-                  <span class="badge badge--verified">Verified responses</span>
+                  <div class="xCard__title">
+                    <span class="xCard__icon">⌂</span> Rent
+                  </div>
+                  <span class="badge">Info</span>
                 </div>
-                <div class="xCard__body">
-                  Verified landlords can respond publicly. Reporting tools keep listings accurate.
-                </div>
-              </div>
-            </div>
-
-            <div class="trustRow">
-              <div class="miniTrust">
-                <div class="miniTrust__t">${bubble("Tenants can post and edit without accounts.")} No login required for reviews</div>
-                <div class="miniTrust__b">Post instantly — you’ll get an edit link.</div>
-              </div>
-              <div class="miniTrust">
-                <div class="miniTrust__t">${bubble("Landlords must verify documents before responding.")} Verified Landlord Responses</div>
-                <div class="miniTrust__b">Accountability + verified responses.</div>
-              </div>
-              <div class="miniTrust">
-                <div class="miniTrust__t">${bubble("Report spam, harassment, or personal info.")} Moderation + Reporting Tools</div>
-                <div class="miniTrust__b">Keep reviews useful and safe.</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="grid">
+        <!-- 50/50 Highlights + Map -->
+        <div class="grid2">
           <div class="card">
             <div class="hd">
               <div>
@@ -193,28 +234,30 @@ function renderHome() {
               </div>
               <a class="btn btn--outline" href="#/search">Browse all</a>
             </div>
-
             <div class="bd">
               <div class="featuredGrid" id="featuredGrid"></div>
             </div>
           </div>
 
-          <aside class="card side">
-            <div class="kicker">Quick Actions</div>
-            <h2 style="margin-top:6px;">Start here</h2>
-            <div class="box" style="margin-top:10px;">
-              <div class="tiny" style="margin-bottom:10px;">Search a landlord or add a missing profile.</div>
-              <a class="btn btn--primary btn--block" href="#/search">Find a landlord</a>
-              <div style="height:10px;"></div>
-              <a class="btn btn--outline btn--block" href="#/add">Add a landlord</a>
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Map</div>
+                <h2>Browse by location</h2>
+                <div class="muted">Pins reflect existing ratings.</div>
+              </div>
+              <a class="btn btn--outline" href="#/search">Open search</a>
             </div>
-
-            <div style="margin-top:14px;">
-              <div class="kicker">Landlord Portal</div>
-              <div class="tiny" style="margin-top:6px;">Landlords verify documents before responding.</div>
-              <a class="btn btn--ghost btn--block" href="#/portal" style="margin-top:10px;">Open portal</a>
+            <div class="bd">
+              <div class="mapWrap">
+                <div id="homeMap"></div>
+              </div>
+              <div id="homeMapFallback" class="box" style="margin-top:12px; display:none;">
+                <div style="font-weight:1000;">Map not loaded</div>
+                <div class="tiny" style="margin-top:6px;">Add Leaflet to index.html to enable the map.</div>
+              </div>
             </div>
-          </aside>
+          </div>
         </div>
 
         <footer class="wrap footer">
@@ -228,11 +271,6 @@ function renderHome() {
       </div>
     </section>
   `;
-
-  // accordion toggle
-  document.querySelectorAll(".xCard").forEach((c) => {
-    c.addEventListener("click", () => c.classList.toggle("open"));
-  });
 
   // featured
   const grid = $("#featuredGrid");
@@ -250,41 +288,37 @@ function renderHome() {
         <div class="smallCard__text">${esc(r.text)}</div>
         <div class="smallCard__foot">
           <span class="tiny">${esc(r.borough || "")}</span>
-          <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View Landlord</a>
+          <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View</a>
         </div>
       </div>
     `).join("");
   }
 
-  // search action
+  // Search
   const homeQ = $("#homeQ");
-  const homeGo = $("#homeGo");
-  homeGo?.addEventListener("click", () => {
+  $("#homeGo")?.addEventListener("click", () => {
     const q = (homeQ?.value || "").trim();
     location.hash = "#/search?q=" + encodeURIComponent(q);
   });
   homeQ?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") homeGo?.click();
+    if (e.key === "Enter") $("#homeGo")?.click();
   });
 
-  // suggestions
-  const sug = $("#homeSuggest");
-  const pool = landlords.map(l => l.name).concat(["ABC Management", "123 Main St", "John Doe"]);
-  if (homeQ && sug) {
-    homeQ.addEventListener("input", () => {
-      const q = homeQ.value.trim().toLowerCase();
-      if (!q) { sug.classList.remove("open"); sug.innerHTML = ""; return; }
-      const hits = pool.filter(x => x.toLowerCase().includes(q)).slice(0, 6);
-      if (!hits.length) { sug.classList.remove("open"); sug.innerHTML = ""; return; }
-      sug.innerHTML = hits.map(x => `<button type="button" data-v="${esc(x)}">${esc(x)}</button>`).join("");
-      sug.classList.add("open");
-      sug.querySelectorAll("button").forEach(b => {
-        b.onclick = () => { homeQ.value = b.dataset.v; sug.classList.remove("open"); };
-      });
+  // Tiles toggle (only for clickable ones)
+  document.querySelectorAll(".xCard:not(.xCard--locked)").forEach((c) => {
+    c.addEventListener("click", () => c.classList.toggle("open"));
+    c.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") c.classList.toggle("open");
     });
-    document.addEventListener("click", (e) => {
-      if (!sug.contains(e.target) && e.target !== homeQ) sug.classList.remove("open");
-    });
+  });
+
+  // Home map init
+  if (!leafletOK()) {
+    $("#homeMap") && ($("#homeMap").style.display = "none");
+    $("#homeMapFallback") && ($("#homeMapFallback").style.display = "block");
+  } else {
+    initMap("homeMap", "home");
+    setMarkers("home", landlords);
   }
 }
 
@@ -314,11 +348,12 @@ function renderSearch() {
           </div>
 
           <div class="bd">
-            <div class="searchTop">
-              <div class="searchTop__bar">
+            <!-- Aesthetic search bar matching hero -->
+            <div class="searchHero">
+              <div class="heroSearch__bar">
                 <input id="q" placeholder="Type a landlord name or address..." value="${esc(initial)}" />
-                <button class="btn btn--primary" id="doSearch">Search</button>
               </div>
+              <button class="btn btn--primary" id="doSearch">Search</button>
             </div>
 
             <div class="filtersRow">
@@ -355,15 +390,13 @@ function renderSearch() {
               </div>
             </div>
 
-            <div class="mapWrap">
-              <div id="map"></div>
+            <div class="mapWrap" style="margin-top:12px;">
+              <div id="searchMap"></div>
             </div>
 
-            <div id="mapFallback" class="box" style="margin-top:12px; display:none;">
-              <div style="font-weight:1000;">Map library not loaded</div>
-              <div class="tiny" style="margin-top:6px;">
-                Add Leaflet includes to <b>index.html</b> (2 lines) to enable the map.
-              </div>
+            <div id="searchMapFallback" class="box" style="margin-top:12px; display:none;">
+              <div style="font-weight:1000;">Map not loaded</div>
+              <div class="tiny" style="margin-top:6px;">Add Leaflet to index.html to enable the map.</div>
             </div>
 
             <div id="results"></div>
@@ -373,77 +406,10 @@ function renderSearch() {
     </section>
   `;
 
-  let map = null;
-  let layerGroup = null;
-
-  function leafletAvailable() {
-    return typeof window.L !== "undefined" && typeof window.L.map === "function";
-  }
-
-  function ensureMap() {
-    const fb = $("#mapFallback");
-    if (!leafletAvailable()) {
-      // hide the empty map div so it doesn't look broken
-      const mapDiv = $("#map");
-      if (mapDiv) mapDiv.style.display = "none";
-      if (fb) fb.style.display = "block";
-      return;
-    }
-    if (fb) fb.style.display = "none";
-    if (map) return;
-
-    map = window.L.map("map", { scrollWheelZoom: false }).setView([40.73, -73.97], 11);
-
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap",
-    }).addTo(map);
-
-    layerGroup = window.L.layerGroup().addTo(map);
-  }
-
-  function setMarkers(list) {
-    ensureMap();
-    if (!map || !layerGroup) return;
-
-    layerGroup.clearLayers();
-    const pts = [];
-
-    list.forEach((x) => {
-      if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
-
-      const m = window.L.marker([x.lat, x.lng]).addTo(layerGroup);
-      m.bindPopup(`
-        <div style="min-width:220px;">
-          <div style="font-weight:1000;">${esc(x.name)}</div>
-          <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
-          <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.addr)}</div>
-          <div style="margin-top:8px;">${starsRow(x.score)}</div>
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-            <a class="btn btn--primary" style="text-decoration:none;" href="#/landlord/${esc(x.id)}">View</a>
-            <a class="btn btn--outline" style="text-decoration:none;" href="#/review/${esc(x.id)}">Review</a>
-          </div>
-        </div>
-      `);
-
-      pts.push([x.lat, x.lng]);
-    });
-
-    if (pts.length) {
-      const bounds = window.L.latLngBounds(pts);
-      map.fitBounds(bounds.pad(0.18));
-    } else {
-      map.setView([40.73, -73.97], 11);
-    }
-  }
-
   function parseDate(d) {
     const parts = String(d || "").split("/");
     if (parts.length !== 3) return new Date(0);
-    const mm = Number(parts[0]) - 1;
-    const dd = Number(parts[1]);
-    const yy = Number(parts[2]);
-    return new Date(yy, mm, dd);
+    return new Date(Number(parts[2]), Number(parts[0]) - 1, Number(parts[1]));
   }
 
   function run() {
@@ -467,36 +433,43 @@ function renderSearch() {
     if (sort === "rating") list.sort((a, b) => (b.score || 0) - (a.score || 0));
     if (sort === "newest") list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
-    const results = $("#results");
-    if (results) {
-      results.innerHTML = list.length
-        ? list.map((x) => `
-            <div class="rowCard">
-              <div style="flex:1;">
-                <div class="rowTitle">${esc(x.name)}</div>
-                <div class="rowSub">${esc(x.addr)}</div>
-                <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
-                ${starsRow(x.score)}
-              </div>
-              <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
-                <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
-                <a class="btn btn--outline" href="#/review/${esc(x.id)}">Write review</a>
-              </div>
-            </div>
-          `).join("")
-        : `
-            <div class="box" style="margin-top:12px;">
-              <div style="font-weight:1000;">No results</div>
-              <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
-              <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-                <a class="btn btn--primary" href="#/add">Add a landlord</a>
-                <a class="btn btn--ghost" href="#/">Back to home</a>
-              </div>
-            </div>
-          `;
-    }
+    $("#results").innerHTML = list.length
+      ? list.map((x) => `
+        <div class="rowCard">
+          <div style="flex:1;">
+            <div class="rowTitle">${esc(x.name)}</div>
+            <div class="rowSub">${esc(x.addr)}</div>
+            <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
+            ${starsRow(x.score)}
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
+            <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
+            <a class="btn btn--outline" href="#/review/${esc(x.id)}">Write review</a>
+          </div>
+        </div>
+      `).join("")
+      : `
+        <div class="box" style="margin-top:12px;">
+          <div style="font-weight:1000;">No results</div>
+          <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn btn--primary" href="#/add">Add a landlord</a>
+            <a class="btn btn--ghost" href="#/">Back to home</a>
+          </div>
+        </div>
+      `;
 
-    setMarkers(list);
+    // map markers
+    if (leafletOK()) setMarkers("search", list);
+  }
+
+  // map init
+  if (!leafletOK()) {
+    $("#searchMap") && ($("#searchMap").style.display = "none");
+    $("#searchMapFallback") && ($("#searchMapFallback").style.display = "block");
+  } else {
+    initMap("searchMap", "search");
+    setMarkers("search", landlords);
   }
 
   $("#doSearch")?.addEventListener("click", run);
@@ -509,7 +482,7 @@ function renderSearch() {
 }
 
 /* =========================================================
-   ADD LANDLORD (demo adds to memory)
+   ADD LANDLORD (demo)
    ========================================================= */
 function renderAdd() {
   const app = $("#app");
@@ -553,14 +526,9 @@ function renderAdd() {
                 </select>
               </div>
               <div class="field">
-                <label>Coordinates (optional for map)</label>
+                <label>Coordinates (optional)</label>
                 <input id="coords" placeholder="lat,lng (e.g., 40.7081,-73.9571)" />
               </div>
-            </div>
-
-            <div class="field" style="margin-top:12px;">
-              <label>Notes (optional)</label>
-              <textarea id="notes" placeholder="Any helpful context (management company, building name, etc.)"></textarea>
             </div>
 
             <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
@@ -582,7 +550,6 @@ function renderAdd() {
     const addr = ($("#addr").value || "").trim();
     const borough = ($("#boro").value || "").trim();
     const coords = ($("#coords").value || "").trim();
-    const notes = ($("#notes").value || "").trim();
 
     if (!name || !addr) return toast("Add name + address.");
 
@@ -596,11 +563,8 @@ function renderAdd() {
     }
 
     const id =
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-        .slice(0, 48) || "landlord-" + Date.now();
+      name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 48)
+      || "landlord-" + Date.now();
 
     landlords.unshift({
       id,
@@ -611,7 +575,7 @@ function renderAdd() {
       lng: typeof lng === "number" ? lng : undefined,
       score: 0,
       date: new Date().toLocaleDateString(),
-      text: notes || "New listing (no reviews yet).",
+      text: "New listing (no reviews yet).",
     });
 
     toast("Added (demo): " + name);
@@ -673,13 +637,6 @@ function renderLandlord(id) {
                 </div>
               </div>
             </div>
-
-            <div class="box" style="margin-top:12px;">
-              <div style="font-weight:1000;">Reviews (demo)</div>
-              <div class="tiny" style="margin-top:6px;">
-                This demo stores one highlight per landlord. Next step is adding a reviews array per landlord.
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -723,7 +680,7 @@ function renderReview(id) {
                 </select>
               </div>
               <div class="field">
-                <label>Borough (for filtering)</label>
+                <label>Borough (optional)</label>
                 <select id="rBoro">
                   <option value="">Use existing</option>
                   <option>Manhattan</option>
@@ -758,7 +715,6 @@ function renderReview(id) {
     const score = Number($("#rScore").value || 0);
     const text = ($("#rText").value || "").trim();
     const boro = ($("#rBoro").value || "").trim();
-
     if (!text) return toast("Write a short description.");
 
     l.score = Math.max(1, Math.min(5, score || 0));
@@ -793,22 +749,22 @@ function renderHow() {
 
           <div class="bd">
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">1) Search</div>
-              <div class="rowSub">Find a landlord by name, company, address, borough, or the map.</div>
+              <div class="rowTitle">Search</div>
+              <div class="rowSub">Find a landlord by name, company, address, borough, or map.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">2) Review</div>
+              <div class="rowTitle">Review</div>
               <div class="rowSub">Post instantly (no account). Keep it factual and specific.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">3) Verified landlord responses</div>
-              <div class="rowSub">Landlords create accounts only in the Landlord Portal and verify documents before responding publicly.</div>
+              <div class="rowTitle">Verified responses</div>
+              <div class="rowSub">Landlords verify documents before responding publicly.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">4) Reporting</div>
+              <div class="rowTitle">Reporting</div>
               <div class="rowSub">Report spam, harassment, or personal information.</div>
             </div></div>
           </div>
@@ -863,7 +819,7 @@ function renderTrust() {
 }
 
 /* =========================================================
-   LANDLORD PORTAL (demo)
+   LANDLORD PORTAL (demo) + logos
    ========================================================= */
 function renderPortal() {
   const app = $("#app");
@@ -898,11 +854,25 @@ function renderPortal() {
                   <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">Sign in</button>
 
                   <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
-                  <button class="btn btn--outline btn--block" id="g">Continue with Google</button>
+
+                  <button class="btn btn--outline btn--block oauthBtn" id="g">
+                    <span class="oauthIcon oauthGoogle" aria-hidden="true"></span>
+                    Continue with Google
+                  </button>
+
                   <div style="height:8px;"></div>
-                  <button class="btn btn--outline btn--block" id="a">Continue with Apple</button>
+
+                  <button class="btn btn--outline btn--block oauthBtn" id="a">
+                    <span class="oauthIcon oauthApple" aria-hidden="true"></span>
+                    Continue with Apple
+                  </button>
+
                   <div style="height:8px;"></div>
-                  <button class="btn btn--outline btn--block" id="m">Continue with Microsoft</button>
+
+                  <button class="btn btn--outline btn--block oauthBtn" id="m">
+                    <span class="oauthIcon oauthMicrosoft" aria-hidden="true"></span>
+                    Continue with Microsoft
+                  </button>
                 </div>
               </div>
 
@@ -958,18 +928,9 @@ function renderPortal() {
    ROUTER
    ========================================================= */
 function route() {
-  setActiveNav();
-
   const raw = location.hash || "#/";
   const [pathPart] = raw.replace(/^#/, "").split("?");
   const parts = pathPart.split("/").filter(Boolean);
-
-  // close mobile drawer if open
-  const drawer = document.getElementById("navDrawer");
-  if (drawer?.classList.contains("open")) {
-    drawer.classList.remove("open");
-    drawer.setAttribute("aria-hidden", "true");
-  }
 
   if (parts.length === 0) return renderHome();
 
@@ -980,21 +941,14 @@ function route() {
   if (page === "how") return renderHow();
   if (page === "trust") return renderTrust();
   if (page === "portal") return renderPortal();
-
   if (page === "landlord" && parts[1]) return renderLandlord(parts[1]);
   if (page === "review" && parts[1]) return renderReview(parts[1]);
 
-  // fallback
   renderHome();
 }
 
-/* =========================================================
-   Boot
-   ========================================================= */
 function boot() {
   window.addEventListener("hashchange", route);
-
-  // if someone loads without hash
   if (!location.hash) location.hash = "#/";
   route();
 }
