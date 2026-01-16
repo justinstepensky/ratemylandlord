@@ -918,3 +918,4 @@ textarea{ resize: vertical; min-height: 90px; }
   align-items:center;
   justify-content:center;
 }
+.brand__tag { display: none !important; }
