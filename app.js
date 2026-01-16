@@ -85,8 +85,7 @@ const landlords = [
 ];
 
 /* =========================================================
-   MAP (Leaflet) helpers
-   - Works only if Leaflet is loaded (index.html)
+   MAP (Leaflet)
    ========================================================= */
 let __homeMap = null;
 let __homeLayer = null;
@@ -100,6 +99,13 @@ function leafletOK() {
 
 function initMap(elId, which) {
   if (!leafletOK()) return null;
+
+  const el = document.getElementById(elId);
+  if (!el) return null;
+
+  // If this element was used before, Leaflet can throw "Map container is already initialized"
+  // Safer to reset it.
+  el.innerHTML = "";
 
   const m = window.L.map(elId, { scrollWheelZoom: false }).setView([40.73, -73.97], 11);
 
@@ -118,6 +124,10 @@ function initMap(elId, which) {
     __searchLayer = layer;
   }
 
+  // 🔥 Critical: force Leaflet to compute correct size after DOM paint
+  requestAnimationFrame(() => m.invalidateSize());
+  setTimeout(() => m.invalidateSize(), 250);
+
   return m;
 }
 
@@ -135,9 +145,8 @@ function setMarkers(which, list) {
   list.forEach((x) => {
     if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
 
-    const m = window.L.marker([x.lat, x.lng]).addTo(layer);
-
-    m.bindPopup(`
+    const mk = window.L.marker([x.lat, x.lng]).addTo(layer);
+    mk.bindPopup(`
       <div style="min-width:220px;">
         <div style="font-weight:1000;">${esc(x.name)}</div>
         <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
@@ -154,11 +163,13 @@ function setMarkers(which, list) {
   });
 
   if (pts.length) {
-    const bounds = window.L.latLngBounds(pts);
-    map.fitBounds(bounds.pad(0.18));
+    map.fitBounds(window.L.latLngBounds(pts).pad(0.18));
   } else {
     map.setView([40.73, -73.97], 11);
   }
+
+  requestAnimationFrame(() => map.invalidateSize());
+  setTimeout(() => map.invalidateSize(), 250);
 }
 
 /* =========================================================
@@ -189,14 +200,13 @@ function renderHome() {
 
             <div class="trustLine">No account required to review. Verified landlords can respond.</div>
 
-            <!-- Tiles -->
+            <!-- Tiles (NO Tap/Info labels) -->
             <div class="cards3" style="margin-top:14px;">
               <div class="xCard" role="button" tabindex="0">
                 <div class="xCard__top">
                   <div class="xCard__title">
                     <span class="xCard__icon">⌕</span> Search
                   </div>
-                  <span class="badge">Tap</span>
                 </div>
                 <div class="xCard__body">Search by name, entity or address</div>
               </div>
@@ -206,7 +216,6 @@ function renderHome() {
                   <div class="xCard__title">
                     <span class="xCard__icon">★</span> Review
                   </div>
-                  <span class="badge">Tap</span>
                 </div>
                 <div class="xCard__body">leave a rating based on select categories</div>
               </div>
@@ -216,7 +225,6 @@ function renderHome() {
                   <div class="xCard__title">
                     <span class="xCard__icon">⌂</span> Rent
                   </div>
-                  <span class="badge">Info</span>
                 </div>
               </div>
             </div>
@@ -254,7 +262,7 @@ function renderHome() {
               </div>
               <div id="homeMapFallback" class="box" style="margin-top:12px; display:none;">
                 <div style="font-weight:1000;">Map not loaded</div>
-                <div class="tiny" style="margin-top:6px;">Add Leaflet to index.html to enable the map.</div>
+                <div class="tiny" style="margin-top:6px;">Leaflet must be included in index.html.</div>
               </div>
             </div>
           </div>
@@ -272,7 +280,7 @@ function renderHome() {
     </section>
   `;
 
-  // featured
+  // Featured cards
   const grid = $("#featuredGrid");
   if (grid) {
     grid.innerHTML = landlords.slice(0, 3).map((r) => `
@@ -294,7 +302,7 @@ function renderHome() {
     `).join("");
   }
 
-  // Search
+  // Home search
   const homeQ = $("#homeQ");
   $("#homeGo")?.addEventListener("click", () => {
     const q = (homeQ?.value || "").trim();
@@ -304,7 +312,7 @@ function renderHome() {
     if (e.key === "Enter") $("#homeGo")?.click();
   });
 
-  // Tiles toggle (only for clickable ones)
+  // Tiles toggle (only clickable ones)
   document.querySelectorAll(".xCard:not(.xCard--locked)").forEach((c) => {
     c.addEventListener("click", () => c.classList.toggle("open"));
     c.addEventListener("keydown", (e) => {
@@ -312,7 +320,7 @@ function renderHome() {
     });
   });
 
-  // Home map init
+  // Home map
   if (!leafletOK()) {
     $("#homeMap") && ($("#homeMap").style.display = "none");
     $("#homeMapFallback") && ($("#homeMapFallback").style.display = "block");
@@ -323,14 +331,14 @@ function renderHome() {
 }
 
 /* =========================================================
-   SEARCH (filters + map)
+   SEARCH
    ========================================================= */
 function renderSearch() {
   const app = $("#app");
   if (!app) return;
 
-  const hash = location.hash || "#/search";
-  const queryString = hash.includes("?") ? hash.split("?")[1] : "";
+  const raw = location.hash || "#/search";
+  const queryString = raw.includes("?") ? raw.split("?")[1] : "";
   const params = new URLSearchParams(queryString);
   const initial = params.get("q") || "";
 
@@ -348,7 +356,6 @@ function renderSearch() {
           </div>
 
           <div class="bd">
-            <!-- Aesthetic search bar matching hero -->
             <div class="searchHero">
               <div class="heroSearch__bar">
                 <input id="q" placeholder="Type a landlord name or address..." value="${esc(initial)}" />
@@ -379,15 +386,6 @@ function renderSearch() {
                   <option value="2">2+ stars</option>
                 </select>
               </div>
-
-              <div class="field">
-                <label>Sort</label>
-                <select id="sort">
-                  <option value="relevance">Relevance</option>
-                  <option value="rating">Rating</option>
-                  <option value="newest">Newest</option>
-                </select>
-              </div>
             </div>
 
             <div class="mapWrap" style="margin-top:12px;">
@@ -396,7 +394,7 @@ function renderSearch() {
 
             <div id="searchMapFallback" class="box" style="margin-top:12px; display:none;">
               <div style="font-weight:1000;">Map not loaded</div>
-              <div class="tiny" style="margin-top:6px;">Add Leaflet to index.html to enable the map.</div>
+              <div class="tiny" style="margin-top:6px;">Leaflet must be included in index.html.</div>
             </div>
 
             <div id="results"></div>
@@ -406,17 +404,10 @@ function renderSearch() {
     </section>
   `;
 
-  function parseDate(d) {
-    const parts = String(d || "").split("/");
-    if (parts.length !== 3) return new Date(0);
-    return new Date(Number(parts[2]), Number(parts[0]) - 1, Number(parts[1]));
-  }
-
   function run() {
     const query = ($("#q").value || "").trim().toLowerCase();
     const borough = ($("#borough").value || "").trim();
     const minr = Number($("#minr").value || 0);
-    const sort = ($("#sort").value || "relevance");
 
     let list = landlords.slice();
 
@@ -426,12 +417,8 @@ function renderSearch() {
         x.addr.toLowerCase().includes(query)
       );
     }
-
     if (borough) list = list.filter((x) => (x.borough || "") === borough);
     if (minr) list = list.filter((x) => (Number(x.score) || 0) >= minr);
-
-    if (sort === "rating") list.sort((a, b) => (b.score || 0) - (a.score || 0));
-    if (sort === "newest") list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
     $("#results").innerHTML = list.length
       ? list.map((x) => `
@@ -452,18 +439,13 @@ function renderSearch() {
         <div class="box" style="margin-top:12px;">
           <div style="font-weight:1000;">No results</div>
           <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
-          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-            <a class="btn btn--primary" href="#/add">Add a landlord</a>
-            <a class="btn btn--ghost" href="#/">Back to home</a>
-          </div>
         </div>
       `;
 
-    // map markers
     if (leafletOK()) setMarkers("search", list);
   }
 
-  // map init
+  // Search map
   if (!leafletOK()) {
     $("#searchMap") && ($("#searchMap").style.display = "none");
     $("#searchMapFallback") && ($("#searchMapFallback").style.display = "block");
@@ -474,9 +456,7 @@ function renderSearch() {
 
   $("#doSearch")?.addEventListener("click", run);
   $("#q")?.addEventListener("keydown", (e) => (e.key === "Enter" ? run() : null));
-  ["borough", "minr", "sort"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("change", run);
-  });
+  ["borough", "minr"].forEach((id) => document.getElementById(id)?.addEventListener("change", run));
 
   run();
 }
@@ -556,10 +536,7 @@ function renderAdd() {
     let lat, lng;
     if (coords.includes(",")) {
       const [a, b] = coords.split(",").map((x) => Number(x.trim()));
-      if (!Number.isNaN(a) && !Number.isNaN(b)) {
-        lat = a;
-        lng = b;
-      }
+      if (!Number.isNaN(a) && !Number.isNaN(b)) { lat = a; lng = b; }
     }
 
     const id =
@@ -584,7 +561,7 @@ function renderAdd() {
 }
 
 /* =========================================================
-   LANDLORD PROFILE
+   LANDLORD PROFILE + REVIEW
    ========================================================= */
 function renderLandlord(id) {
   const app = $("#app");
@@ -644,9 +621,6 @@ function renderLandlord(id) {
   `;
 }
 
-/* =========================================================
-   WRITE REVIEW (demo)
-   ========================================================= */
 function renderReview(id) {
   const app = $("#app");
   if (!app) return;
@@ -700,10 +674,6 @@ function renderReview(id) {
             <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
               <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Cancel</a>
               <button class="btn btn--primary" id="submitReview">Submit review</button>
-            </div>
-
-            <div class="tiny" style="margin-top:10px;">
-              Demo mode: this replaces the landlord’s highlight + score.
             </div>
           </div>
         </div>
@@ -819,8 +789,38 @@ function renderTrust() {
 }
 
 /* =========================================================
-   LANDLORD PORTAL (demo) + logos
+   LANDLORD PORTAL (inline SVG logos; no CSS dependency)
    ========================================================= */
+function googleIcon() {
+  return `
+    <svg class="oauthSvg" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.18 3.22l6.82-6.82C35.86 2.36 30.28 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.93 6.16C12.36 13.02 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9.01h12.7c-.55 2.96-2.2 5.47-4.67 7.16l7.16 5.55C43.88 36.52 46.5 30.78 46.5 24z"/>
+      <path fill="#FBBC05" d="M10.49 28.38A14.5 14.5 0 0 1 9.5 24c0-1.52.26-2.99.74-4.38l-7.93-6.16A23.9 23.9 0 0 0 0 24c0 3.85.92 7.49 2.56 10.78l7.93-6.4z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.9-5.78l-7.16-5.55c-1.99 1.34-4.54 2.13-8.74 2.13-6.26 0-11.64-3.52-13.51-8.62l-7.93 6.4C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+  `;
+}
+
+function appleIcon() {
+  return `
+    <svg class="oauthSvg" viewBox="0 0 384 512" aria-hidden="true">
+      <path fill="#111" d="M318.7 268.6c-.3-52.6 43.1-77.8 45.1-79.1-24.6-35.9-62.9-40.8-76.4-41.4-32.6-3.3-63.7 19.2-80.2 19.2-16.5 0-42-18.7-69-18.2-35.5.5-68.2 20.6-86.5 52.4-36.9 64-9.4 158.7 26.5 210.6 17.6 25.4 38.6 54 66.2 52.9 26.6-1.1 36.7-17.2 68.8-17.2 32.1 0 41.2 17.2 69.1 16.6 28.5-.5 46.6-25.9 64.1-51.4 20.2-29.5 28.6-58 28.9-59.5-.6-.3-55.4-21.3-55.6-84.9zM259.5 78.7c14.6-17.7 24.4-42.2 21.7-66.7-21.1.8-46.6 14.1-61.7 31.8-13.6 15.7-25.5 40.8-22.3 64.8 23.5 1.8 47.7-12 62.3-29.9z"/>
+    </svg>
+  `;
+}
+
+function microsoftIcon() {
+  return `
+    <svg class="oauthSvg" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#F25022" d="M1 1h10v10H1z"/>
+      <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+      <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+      <path fill="#FFB900" d="M13 13h10v10H13z"/>
+    </svg>
+  `;
+}
+
 function renderPortal() {
   const app = $("#app");
   if (!app) return;
@@ -856,22 +856,15 @@ function renderPortal() {
                   <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
 
                   <button class="btn btn--outline btn--block oauthBtn" id="g">
-                    <span class="oauthIcon oauthGoogle" aria-hidden="true"></span>
-                    Continue with Google
+                    ${googleIcon()} <span>Continue with Google</span>
                   </button>
-
                   <div style="height:8px;"></div>
-
                   <button class="btn btn--outline btn--block oauthBtn" id="a">
-                    <span class="oauthIcon oauthApple" aria-hidden="true"></span>
-                    Continue with Apple
+                    ${appleIcon()} <span>Continue with Apple</span>
                   </button>
-
                   <div style="height:8px;"></div>
-
                   <button class="btn btn--outline btn--block oauthBtn" id="m">
-                    <span class="oauthIcon oauthMicrosoft" aria-hidden="true"></span>
-                    Continue with Microsoft
+                    ${microsoftIcon()} <span>Continue with Microsoft</span>
                   </button>
                 </div>
               </div>
