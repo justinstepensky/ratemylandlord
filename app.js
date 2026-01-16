@@ -795,33 +795,89 @@
                   </div>
                 </div>
 
-                <div class="card" style="box-shadow:none;">
-                  <div class="pad">
-                    <div class="kicker">Create account</div>
-                    <div class="field" style="margin-top:10px;">
-                      <label>Email</label>
-                      <input id="se" placeholder="you@company.com"/>
-                    </div>
-                    <div class="field" style="margin-top:10px;">
-                      <label>Password</label>
-                      <input id="sp" type="password" placeholder="Create a password"/>
-                    </div>
-                    <div class="field" style="margin-top:10px;">
-                      <label>Verification document (demo)</label>
-                      <input id="doc" type="file"/>
-                      <div class="tiny" style="margin-top:6px;">Lease header, LLC registration, management agreement, etc.</div>
-                    </div>
-                    <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-                    <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+           <div class="card" style="box-shadow:none;">
+  <div class="pad">
+    <div class="kicker">Create account</div>
 
-          </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Email</label>
+      <input id="se" placeholder="you@company.com"/>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <label>Password</label>
+      <input id="sp" type="password" placeholder="Create a password"/>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <label>Verification document (demo)</label>
+
+      <!-- custom file input -->
+      <div class="fileRow" style="margin-top:6px;">
+        <input id="doc" type="file" class="fileInput" />
+        <div class="fileFake">
+          <span class="fileBtn">Choose file</span>
+          <span class="fileName" id="docName">No file chosen</span>
         </div>
-      </section>
-    `;
+      </div>
+
+      <div class="tiny" style="margin-top:6px;">
+        Lease header, LLC registration, management agreement, etc.
+      </div>
+    </div>
+
+    <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">
+      Create account
+    </button>
+
+    <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
+
+    <!-- oauth buttons -->
+    <button class="btn btn--outline btn--block oauthBtn" id="sg">
+      <span class="oauthIcon" aria-hidden="true">
+        <!-- Google -->
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.02 1.53 7.4 2.81l5.41-5.41C33.69 4.06 29.28 2 24 2 14.73 2 6.98 7.39 3.36 15.21l6.64 5.16C11.61 14.25 17.31 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.1 24.5c0-1.57-.14-3.08-.4-4.5H24v9h12.4c-.54 2.9-2.18 5.36-4.62 7.02l7.06 5.48C42.96 37.36 46.1 31.45 46.1 24.5z"/>
+          <path fill="#FBBC05" d="M10 28.37c-.49-1.46-.77-3.02-.77-4.62 0-1.6.28-3.16.77-4.62l-6.64-5.16C1.98 17.39 1.2 20.11 1.2 23.75c0 3.64.78 6.36 2.16 9.78L10 28.37z"/>
+          <path fill="#34A853" d="M24 46c5.28 0 9.72-1.74 12.96-4.72l-7.06-5.48c-1.96 1.32-4.47 2.1-5.9 2.1-6.69 0-12.39-4.75-14-10.87l-6.64 5.16C6.98 40.61 14.73 46 24 46z"/>
+        </svg>
+      </span>
+      Continue with Google
+    </button>
+
+    <div style="height:8px;"></div>
+
+    <button class="btn btn--outline btn--block oauthBtn" id="sa">
+      <span class="oauthIcon" aria-hidden="true">
+        <!-- Apple -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+             xmlns="http://www.w3.org/2000/svg">
+          <path fill="currentColor" d="M16.365 1.43c0 1.14-.41 2.2-1.19 3.07-.77.87-2.05 1.54-3.17 1.44-.14-1.1.45-2.26 1.16-3.07.79-.91 2.14-1.58 3.2-1.44z"/>
+          <path fill="currentColor" d="M20.8 17.02c-.55 1.27-.82 1.84-1.53 2.97-.99 1.55-2.39 3.48-4.12 3.5-1.54.01-1.94-1-4.03-1-2.09 0-2.53.98-4.06 1.02-1.72.06-3.04-1.72-4.03-3.27C1.2 17.7.0 13.03 1.85 9.82c.99-1.72 2.71-2.73 4.53-2.73 1.78 0 2.89 1 4.35 1 1.42 0 2.28-1 4.33-1 1.62 0 3.34.89 4.31 2.43-3.76 2.06-3.15 7.43.43 8.5z"/>
+        </svg>
+      </span>
+      Continue with Apple
+    </button>
+
+    <div style="height:8px;"></div>
+
+    <button class="btn btn--outline btn--block oauthBtn" id="sm">
+      <span class="oauthIcon" aria-hidden="true">
+        <!-- Microsoft -->
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#F35325" d="M6 6h17v17H6z"/>
+          <path fill="#81BC06" d="M25 6h17v17H25z"/>
+          <path fill="#05A6F0" d="M6 25h17v17H6z"/>
+          <path fill="#FFBA08" d="M25 25h17v17H25z"/>
+        </svg>
+      </span>
+      Continue with Microsoft
+    </button>
+
+    <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
+  </div>
+</div>
 
     $("#login")?.addEventListener("click", () => {
       const e = ($("#le").value || "").trim();
