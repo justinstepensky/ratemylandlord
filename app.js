@@ -1,1416 +1,1443 @@
-/* =========================
-   CASA — SPA (Hash Router)
-   ========================= */
+/* =========================================================
+   CASA — app.js (single-file SPA)
+   ========================================================= */
 
+/* ---------- Badge asset paths (SET THESE) ---------- */
+const BADGE_VERIFIED_SRC = "assets/badge-verified.png"; // Blue check image
+const BADGE_TOP_SRC      = "assets/badge-top.png";      // CASA logo badge
+
+/* ---------- Utilities ---------- */
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
-/* ---------- Badge assets (YOU MUST ADD THESE FILES) ----------
-   /assets/badges/verified.png  (Blue check badge image)
-   /assets/badges/top.png       (CASA logo badge image)
--------------------------------------------------------------- */
-const BADGE_VERIFIED_SRC = "assets/badges/verified.png";
-const BADGE_TOP_SRC = "assets/badges/top.png";
-
-/* ---------- Local Storage ---------- */
-const LS = {
-  landlords: "casa_landlords_v1",
-  reviews: "casa_reviews_v1",
-  replies: "casa_replies_v1",
+const nowISO = () => new Date().toISOString();
+const daysBetween = (aISO, bISO) => {
+  const a = new Date(aISO).getTime();
+  const b = new Date(bISO).getTime();
+  return Math.max(0, Math.round((b - a) / (1000*60*60*24)));
 };
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
-function load(key, fallback){
-  try{
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  }catch(e){ return fallback; }
-}
-function save(key, val){
-  localStorage.setItem(key, JSON.stringify(val));
+function safeText(s){
+  return (s ?? "").toString().replace(/[<>&"]/g, (c) => ({
+    "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;"
+  }[c]));
 }
 
-/* ---------- Seed Data (safe) ---------- */
-function ensureSeed(){
-  const landlords = load(LS.landlords, null);
-  const reviews = load(LS.reviews, null);
+function slugify(s){
+  return (s||"")
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g,"")
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/(^-|-$)/g,"");
+}
 
-  if (!landlords || !Array.isArray(landlords) || landlords.length === 0){
-    const seeded = [
+function starsHTML(avg){
+  const on = Math.round(clamp(avg,0,5));
+  let out = `<span class="stars" aria-label="${avg.toFixed(1)} out of 5">`;
+  for(let i=1;i<=5;i++){
+    out += `<span class="${i<=on ? "on":"off"}">★</span>`;
+  }
+  out += `</span>`;
+  return out;
+}
+
+/* ---------- Data ---------- */
+const LS_KEY = "casa_v1";
+
+function seed(){
+  return {
+    landlords: [
       {
-        id: uid(),
-        name: "Northside Properties",
-        entity: "Northside Properties LLC",
-        address: { address:"123 Main St", unit:"", city:"Brooklyn", state:"NY" },
-        borough: "Brooklyn",
-        lat: 40.717, lng: -73.956,
-        verified: true,
-        topLandlord: false,
-        claimed: true,
-      },
-      {
-        id: uid(),
+        id: "ld_parkave",
         name: "Park Ave Management",
         entity: "Park Ave Management LLC",
-        address: { address:"22 Park Ave", unit:"", city:"New York", state:"NY" },
+        address1: "22 Park Ave",
+        unit: "",
+        city: "New York",
+        state: "NY",
         borough: "Manhattan",
-        lat: 40.743, lng: -73.983,
+        lat: 40.7442,
+        lng: -73.9836,
         verified: true,
-        topLandlord: true,
-        claimed: true,
+        top: false,
+        createdAt: "2025-10-01T12:00:00.000Z",
       },
       {
-        id: uid(),
-        name: "Elmhurst Holdings",
-        entity: "Elmhurst Holdings",
-        address: { address:"86-12 Broadway", unit:"", city:"Queens", state:"NY" },
-        borough: "Queens",
-        lat: 40.742, lng: -73.877,
+        id: "ld_northside",
+        name: "Northside Properties",
+        entity: "",
+        address1: "123 Main St",
+        unit: "",
+        city: "Brooklyn",
+        state: "NY",
+        borough: "Brooklyn",
+        lat: 40.7175,
+        lng: -73.9566,
         verified: false,
-        topLandlord: false,
-        claimed: false,
-      }
-    ];
-    save(LS.landlords, seeded);
-  }
-
-  if (!reviews || !Array.isArray(reviews) || reviews.length === 0){
-    const lls = load(LS.landlords, []);
-    const byName = (n)=> lls.find(x => x.name === n)?.id;
-
-    const seededReviews = [
-      {
-        id: uid(),
-        landlordId: byName("Northside Properties"),
-        rating: 4,
-        text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
-        createdAt: "2026-01-05T12:00:00.000Z",
+        top: false,
+        createdAt: "2025-11-10T12:00:00.000Z",
       },
       {
-        id: uid(),
-        landlordId: byName("Park Ave Management"),
-        rating: 3,
+        id: "ld_elmhurst",
+        name: "Elmhurst Holdings",
+        entity: "",
+        address1: "86-12 Broadway",
+        unit: "",
+        city: "Queens",
+        state: "NY",
+        borough: "Queens",
+        lat: 40.7427,
+        lng: -73.8919,
+        verified: true,
+        top: true,
+        createdAt: "2025-11-20T12:00:00.000Z",
+      },
+    ],
+    reviews: [
+      {
+        id: "rv_1",
+        landlordId: "ld_parkave",
+        stars: 3,
         text: "Great location, but communication was slow. Security deposit itemization took weeks.",
-        createdAt: "2025-12-18T12:00:00.000Z",
+        createdAt: "2025-12-18T18:10:00.000Z",
       },
       {
-        id: uid(),
-        landlordId: byName("Elmhurst Holdings"),
-        rating: 5,
+        id: "rv_2",
+        landlordId: "ld_northside",
+        stars: 4,
+        text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
+        createdAt: "2026-01-05T15:15:00.000Z",
+      },
+      {
+        id: "rv_3",
+        landlordId: "ld_elmhurst",
+        stars: 5,
         text: "Responsive management. Clear lease terms and quick repairs.",
-        createdAt: "2025-11-30T12:00:00.000Z",
-      }
-    ].filter(r => r.landlordId);
-
-    save(LS.reviews, seededReviews);
-  }
-}
-
-/* ---------- Helpers ---------- */
-function uid(){
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-function slugify(s){
-  return (s || "").toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-function fmtDate(iso){
-  try{
-    const d = new Date(iso);
-    return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
-  }catch(e){ return ""; }
-}
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-
-function starsVis(rating){
-  const r = clamp(Math.round(rating), 0, 5);
-  return "★★★★★".slice(0, r) + "☆☆☆☆☆".slice(0, 5-r);
-}
-
-/* ---------- Recency-weighted rating (simple, credibility-minded) ----------
-   Weight decreases with age:
-   w = exp(-ageDays / 365)
-   Returns { avg, count, dist, note }
--------------------------------------------------------------------------- */
-function ratingStats(landlordId){
-  const reviews = load(LS.reviews, []).filter(r => r.landlordId === landlordId);
-  const count = reviews.length;
-
-  const dist = {1:0,2:0,3:0,4:0,5:0};
-  if (count === 0){
-    return { avg: 0, rounded: 0, count: 0, dist, note: "" };
-  }
-
-  const now = Date.now();
-  let wsum = 0;
-  let rsum = 0;
-
-  for (const rv of reviews){
-    const ageDays = Math.max(0, (now - new Date(rv.createdAt).getTime()) / (1000*60*60*24));
-    const w = Math.exp(-ageDays / 365);
-    wsum += w;
-    rsum += (rv.rating * w);
-    dist[rv.rating] = (dist[rv.rating] || 0) + 1;
-  }
-
-  const avg = rsum / (wsum || 1);
-  const rounded = Math.round(avg * 10) / 10; // 1 decimal
-
-  return {
-    avg,
-    rounded,
-    count,
-    dist,
-    note: "Rating reflects review recency."
+        createdAt: "2025-11-30T14:30:00.000Z",
+      },
+      /* extra reviews to make tiers look real */
+      {
+        id: "rv_4",
+        landlordId: "ld_elmhurst",
+        stars: 5,
+        text: "Very consistent, super fast maintenance responses.",
+        createdAt: "2026-01-02T10:00:00.000Z",
+      },
+      {
+        id: "rv_5",
+        landlordId: "ld_elmhurst",
+        stars: 4,
+        text: "Overall excellent. Minor issue on move-out but resolved.",
+        createdAt: "2025-09-12T10:00:00.000Z",
+      },
+      {
+        id: "rv_6",
+        landlordId: "ld_elmhurst",
+        stars: 5,
+        text: "Clean building and good communication.",
+        createdAt: "2025-08-01T10:00:00.000Z",
+      },
+    ]
   };
 }
 
-/* ---------- Tier coloring (Implement EXACT boundaries using rounded rating) ----------
-   If reviewCount===0 -> no tier.
-   red:    1.00 <= rounded <= 2.99
-   yellow: 2.99 <  rounded <= 3.99   (i.e., 3.0–3.99)
-   green:  4.00 <= rounded <= 5.00
-------------------------------------------------------------------------- */
-function ratingTierClass(rounded, count){
-  if (!count || count === 0) return "";
-  if (rounded >= 1.0 && rounded <= 2.99) return "tierRed";
-  if (rounded > 2.99 && rounded <= 3.99) return "tierYellow";
-  if (rounded >= 4.0 && rounded <= 5.0) return "tierGreen";
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw){
+      const s = seed();
+      localStorage.setItem(LS_KEY, JSON.stringify(s));
+      return s;
+    }
+    return JSON.parse(raw);
+  }catch(e){
+    const s = seed();
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+    return s;
+  }
+}
+function saveDB(db){
+  localStorage.setItem(LS_KEY, JSON.stringify(db));
+}
+let DB = loadDB();
+
+/* ---------- Rating logic ---------- */
+function reviewsFor(landlordId){
+  return DB.reviews.filter(r => r.landlordId === landlordId);
+}
+
+/* Recency-weighted average (half-life 365 days) */
+function recencyWeightedAverage(revs){
+  if(!revs.length) return 0;
+  const HALF_LIFE_DAYS = 365;
+  const ln2 = Math.log(2);
+  const now = new Date().toISOString();
+  let wSum = 0;
+  let vSum = 0;
+  for(const r of revs){
+    const age = daysBetween(r.createdAt, now);
+    const w = Math.exp(-ln2 * (age / HALF_LIFE_DAYS));
+    wSum += w;
+    vSum += w * r.stars;
+  }
+  return vSum / Math.max(1e-9, wSum);
+}
+
+function ratingSummary(landlordId){
+  const revs = reviewsFor(landlordId);
+  const count = revs.length;
+  if(count === 0){
+    return { avg: 0, avgRounded: 0, count: 0, dist: [0,0,0,0,0], recent12: 0 };
+  }
+  const avg = recencyWeightedAverage(revs);
+  const avgRounded = Math.round(avg * 10) / 10;
+
+  const dist = [0,0,0,0,0]; // index 0 => 1★ ... index 4 => 5★
+  for(const r of revs){
+    dist[r.stars - 1] = (dist[r.stars - 1] || 0) + 1;
+  }
+
+  const now = new Date().toISOString();
+  const recent12 = revs.filter(r => daysBetween(r.createdAt, now) <= 365).length;
+
+  return { avg, avgRounded, count, dist, recent12 };
+}
+
+function tierClass(avgRounded, count){
+  if(count === 0) return "";
+  // Use the rounded rating for tier classification (required)
+  if(avgRounded >= 1.0 && avgRounded <= 2.99) return "card--tierRed";
+  if(avgRounded > 2.99 && avgRounded <= 3.99) return "card--tierYellow";
+  if(avgRounded >= 4.0 && avgRounded <= 5.0) return "card--tierGreen";
   return "";
 }
-function ratingTierLabel(rounded, count){
-  if (!count || count === 0) return "";
-  if (rounded >= 1.0 && rounded <= 2.99) return "Low Rating";
-  if (rounded > 2.99 && rounded <= 3.99) return "Mixed Reviews";
-  if (rounded >= 4.0 && rounded <= 5.0) return "Highly Rated";
+function tierLabel(avgRounded, count){
+  if(count === 0) return "";
+  if(avgRounded >= 1.0 && avgRounded <= 2.99) return "Low Rating";
+  if(avgRounded > 2.99 && avgRounded <= 3.99) return "Mixed Reviews";
+  if(avgRounded >= 4.0) return "Highly Rated";
   return "";
 }
 
-/* ---------- Credentials (public states) ----------
-   Unrated: 0 reviews
-   Not yet CASA Rated — needs more reviews: <10 total OR <3 in last 12 months
-   CASA Rated: 10+ total AND 3+ in last 12 months
-   Verified: landlord.verified
-   Top: landlord.topLandlord
------------------------------------------------ */
-function credentialText(landlord){
-  const reviews = load(LS.reviews, []).filter(r => r.landlordId === landlord.id);
-  const total = reviews.length;
-  if (total === 0) return "Unrated";
-
-  const twelveMonthsAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
-  const recent = reviews.filter(r => new Date(r.createdAt).getTime() >= twelveMonthsAgo).length;
-
-  if (total < 10 || recent < 3) return "Not yet CASA Rated — needs more reviews";
-  return "CASA Rated";
+function casaCredential(summary){
+  // Criteria from your spec (second version): CASA Rated = 10+ total AND 3+ in last 12 months
+  if(summary.count === 0) return { label: "Unrated", detail: "No reviews yet." };
+  if(summary.count < 10 || summary.recent12 < 3){
+    return { label: "Not yet CASA Rated", detail: "Needs more recent reviews." };
+  }
+  return { label: "CASA Rated", detail: "Meets the CASA rating standard." };
 }
 
-/* ---------- Badges UI ---------- */
-function badgeHTML(landlord){
+/* ---------- Badges ---------- */
+function badgesHTML(landlord){
   const parts = [];
-  if (landlord.verified){
-    parts.push(`<img class="badgeImg" src="${BADGE_VERIFIED_SRC}" alt="Verified Landlord"
-      title="Verified Landlord (ownership verified)"/>`);
+  if(landlord.verified){
+    parts.push(`<img class="badge" src="${BADGE_VERIFIED_SRC}" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
   }
-  if (landlord.topLandlord){
-    parts.push(`<img class="badgeImg" src="${BADGE_TOP_SRC}" alt="Top Landlord"
-      title="Top Landlord (high rating + consistent performance)"/>`);
+  if(landlord.top){
+    parts.push(`<img class="badge" src="${BADGE_TOP_SRC}" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
   }
-  if (!parts.length) return "";
+  if(!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
 
-/* ---------- Map globals ---------- */
-let homeMap = null;
-let searchMap = null;
-let addMap = null;
-let activeMarkers = [];
-let addPinMarker = null;
-let addPinLatLng = null;
+/* ---------- Maps ---------- */
+let maps = {
+  home: null,
+  search: null,
+  add: null,
+  profile: null,
+};
+let mapMarkers = {
+  home: [],
+  search: [],
+  addPin: null,
+  profilePin: null
+};
+
+function destroyMap(key){
+  try{
+    if(maps[key]){
+      maps[key].remove();
+      maps[key] = null;
+    }
+    mapMarkers[key] = [];
+  }catch(e){}
+}
+
+function ensureMap(key, elId, opts){
+  destroyMap(key);
+  const el = document.getElementById(elId);
+  if(!el) return null;
+
+  const map = L.map(elId, { zoomControl:true, scrollWheelZoom: false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  map.setView(opts.center, opts.zoom);
+  maps[key] = map;
+  return map;
+}
+
+function addLandlordMarkers(map, key, landlords){
+  // clear old
+  for(const m of (mapMarkers[key] || [])){
+    try{ m.remove(); }catch(e){}
+  }
+  mapMarkers[key] = [];
+
+  landlords.forEach(ld => {
+    if(typeof ld.lat !== "number" || typeof ld.lng !== "number") return;
+    const s = ratingSummary(ld.id);
+    const label = s.count ? `${s.avgRounded.toFixed(1)} ★ (${s.count})` : "No ratings";
+    const marker = L.marker([ld.lat, ld.lng]).addTo(map);
+    marker.bindPopup(`<b>${safeText(ld.name)}</b><br/>${safeText(label)}`);
+    mapMarkers[key].push(marker);
+  });
+}
 
 /* ---------- Router ---------- */
 function route(){
-  closeMenu(); // if mobile menu open, close on nav
-  const hash = (location.hash || "#/").replace("#", "");
-  const [path, qs] = hash.split("?");
-  const params = new URLSearchParams(qs || "");
+  const hash = location.hash || "#/";
+  const [path, queryStr] = hash.slice(2).split("?");
+  const parts = (path || "").split("/").filter(Boolean);
 
-  // cleanup any modal
+  // close modals when navigating
   closeModal();
 
-  // Render route
-  if (path === "/" || path === "") return renderHome();
-  if (path === "/search") return renderSearch(params);
-  if (path === "/add") return renderAdd();
-  if (path === "/how") return renderHow();
-  if (path === "/trust") return renderTrust();
-  if (path === "/portal") return renderPortal();
-  if (path.startsWith("/landlord/")){
-    const id = path.split("/landlord/")[1];
-    return renderLandlord(id);
-  }
+  if(parts.length === 0) return renderHome();
+  if(parts[0] === "search") return renderSearch();
+  if(parts[0] === "add") return renderAdd();
+  if(parts[0] === "how") return renderHow();
+  if(parts[0] === "trust") return renderTrust();
+  if(parts[0] === "portal") return renderPortal();
+  if(parts[0] === "landlord" && parts[1]) return renderProfile(parts[1]);
+
   // fallback
-  return renderHome();
+  renderHome();
 }
 
-/* ---------- MENU (mobile drawer) ---------- */
-function openMenu(){
-  const drawer = $("#mobileDrawer");
-  const btn = $("#menuBtn");
-  drawer?.classList.add("isOpen");
-  drawer?.setAttribute("aria-hidden","false");
-  btn?.setAttribute("aria-expanded","true");
-}
-function closeMenu(){
-  const drawer = $("#mobileDrawer");
-  const btn = $("#menuBtn");
-  drawer?.classList.remove("isOpen");
-  drawer?.setAttribute("aria-hidden","true");
-  btn?.setAttribute("aria-expanded","false");
-}
-function initMenu(){
-  $("#menuBtn")?.addEventListener("click", ()=>{
-    const drawer = $("#mobileDrawer");
-    if (drawer?.classList.contains("isOpen")) closeMenu();
-    else openMenu();
-  });
-  $("#menuClose")?.addEventListener("click", closeMenu);
-  $("#menuBackdrop")?.addEventListener("click", closeMenu);
+window.addEventListener("hashchange", route);
+window.addEventListener("load", () => {
+  setupNavMenu();
+  route();
+});
 
-  // Close drawer when tapping any drawer link
-  $("#mobileDrawer")?.addEventListener("click",(e)=>{
-    const a = e.target?.closest?.("a");
-    if (a) closeMenu();
+/* ---------- Nav Menu (mobile) ---------- */
+function setupNavMenu(){
+  const btn = $("#menuBtn");
+  if(!btn) return;
+
+  btn.addEventListener("click", () => {
+    openMenuModal();
   });
 }
 
-/* ---------- Render shell helpers ---------- */
-function setApp(html){
-  const app = $("#app");
-  if (app) app.innerHTML = html;
-}
-function safeInitMap(kind){
-  // invalidate after paint
-  setTimeout(()=>{
-    try{
-      if (kind === "home" && homeMap) homeMap.invalidateSize();
-      if (kind === "search" && searchMap) searchMap.invalidateSize();
-      if (kind === "add" && addMap) addMap.invalidateSize();
-    }catch(e){}
-  }, 80);
-}
-function clearMarkers(){
-  for (const m of activeMarkers){
-    try{ m.remove(); }catch(e){}
-  }
-  activeMarkers = [];
-}
-
-/* ---------- Home ---------- */
-function renderHome(){
-  const landlords = load(LS.landlords, []);
-  const reviews = load(LS.reviews, []);
-
-  const highlights = computeHighlights(landlords, reviews);
-
-  setApp(`
-    <section class="section">
-      <div class="wrap">
-        <div class="card heroCard soft">
-          <div class="heroTop">
-            <div>
-              <div class="kicker">CASA</div>
-              <h1>Know your landlord<br/>before you sign.</h1>
-              <div class="muted">Search landlords, read tenant reviews, and add your building in minutes.</div>
-            </div>
-            <div class="heroActions">
-              <a class="btn btn--primary" href="#/search">Search</a>
-              <a class="btn" href="#/add">Add a landlord</a>
-            </div>
-          </div>
-
-          <div class="searchRow">
-            <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
-            <button class="btn btn--primary" id="homeGo">Search</button>
-          </div>
-
-          <div class="inlineNote">No account required to review. Verified landlords can respond.</div>
-
-          <!-- Search / Review / Rent tiles (no Tap/Info) -->
-          <div class="triplets">
-            <div class="tile" data-tile="search">
-              <div class="tileLeft">
-                <div class="tileIcon">⌕</div>
-                <div class="tileStack">
-                  <div class="tileTitle">Search</div>
-                  <div class="tileBody">Search by name, entity or address</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="tile" data-tile="review">
-              <div class="tileLeft">
-                <div class="tileIcon">★</div>
-                <div class="tileStack">
-                  <div class="tileTitle">Review</div>
-                  <div class="tileBody">Leave a rating based on select categories</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="tile isDisabled">
-              <div class="tileLeft">
-                <div class="tileIcon">⌂</div>
-                <div class="tileStack">
-                  <div class="tileTitle">Rent</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom 2-up: Recent highlights + Map (half/half) -->
-        <div class="grid2">
-          <div class="card soft">
-            <div class="hd">
-              <div>
-                <div class="kicker">FEATURED REVIEWS</div>
-                <h2 class="panelTitle">Recent highlights</h2>
-                <div class="panelSub">Browse ratings and landlord profiles.</div>
-              </div>
-              <a class="btn" href="#/search">Browse all</a>
-            </div>
-            <div class="bd">
-              <div class="carousel" aria-label="Recent highlights carousel">
-                <div class="carouselTrack" id="hiTrack">
-                  ${highlights.map(h => highlightSlideHTML(h)).join("")}
-                </div>
-                <div class="carouselDots" id="hiDots"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card soft">
-            <div class="hd">
-              <div>
-                <div class="kicker">MAP</div>
-                <h2 class="panelTitle">Browse by location</h2>
-                <div class="panelSub">Pins reflect existing ratings.</div>
-              </div>
-              <a class="btn" href="#/search">Open search</a>
-            </div>
-            <div class="bd">
-              <div class="mapFrame">
-                <div class="map" id="homeMap"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
-          </div>
-        </div>
+function openMenuModal(){
+  openModal({
+    title: "Menu",
+    body: `
+      <div class="list">
+        <a class="btn btn--block btn--outline" href="#/search">Search</a>
+        <a class="btn btn--block btn--outline" href="#/add">Add Landlord</a>
+        <a class="btn btn--block btn--outline" href="#/how">How It Works</a>
+        <a class="btn btn--block btn--outline" href="#/trust">Trust & Safety</a>
+        <a class="btn btn--block btn--primary" href="#/portal">Landlord Portal</a>
       </div>
-    </section>
-  `);
-
-  // Hero search
-  $("#homeGo")?.addEventListener("click", ()=>{
-    const q = ($("#homeQ")?.value || "").trim();
-    location.hash = `#/search?q=${encodeURIComponent(q)}`;
+    `,
+    footer: ``
   });
-  $("#homeQ")?.addEventListener("keydown",(e)=>{
-    if (e.key === "Enter") $("#homeGo")?.click();
-  });
-
-  // Tile expand
-  $$(".tile[data-tile]").forEach(t=>{
-    t.addEventListener("click", ()=>{
-      // toggle open, but only one at a time
-      $$(".tile[data-tile]").forEach(x=> x.classList.remove("isOpen"));
-      t.classList.add("isOpen");
-    });
-  });
-
-  // Highlights carousel (scroll wheel + autoplay + dots)
-  initCarousel("#hiTrack", "#hiDots");
-
-  // Map
-  initHomeMap();
-
-  safeInitMap("home");
 }
 
-function computeHighlights(landlords, reviews){
-  // pick the most recent review per landlord, then sort by recency (desc)
-  const byLandlord = new Map();
-  for (const r of reviews){
-    const cur = byLandlord.get(r.landlordId);
-    if (!cur || new Date(r.createdAt) > new Date(cur.createdAt)){
-      byLandlord.set(r.landlordId, r);
+/* ---------- Modal helpers ---------- */
+function openModal({ title, body, footer }){
+  const root = $("#modalRoot");
+  if(!root) return;
+  root.classList.add("isOpen");
+  root.setAttribute("aria-hidden","false");
+
+  root.innerHTML = `
+    <div class="modalBackdrop" data-close="1"></div>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal__hd">
+        <div class="modal__title">${safeText(title || "")}</div>
+        <button class="modalClose" type="button" data-close="1" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__bd">${body || ""}</div>
+      ${footer !== undefined ? `<div class="modal__ft">${footer}</div>` : ""}
+    </div>
+  `;
+
+  root.addEventListener("click", (e) => {
+    const t = e.target;
+    if(t && t.getAttribute && t.getAttribute("data-close") === "1"){
+      closeModal();
     }
-  }
-  const items = [];
-  for (const l of landlords){
-    const last = byLandlord.get(l.id);
-    const stats = ratingStats(l.id);
-    items.push({
-      landlord: l,
-      lastReview: last || null,
-      stats
-    });
-  }
-  items.sort((a,b)=>{
-    const ad = a.lastReview ? new Date(a.lastReview.createdAt).getTime() : 0;
-    const bd = b.lastReview ? new Date(b.lastReview.createdAt).getTime() : 0;
-    return bd - ad;
-  });
-  // keep up to 8 slides
-  return items.slice(0, 8);
+  }, { once:false });
+}
+function closeModal(){
+  const root = $("#modalRoot");
+  if(!root) return;
+  root.classList.remove("isOpen");
+  root.setAttribute("aria-hidden","true");
+  root.innerHTML = "";
 }
 
-function highlightSlideHTML(item){
-  const l = item.landlord;
-  const s = item.stats;
-  const tierClass = ratingTierClass(s.rounded, s.count);
-  const tierLabel = ratingTierLabel(s.rounded, s.count);
-  const locationLine = compactLocation(l);
+/* ---------- Shared: landlord card ---------- */
+function landlordCardHTML(ld, { compact=false, showCenterBtn=false } = {}){
+  const s = ratingSummary(ld.id);
+  const tier = tierClass(s.avgRounded, s.count);
+  const tierTxt = tierLabel(s.avgRounded, s.count);
 
-  const reviewText = item.lastReview?.text
-    ? escapeHTML(item.lastReview.text)
-    : "Be the first to post a review.";
+  const locLine = [ld.address1, ld.city, ld.state].filter(Boolean).join(" • ");
+  const borough = ld.borough || "Other";
 
-  const reviewDate = item.lastReview?.createdAt ? fmtDate(item.lastReview.createdAt) : "";
+  const avgTxt = s.count ? `${s.avgRounded.toFixed(1)}` : "—";
+  const countTxt = s.count ? `(${s.count} review${s.count===1?"":"s"})` : "(0 reviews)";
 
   return `
-    <div class="carouselItem">
-      <div class="landCard ${tierClass}">
-        <div class="landTop">
-          <div style="min-width:0">
-            <div class="landNameRow">
-              <div class="landName">${escapeHTML(l.name)}</div>
-              ${badgeHTML(l)}
-            </div>
-            <div class="landMeta">${escapeHTML(locationLine)} ${reviewDate ? "• " + reviewDate : ""}</div>
+    <div class="rowCard card--inner ${tier}" style="align-items:stretch;">
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="rowTitle" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ${safeText(ld.name)}
+            ${badgesHTML(ld)}
           </div>
-          ${tierLabel ? `<span class="tierLabel">${tierLabel}</span>` : ""}
+          ${tierTxt ? `<span class="tierPill">${safeText(tierTxt)}</span>` : ``}
         </div>
 
-        <div class="stars">
-          <span class="starsVis">${starsVis(s.rounded || 0)}</span>
-          <span class="score">${s.count ? `${s.rounded.toFixed(1)}` : "—"}</span>
-          <span class="landMeta">${s.count ? `(${s.count} reviews)` : "(0 reviews)"}</span>
+        <div class="tiny" style="margin-top:3px;">
+          ${safeText(locLine)}${locLine ? " • " : ""}${safeText(borough)}
         </div>
 
-        <div class="landMeta" style="flex:1; line-height:1.45;">
-          ${reviewText}
+        <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          ${s.count ? starsHTML(s.avgRounded) : `<span class="tiny">No ratings yet</span>`}
+          <div style="font-weight:800;">${safeText(avgTxt)}</div>
+          <div class="tiny">${safeText(countTxt)}</div>
+          <div class="tiny">Rating reflects review recency.</div>
         </div>
+      </div>
 
-        <div class="row">
-          <div class="tiny">${s.count ? s.note : ""}</div>
-          <a class="btn btn--primary" href="#/landlord/${encodeURIComponent(l.id)}">View</a>
-        </div>
+      <div style="display:flex; flex-direction:column; gap:10px; justify-content:flex-end;">
+        <a class="btn btn--primary" href="#/landlord/${encodeURIComponent(ld.id)}">View</a>
+        ${showCenterBtn ? `<button class="btn btn--outline" data-center="${safeText(ld.id)}">Center on map</button>` : ``}
       </div>
     </div>
   `;
 }
 
-function initCarousel(trackSel, dotsSel){
-  const track = $(trackSel);
-  const dots = $(dotsSel);
-  if (!track || !dots) return;
+/* ---------- HOME ---------- */
+function renderHome(){
+  const app = $("#app");
+  if(!app) return;
 
-  const slides = $$(".carouselItem", track);
-  dots.innerHTML = slides.map((_,i)=> `<div class="dot ${i===0?"isActive":""}"></div>`).join("");
-
-  let idx = 0;
-  let timer = null;
-
-  function setActiveDot(i){
-    $$(".dot", dots).forEach((d,di)=> d.classList.toggle("isActive", di===i));
-  }
-
-  function snapTo(i){
-    idx = (i + slides.length) % slides.length;
-    const el = slides[idx];
-    if (el) el.scrollIntoView({behavior:"smooth", inline:"start", block:"nearest"});
-    setActiveDot(idx);
-  }
-
-  function start(){
-    stop();
-    timer = setInterval(()=> snapTo(idx + 1), 3200);
-  }
-  function stop(){
-    if (timer) clearInterval(timer);
-    timer = null;
-  }
-
-  // update dot based on scroll position (best-effort)
-  track.addEventListener("scroll", ()=>{
-    const w = track.clientWidth;
-    const x = track.scrollLeft;
-    const i = Math.round(x / Math.max(1, w));
-    if (i !== idx){
-      idx = clamp(i, 0, slides.length-1);
-      setActiveDot(idx);
-    }
-  }, {passive:true});
-
-  // pause on hover/touch
-  track.addEventListener("mouseenter", stop);
-  track.addEventListener("mouseleave", start);
-  track.addEventListener("touchstart", stop, {passive:true});
-  track.addEventListener("touchend", start, {passive:true});
-
-  start();
-}
-
-/* ---------- Map init (Home) ---------- */
-function initHomeMap(){
-  const el = $("#homeMap");
-  if (!el) return;
-
-  // if already exists, just refresh markers
-  if (!homeMap){
-    homeMap = L.map(el, { zoomControl:true }).setView([40.73, -73.98], 11);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(homeMap);
-  }
-
-  clearMarkers();
-  const landlords = load(LS.landlords, []);
-  for (const l of landlords){
-    if (typeof l.lat !== "number" || typeof l.lng !== "number") continue;
-    const stats = ratingStats(l.id);
-    const popup = `
-      <div style="font-weight:900; margin-bottom:6px;">${escapeHTML(l.name)}</div>
-      <div style="opacity:.75; font-weight:700; margin-bottom:6px;">${escapeHTML(compactLocation(l))}</div>
-      <div style="font-weight:900;">${stats.count ? `${starsVis(stats.rounded)} ${stats.rounded.toFixed(1)} (${stats.count})` : "No ratings yet"}</div>
-      <div style="margin-top:10px;"><a href="#/landlord/${encodeURIComponent(l.id)}">View profile →</a></div>
-    `;
-    const m = L.marker([l.lat, l.lng]).addTo(homeMap).bindPopup(popup);
-    activeMarkers.push(m);
-  }
-}
-
-/* ---------- Search ---------- */
-function renderSearch(params){
-  const q = (params.get("q") || "").trim();
-  const borough = (params.get("b") || "all").trim();
-
-  const landlords = load(LS.landlords, []);
-  const boroughs = ["All boroughs", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
-
-  const filtered = landlords.filter(l=>{
-    const hay = `${l.name} ${l.entity || ""} ${fullAddress(l)} ${l.borough || ""}`.toLowerCase();
-    const okQ = !q || hay.includes(q.toLowerCase());
-    const okB = (borough === "all") || ((l.borough || "").toLowerCase() === borough);
-    return okQ && okB;
-  });
-
-  setApp(`
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
+
+        <div class="hero">
+          <div class="kicker">CASA</div>
+          <h1>Know your landlord<br/>before you sign.</h1>
+          <div class="muted">Search landlords, read tenant reviews, and add your building in minutes.</div>
+
+          <div class="hero__row">
+            <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
+            <a class="btn btn--primary" id="homeSearchBtn" href="#/search">Search</a>
+            <a class="btn btn--outline" href="#/add">Add a landlord</a>
+          </div>
+
+          <div class="hero__sub">No account required to review. Verified landlords can respond.</div>
+
+          <div class="triple" style="margin-top:18px;">
+            <div>
+              <div class="stepCard" data-step="search">
+                <div class="stepIcon">⌕</div>
+                <div>
+                  <div class="stepTitle">Search</div>
+                </div>
+              </div>
+              <div class="stepBody" id="step-search">Search by name, entity or address</div>
+            </div>
+
+            <div>
+              <div class="stepCard" data-step="review">
+                <div class="stepIcon">★</div>
+                <div>
+                  <div class="stepTitle">Review</div>
+                </div>
+              </div>
+              <div class="stepBody" id="step-review">Leave a rating based on select categories</div>
+            </div>
+
+            <div>
+              <div class="stepCard" data-step="rent" style="cursor:default;">
+                <div class="stepIcon">⌂</div>
+                <div>
+                  <div class="stepTitle">Rent</div>
+                </div>
+              </div>
+              <!-- intentionally no body + not clickable -->
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Featured reviews</div>
+                <h2 style="margin-top:6px;">Recent highlights</h2>
+                <div class="muted">Browse ratings and landlord profiles.</div>
+              </div>
+              <a class="btn btn--outline" href="#/search">Browse all</a>
+            </div>
+            <div class="bd">
+              <div class="carousel">
+                <div class="carousel__viewport" id="highlightsViewport" aria-label="Highlighted landlords"></div>
+
+                <div class="carousel__controls">
+                  <input id="highlightsRange" class="carousel__range" type="range" min="0" max="100" value="0" />
+                  <div class="dots" id="highlightsDots" aria-hidden="true"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Map</div>
+                <h2 style="margin-top:6px;">Browse by location</h2>
+                <div class="muted">Pins reflect existing ratings.</div>
+              </div>
+              <a class="btn btn--outline" href="#/search">Open search</a>
+            </div>
+            <div class="bd">
+              <div class="mapBox">
+                <div id="homeMap"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
+
+  // step toggles
+  $$(".stepCard").forEach(card => {
+    card.addEventListener("click", () => {
+      const k = card.getAttribute("data-step");
+      if(k === "rent") return;
+
+      const el = document.getElementById(`step-${k}`);
+      if(!el) return;
+
+      // close others
+      ["search","review"].forEach(x => {
+        const e2 = document.getElementById(`step-${x}`);
+        if(e2 && e2 !== el) e2.classList.remove("isOpen");
+      });
+
+      el.classList.toggle("isOpen");
+    });
+  });
+
+  // search pass-through
+  $("#homeSearchBtn")?.addEventListener("click", () => {
+    const q = ($("#homeQ")?.value || "").trim();
+    if(q){
+      sessionStorage.setItem("casa_last_query", q);
+    }
+  });
+
+  // render highlights + map
+  renderHighlightsCarousel();
+  renderHomeMap();
+}
+
+function highlightedLandlords(){
+  // pick the top 8 by review recency and rating
+  const scored = DB.landlords.map(ld => {
+    const s = ratingSummary(ld.id);
+    // score: rating + recent activity
+    const recencyBoost = clamp(s.recent12, 0, 10) / 10;
+    const base = s.count ? (s.avgRounded / 5) : 0;
+    return { ld, score: (base * 0.75) + (recencyBoost * 0.25), count: s.count };
+  });
+
+  // keep some unrated too if needed
+  scored.sort((a,b) => b.score - a.score);
+  const top = scored.slice(0, 8).map(x => x.ld);
+
+  // ensure at least 4 items
+  if(top.length < 4){
+    return DB.landlords.slice(0, 4);
+  }
+  return top;
+}
+
+let highlightsAutoTimer = null;
+
+function renderHighlightsCarousel(){
+  const viewport = $("#highlightsViewport");
+  const dots = $("#highlightsDots");
+  const range = $("#highlightsRange");
+  if(!viewport || !dots || !range) return;
+
+  const items = highlightedLandlords();
+  viewport.innerHTML = items.map(ld => {
+    const s = ratingSummary(ld.id);
+    const tier = tierClass(s.avgRounded, s.count);
+    const tierTxt = tierLabel(s.avgRounded, s.count);
+
+    const date = (() => {
+      // show most recent review date if exists
+      const revs = reviewsFor(ld.id).slice().sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+      if(!revs.length) return "";
+      const d = new Date(revs[0].createdAt);
+      return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+    })();
+
+    const short = (() => {
+      const revs = reviewsFor(ld.id).slice().sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+      if(!revs.length) return "No reviews yet.";
+      return revs[0].text;
+    })();
+
+    return `
+      <div class="card card--inner highlightCard ${tier}" style="padding:16px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="rowTitle" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                ${safeText(ld.name)}
+                ${badgesHTML(ld)}
+              </div>
+              ${tierTxt ? `<span class="tierPill">${safeText(tierTxt)}</span>` : ``}
+            </div>
+            <div class="tiny" style="margin-top:4px;">
+              ${safeText([ld.address1, ld.city, ld.state].filter(Boolean).join(" • "))}${ld.borough ? ` • ${safeText(ld.borough)}` : ""}
+              ${date ? ` • ${safeText(date)}` : ""}
+            </div>
+
+            <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              ${s.count ? starsHTML(s.avgRounded) : `<span class="tiny">No ratings</span>`}
+              ${s.count ? `<div style="font-weight:850;">${s.avgRounded.toFixed(1)}</div>` : ``}
+              <div class="tiny">${s.count ? `(${s.count} review${s.count===1?"":"s"})` : ""}</div>
+            </div>
+
+            <div style="margin-top:10px; color:rgba(32,21,15,.72); font-weight:600;">
+              ${safeText(short)}
+            </div>
+
+            <div class="tiny" style="margin-top:10px;">Rating reflects review recency.</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:10px; justify-content:flex-start;">
+            <a class="btn btn--primary" href="#/landlord/${encodeURIComponent(ld.id)}">View</a>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // dots
+  dots.innerHTML = items.map((_,i)=> `<div class="dot ${i===0?"isOn":""}"></div>`).join("");
+
+  const dotEls = $$(".dot", dots);
+
+  function setDot(idx){
+    dotEls.forEach((d,i)=> d.classList.toggle("isOn", i===idx));
+  }
+
+  function indexFromScroll(){
+    const w = viewport.clientWidth;
+    const idx = Math.round(viewport.scrollLeft / Math.max(1, w));
+    return clamp(idx, 0, items.length-1);
+  }
+
+  function syncRange(){
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+    const v = maxScroll <= 0 ? 0 : Math.round((viewport.scrollLeft / maxScroll) * 100);
+    range.value = `${v}`;
+    setDot(indexFromScroll());
+  }
+
+  viewport.addEventListener("scroll", () => {
+    syncRange();
+  }, { passive:true });
+
+  range.addEventListener("input", () => {
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+    const target = maxScroll * (parseInt(range.value,10)/100);
+    viewport.scrollTo({ left: target, behavior: "smooth" });
+  });
+
+  // autoplay
+  if(highlightsAutoTimer) clearInterval(highlightsAutoTimer);
+  let idx = 0;
+  highlightsAutoTimer = setInterval(() => {
+    idx = (idx + 1) % items.length;
+    viewport.scrollTo({ left: idx * viewport.clientWidth, behavior: "smooth" });
+    setDot(idx);
+  }, 3500);
+
+  // pause on hover / touch
+  viewport.addEventListener("pointerdown", ()=> { if(highlightsAutoTimer){ clearInterval(highlightsAutoTimer); highlightsAutoTimer=null; } }, { once:true });
+
+  // initial sync
+  syncRange();
+}
+
+function renderHomeMap(){
+  const map = ensureMap("home", "homeMap", { center: [40.73, -73.98], zoom: 11 });
+  if(!map) return;
+  addLandlordMarkers(map, "home", DB.landlords);
+}
+
+/* ---------- SEARCH ---------- */
+function renderSearch(){
+  const app = $("#app");
+  if(!app) return;
+
+  const lastQ = sessionStorage.getItem("casa_last_query") || "";
+
+  app.innerHTML = `
+    <section class="section">
+      <div class="wrap">
+        <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">SEARCH</div>
+              <div class="kicker">Search</div>
               <h2>Find a landlord</h2>
               <div class="muted">Search by name, entity or address. Filter by borough.</div>
             </div>
-            <a class="btn" href="#/">Home</a>
+            <a class="btn btn--outline" href="#/">Home</a>
           </div>
 
           <div class="bd">
-            <div class="searchRow" style="margin-top:0;">
-              <input class="input" id="sq" value="${escapeAttr(q)}" placeholder="Search landlord name, management company, or address..." />
-              <select class="select" id="sb">
-                ${boroughs.map(b=> {
-                  const val = b === "All boroughs" ? "all" : b.toLowerCase();
-                  const sel = (val === (borough || "all")) ? "selected" : "";
-                  return `<option value="${val}" ${sel}>${b}</option>`;
-                }).join("")}
-              </select>
-              <button class="btn btn--primary" id="sgo">Search</button>
+            <div class="searchTop">
+              <input class="input" id="q" placeholder="Search landlord name, management company, or address..." value="${safeText(lastQ)}" />
+              <div class="field" style="min-width:240px;">
+                <label>Borough</label>
+                <select id="borough">
+                  <option value="">All boroughs</option>
+                  <option>Manhattan</option>
+                  <option>Brooklyn</option>
+                  <option>Queens</option>
+                  <option>Bronx</option>
+                  <option>Staten Island</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <button class="btn btn--primary" id="doSearch" type="button">Search</button>
             </div>
 
-            <!-- MAP ON TOP (like before) -->
-            <div class="mapFrame" style="margin-top:14px;">
-              <div class="map" id="searchMap"></div>
+            <div style="margin-top:14px;">
+              <div class="mapBox">
+                <div id="searchMap"></div>
+              </div>
             </div>
 
-            <div class="stack" style="margin-top:14px;">
-              ${filtered.map(l => searchCardHTML(l)).join("") || `<div class="tiny">No results found.</div>`}
-            </div>
-          </div>
-        </div>
+            <div class="divider"></div>
 
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
+            <div class="list" id="results"></div>
           </div>
         </div>
       </div>
     </section>
-  `);
 
-  $("#sgo")?.addEventListener("click", ()=>{
-    const nq = ($("#sq")?.value || "").trim();
-    const nb = ($("#sb")?.value || "all").trim();
-    location.hash = `#/search?q=${encodeURIComponent(nq)}&b=${encodeURIComponent(nb)}`;
-  });
-  $("#sq")?.addEventListener("keydown", (e)=>{ if (e.key==="Enter") $("#sgo")?.click(); });
-
-  initSearchMap(filtered);
-  safeInitMap("search");
-}
-
-function searchCardHTML(l){
-  const stats = ratingStats(l.id);
-  const tierClass = ratingTierClass(stats.rounded, stats.count);
-  const tierLabel = ratingTierLabel(stats.rounded, stats.count);
-  const cred = credentialText(l);
-
-  return `
-    <div class="resultCard ${tierClass}">
-      <div class="resultLeft">
-        <div class="landNameRow">
-          <div class="landName">${escapeHTML(l.name)}</div>
-          ${badgeHTML(l)}
-          ${tierLabel ? `<span class="tierLabel">${tierLabel}</span>` : ""}
-        </div>
-        <div class="landMeta">${escapeHTML(compactLocation(l))}</div>
-
-        <div class="stars">
-          <span class="starsVis">${stats.count ? starsVis(stats.rounded) : "☆☆☆☆☆"}</span>
-          <span class="score">${stats.count ? stats.rounded.toFixed(1) : "—"}</span>
-          <span class="landMeta">${stats.count ? `(${stats.count} reviews)` : "(0 reviews)"}</span>
-        </div>
-
-        <div class="tiny">${cred}${stats.count ? ` • ${stats.note}` : ""}</div>
-      </div>
-
-      <div class="resultRight">
-        <a class="btn btn--primary" href="#/landlord/${encodeURIComponent(l.id)}">View profile</a>
-        <button class="btn" data-center="${escapeAttr(l.id)}" type="button">Center on map</button>
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
       </div>
     </div>
   `;
-}
 
-function initSearchMap(list){
-  const el = $("#searchMap");
-  if (!el) return;
+  const map = ensureMap("search", "searchMap", { center: [40.73, -73.98], zoom: 10 });
+  if(map) addLandlordMarkers(map, "search", DB.landlords);
 
-  if (!searchMap){
-    searchMap = L.map(el, { zoomControl:true }).setView([40.73, -73.98], 10);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(searchMap);
-  }
+  function run(){
+    const q = ($("#q").value || "").trim().toLowerCase();
+    const b = ($("#borough").value || "").trim();
 
-  clearMarkers();
-  for (const l of list){
-    if (typeof l.lat !== "number" || typeof l.lng !== "number") continue;
-    const stats = ratingStats(l.id);
-    const popup = `
-      <div style="font-weight:900; margin-bottom:6px;">${escapeHTML(l.name)} ${badgeHTML(l)}</div>
-      <div style="opacity:.75; font-weight:700; margin-bottom:6px;">${escapeHTML(compactLocation(l))}</div>
-      <div style="font-weight:900;">${stats.count ? `${starsVis(stats.rounded)} ${stats.rounded.toFixed(1)} (${stats.count})` : "No ratings yet"}</div>
-      <div style="margin-top:10px;"><a href="#/landlord/${encodeURIComponent(l.id)}">View profile →</a></div>
-    `;
-    const m = L.marker([l.lat, l.lng]).addTo(searchMap).bindPopup(popup);
-    activeMarkers.push(m);
-  }
+    const filtered = DB.landlords.filter(ld => {
+      const hay = [
+        ld.name, ld.entity, ld.address1, ld.unit, ld.city, ld.state, ld.borough
+      ].filter(Boolean).join(" ").toLowerCase();
 
-  // center buttons
-  $$("button[data-center]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const id = btn.getAttribute("data-center");
-      const l = load(LS.landlords, []).find(x => x.id === id);
-      if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
-      searchMap.setView([l.lat, l.lng], 13, {animate:true});
+      const qOk = !q || hay.includes(q);
+      const bOk = !b || ((ld.borough || "Other") === b) || (!ld.borough && b === "Other");
+      return qOk && bOk;
     });
-  });
 
-  // Fit bounds if results have markers
-  const pts = list.filter(l => typeof l.lat==="number" && typeof l.lng==="number").map(l => [l.lat,l.lng]);
-  if (pts.length >= 2){
-    try{
-      const b = L.latLngBounds(pts);
-      searchMap.fitBounds(b.pad(0.18));
-    }catch(e){}
-  } else if (pts.length === 1){
-    searchMap.setView(pts[0], 13);
+    const results = $("#results");
+    results.innerHTML = filtered.length
+      ? filtered.map(ld => landlordCardHTML(ld, { showCenterBtn:true })).join("")
+      : `<div class="muted">No results yet. Try a different search.</div>`;
+
+    // bind center buttons
+    $$("[data-center]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-center");
+        const ld = DB.landlords.find(x => x.id === id);
+        if(!ld || !map || typeof ld.lat !== "number") return;
+        map.setView([ld.lat, ld.lng], 14, { animate:true });
+      });
+    });
+
+    // update map markers to filtered set
+    if(map) addLandlordMarkers(map, "search", filtered);
   }
+
+  $("#doSearch").addEventListener("click", run);
+  $("#q").addEventListener("keydown", (e) => { if(e.key === "Enter") run(); });
+
+  run();
 }
 
-/* ---------- Add Landlord ---------- */
+/* ---------- ADD LANDLORD ---------- */
 function renderAdd(){
-  setApp(`
+  const app = $("#app");
+  if(!app) return;
+
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
+        <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">ADD</div>
+              <div class="kicker">Add</div>
               <h2>Add a landlord</h2>
               <div class="muted">Add the landlord first. You can rate them immediately after.</div>
             </div>
-            <a class="btn" href="#/">Home</a>
+            <a class="btn btn--outline" href="#/">Home</a>
           </div>
 
           <div class="bd">
-            <div style="display:grid; grid-template-columns: 1.1fr .9fr; gap:14px;">
-              <div class="card" style="box-shadow:none; background:transparent;">
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                  <div class="field">
-                    <label class="req">Landlord / Company name</label>
-                    <input class="input" id="aname" placeholder="e.g., Park Ave Management" />
-                  </div>
-
-                  <div class="field">
-                    <label>Entity (optional)</label>
-                    <input class="input" id="aentity" placeholder="e.g., Park Ave Management LLC" />
-                  </div>
-
-                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                    <div class="field">
-                      <label class="req">Address</label>
-                      <input class="input" id="aaddr" placeholder="Street address" />
-                    </div>
-                    <div class="field">
-                      <label>Unit (optional)</label>
-                      <input class="input" id="aunit" placeholder="Apt / Unit" />
-                    </div>
-                  </div>
-
-                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                    <div class="field">
-                      <label class="req">City</label>
-                      <input class="input" id="acity" placeholder="City" />
-                    </div>
-                    <div class="field">
-                      <label class="req">State</label>
-                      <input class="input" id="astate" placeholder="NY" />
-                    </div>
-                  </div>
-
-                  <button class="btn btn--primary btn--block" id="addBtn">Add landlord</button>
-                  <div class="tiny">After adding, you’ll be taken to the landlord page where you can rate them.</div>
+            <div class="split2">
+              <div class="card--inner" style="padding:16px;">
+                <div class="field">
+                  <label>Landlord / Company name <span style="color:#b43;">*</span></label>
+                  <input class="input" id="name" placeholder="e.g., Park Ave Management" />
                 </div>
+
+                <div class="field" style="margin-top:12px;">
+                  <label>Entity (optional)</label>
+                  <input class="input" id="entity" placeholder="e.g., Park Ave Management LLC" />
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+                  <div class="field">
+                    <label>Address <span style="color:#b43;">*</span></label>
+                    <input class="input" id="address1" placeholder="Street address" />
+                  </div>
+                  <div class="field">
+                    <label>Unit (optional)</label>
+                    <input class="input" id="unit" placeholder="Apt / Unit" />
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+                  <div class="field">
+                    <label>City <span style="color:#b43;">*</span></label>
+                    <input class="input" id="city" placeholder="City" />
+                  </div>
+                  <div class="field">
+                    <label>State <span style="color:#b43;">*</span></label>
+                    <input class="input" id="state" placeholder="NY" />
+                  </div>
+                </div>
+
+                <button class="btn btn--primary btn--block" style="margin-top:14px;" id="addBtn" type="button">Add landlord</button>
+                <div class="tiny" style="margin-top:10px;">After adding, you’ll be taken to the landlord page where you can rate them.</div>
               </div>
 
-              <div class="card" style="box-shadow:none; background:transparent;">
-                <div class="kicker" style="margin-bottom:8px;">PLACE THE PIN (OPTIONAL)</div>
-                <div class="muted" style="margin-top:0;">Click the map to set a location. You won’t enter coordinates.</div>
-                <div class="mapFrame" style="margin-top:10px;">
-                  <div class="map" id="addMap"></div>
+              <div class="card--inner" style="padding:16px;">
+                <div class="kicker">Place the pin (optional)</div>
+                <div class="muted" style="margin-top:6px;">Click the map to set a location. You won’t enter coordinates.</div>
+
+                <div style="margin-top:12px;" class="mapBox">
+                  <div id="addMap"></div>
                 </div>
                 <div class="tiny" style="margin-top:10px;">Tip: If you don’t pick a pin, we’ll place it near NYC.</div>
               </div>
             </div>
           </div>
         </div>
-
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
-          </div>
-        </div>
       </div>
     </section>
-  `);
 
-  initAddMap();
-  safeInitMap("add");
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
 
-  $("#addBtn")?.addEventListener("click", ()=>{
-    const name = ($("#aname")?.value || "").trim();
-    const entity = ($("#aentity")?.value || "").trim();
-    const address = ($("#aaddr")?.value || "").trim();
-    const unit = ($("#aunit")?.value || "").trim();
-    const city = ($("#acity")?.value || "").trim();
-    const state = ($("#astate")?.value || "").trim();
+  const map = ensureMap("add", "addMap", { center: [40.73, -73.98], zoom: 10 });
+  let picked = null;
 
-    if (!name || !address || !city || !state){
-      alert("Please fill out all required fields: Name, Address, City, State.");
+  if(map){
+    map.on("click", (e) => {
+      picked = { lat: e.latlng.lat, lng: e.latlng.lng };
+      if(mapMarkers.addPin){ try{ mapMarkers.addPin.remove(); }catch(err){} }
+      mapMarkers.addPin = L.marker([picked.lat, picked.lng]).addTo(map);
+      map.setView([picked.lat, picked.lng], 13, { animate:true });
+    });
+  }
+
+  $("#addBtn").addEventListener("click", () => {
+    const name = ($("#name").value || "").trim();
+    const entity = ($("#entity").value || "").trim();
+    const address1 = ($("#address1").value || "").trim();
+    const unit = ($("#unit").value || "").trim();
+    const city = ($("#city").value || "").trim();
+    const state = ($("#state").value || "").trim();
+
+    if(!name || !address1 || !city || !state){
+      openModal({
+        title: "Missing required fields",
+        body: `<div class="muted">Please fill out <b>Name</b>, <b>Address</b>, <b>City</b>, and <b>State</b>.</div>`,
+        footer: `<button class="btn btn--primary" data-close="1" type="button">OK</button>`
+      });
       return;
     }
 
-    const landlords = load(LS.landlords, []);
-    const id = uid();
-
-    const fallback = { lat: 40.73, lng: -73.98 };
-    const lat = addPinLatLng?.lat ?? fallback.lat;
-    const lng = addPinLatLng?.lng ?? fallback.lng;
-
-    const newL = {
+    const id = `ld_${Date.now().toString(36)}`;
+    const ld = {
       id,
       name,
       entity,
-      address: { address, unit, city, state },
-      borough: "", // removed from Add flow
-      lat, lng,
+      address1,
+      unit,
+      city,
+      state,
+      borough: "",        // intentionally not collected; search filter will treat as "Other"
+      lat: picked?.lat ?? 40.73,
+      lng: picked?.lng ?? -73.98,
       verified: false,
-      topLandlord: false,
-      claimed: false
+      top: false,
+      createdAt: nowISO()
     };
 
-    landlords.unshift(newL);
-    save(LS.landlords, landlords);
+    DB.landlords.unshift(ld);
+    saveDB(DB);
 
-    location.hash = `#/landlord/${encodeURIComponent(id)}&new=1`;
+    location.hash = `#/landlord/${encodeURIComponent(id)}`;
   });
 }
 
-function initAddMap(){
-  const el = $("#addMap");
-  if (!el) return;
+/* ---------- PROFILE ---------- */
+function renderProfile(id){
+  const app = $("#app");
+  if(!app) return;
 
-  if (!addMap){
-    addMap = L.map(el, { zoomControl:true }).setView([40.73, -73.98], 10);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(addMap);
-
-    addMap.on("click", (e)=>{
-      addPinLatLng = e.latlng;
-      if (addPinMarker){
-        try{ addPinMarker.setLatLng(e.latlng); }catch(_){}
-      } else {
-        addPinMarker = L.marker(e.latlng).addTo(addMap);
-      }
-    });
-  }
-}
-
-/* ---------- Landlord Profile (Trust page core) ---------- */
-function renderLandlord(id){
-  const landlords = load(LS.landlords, []);
-  const l = landlords.find(x => x.id === id);
-  if (!l){
-    setApp(`<section class="section"><div class="wrap"><div class="card soft"><div class="bd">Not found.</div></div></div></section>`);
+  const ld = DB.landlords.find(x => x.id === id);
+  if(!ld){
+    location.hash = "#/";
     return;
   }
 
-  const stats = ratingStats(l.id);
-  const tierClass = ratingTierClass(stats.rounded, stats.count);
-  const cred = credentialText(l);
+  const sum = ratingSummary(ld.id);
+  const cred = casaCredential(sum);
 
-  const reviews = load(LS.reviews, []).filter(r => r.landlordId === l.id)
-    .sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  const avgTxt = sum.count ? sum.avgRounded.toFixed(1) : "—";
+  const countTxt = `${sum.count} review${sum.count===1?"":"s"}`;
 
-  const dist = stats.dist;
+  const fullAddr = [
+    ld.address1,
+    ld.unit ? `Unit ${ld.unit}` : "",
+    ld.city,
+    ld.state
+  ].filter(Boolean).join(", ");
 
-  setApp(`
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
-          <div class="hd">
-            <div style="min-width:0;">
-              <div class="kicker">LANDLORD</div>
-              <div class="landNameRow" style="margin-top:6px;">
-                <h2 style="margin:0;">${escapeHTML(l.name)}</h2>
-                ${badgeHTML(l)}
-              </div>
-              <div class="muted" style="margin-top:8px;">${escapeHTML(fullAddress(l))}</div>
-
-              <div class="stars" style="margin-top:10px;">
-                <span class="starsVis">${stats.count ? starsVis(stats.rounded) : "☆☆☆☆☆"}</span>
-                <span class="score">${stats.count ? stats.rounded.toFixed(1) : "—"}</span>
-                <span class="landMeta">${stats.count ? `(${stats.count} reviews)` : "(0 reviews)"}</span>
-              </div>
-              <div class="tiny" style="margin-top:8px;">
-                ${cred}${stats.count ? ` • ${stats.note}` : ""}
-              </div>
-            </div>
-
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-              <a class="btn" href="#/search">Back</a>
-              <button class="btn btn--primary" id="rateNow">Rate this landlord</button>
-              ${!l.claimed ? `<button class="btn" id="claimBtn" type="button">Claim this profile</button>` : ``}
-            </div>
-          </div>
-
+        <div class="card">
           <div class="bd">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+
+            <div class="profileHeader">
               <div>
-                <div class="kicker">LOCATION</div>
-                <div class="mapFrame" style="margin-top:10px; height:280px;">
-                  <div class="map" id="landMap"></div>
+                <div class="kicker">Landlord</div>
+                <div class="profileName">
+                  ${safeText(ld.name)}
+                  ${badgesHTML(ld)}
                 </div>
-                <button class="btn" style="margin-top:10px;" id="centerLand">Center on map</button>
+
+                <div class="profileMeta">
+                  ${sum.count ? starsHTML(sum.avgRounded) : `<span class="tiny">No ratings yet</span>`}
+                  <div style="font-weight:900;">${safeText(avgTxt)}</div>
+                  <div class="muted">${safeText(countTxt)}</div>
+                  <div class="tiny">Rating reflects review recency.</div>
+                  <span class="tierPill">${safeText(cred.label)}</span>
+                </div>
+
+                <div class="tiny" style="margin-top:10px;">${safeText(fullAddr)}</div>
               </div>
 
-              <div>
-                <div class="kicker">RATING DISTRIBUTION</div>
-                <div class="card ${tierClass}" style="box-shadow:none; margin-top:10px; border-radius:18px; padding:14px;">
-                  ${histRow(5, dist[5] || 0, stats.count)}
-                  ${histRow(4, dist[4] || 0, stats.count)}
-                  ${histRow(3, dist[3] || 0, stats.count)}
-                  ${histRow(2, dist[2] || 0, stats.count)}
-                  ${histRow(1, dist[1] || 0, stats.count)}
-                  <div class="tiny" style="margin-top:10px;">${stats.count ? stats.note : ""}</div>
-                </div>
-
-                <div class="kicker" style="margin-top:14px;">REVIEWS</div>
-                <div class="card" style="box-shadow:none; margin-top:10px; border-radius:18px; padding:14px;">
-                  ${reviews.length ? reviews.map(r => reviewCardHTML(r)).join("") : `<div class="tiny">No reviews yet. Be the first.</div>`}
-                </div>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                <a class="btn btn--outline" href="#/search">Back</a>
+                <button class="btn btn--primary" id="rateBtn" type="button">Rate this landlord</button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
+            <div class="divider"></div>
+
+            <div class="split2">
+              <div>
+                <div class="kicker">Location</div>
+                <div class="mapBox" style="margin-top:10px;">
+                  <div id="profileMap"></div>
+                </div>
+                <button class="btn btn--outline" style="margin-top:12px;" id="centerProfile" type="button">Center on map</button>
+
+                <div class="divider"></div>
+
+                <div class="kicker">Rating distribution</div>
+                <div class="hist" id="hist"></div>
+              </div>
+
+              <div>
+                <div class="kicker">Reviews</div>
+                <div class="list" id="reviews" style="margin-top:10px;"></div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
     </section>
-  `);
 
-  // Map
-  initLandMap(l);
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
 
-  $("#centerLand")?.addEventListener("click", ()=>{
-    if (homeMap) {} // ignore
-    if (searchMap) {} // ignore
-    if (!window.__landMap) return;
-    window.__landMap.setView([l.lat, l.lng], 13, {animate:true});
-  });
-
-  $("#rateNow")?.addEventListener("click", ()=> openReviewModal(l.id));
-
-  $("#claimBtn")?.addEventListener("click", ()=>{
-    alert("Demo: claiming would require a subscription (Stripe) in production.\n\nPlan examples:\nClaimed — $39/mo\nVerified — $99/mo\nCertified/Pro — $299/mo");
-  });
-}
-
-function initLandMap(l){
-  const el = $("#landMap");
-  if (!el) return;
-
-  // Create a per-page map instance
-  if (window.__landMap){
-    try{ window.__landMap.remove(); }catch(e){}
+  // map
+  const map = ensureMap("profile", "profileMap", { center: [ld.lat, ld.lng], zoom: 12 });
+  if(map){
+    if(mapMarkers.profilePin){ try{ mapMarkers.profilePin.remove(); }catch(e){} }
+    mapMarkers.profilePin = L.marker([ld.lat, ld.lng]).addTo(map);
   }
-  window.__landMap = L.map(el, { zoomControl:true }).setView([l.lat, l.lng], 12);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(window.__landMap);
+  $("#centerProfile")?.addEventListener("click", () => {
+    if(map) map.setView([ld.lat, ld.lng], 14, { animate:true });
+  });
 
-  L.marker([l.lat, l.lng]).addTo(window.__landMap);
-
-  setTimeout(()=> {
-    try{ window.__landMap.invalidateSize(); }catch(e){}
-  }, 80);
-}
-
-function histRow(star, count, total){
-  const pct = total ? Math.round((count/total)*100) : 0;
-  return `
-    <div style="display:flex; align-items:center; gap:10px; margin:8px 0;">
-      <div style="width:40px; font-weight:900;">${star}★</div>
-      <div style="flex:1; height:10px; border-radius:999px; border:1px solid var(--line); background: rgba(255,255,255,.35); overflow:hidden;">
-        <div style="width:${pct}%; height:100%; background: rgba(0,0,0,.18);"></div>
-      </div>
-      <div style="width:46px; text-align:right; font-weight:900;">${count}</div>
-    </div>
-  `;
-}
-
-function reviewCardHTML(r){
-  return `
-    <div style="border-top:1px solid var(--soft); padding-top:12px; margin-top:12px;">
-      <div class="row">
-        <div class="stars">
-          <span class="starsVis">${starsVis(r.rating)}</span>
-          <span class="score">${r.rating}/5</span>
+  // histogram
+  const hist = $("#hist");
+  if(hist){
+    const dist = sum.dist; // [1..5]
+    const total = Math.max(1, sum.count);
+    hist.innerHTML = [5,4,3,2,1].map(st => {
+      const c = dist[st-1] || 0;
+      const pct = Math.round((c/total) * 100);
+      return `
+        <div class="histRow">
+          <div class="tiny" style="font-weight:800;">${st}★</div>
+          <div class="bar"><span style="width:${pct}%;"></span></div>
+          <div class="tiny" style="text-align:right;">${c}</div>
         </div>
-        <div class="tiny">${fmtDate(r.createdAt)}</div>
-      </div>
-      <div style="margin-top:8px; font-weight:650; color: rgba(23,18,15,.70); line-height:1.5;">
-        ${escapeHTML(r.text)}
-      </div>
-      <div style="margin-top:10px;">
-        <button class="btn btn--ghost" type="button" onclick="alert('Demo: report flow would open here (spam/harassment/doxxing/etc).')">Report review</button>
-      </div>
-    </div>
-  `;
+      `;
+    }).join("");
+  }
+
+  // reviews list
+  renderReviewList(ld.id);
+
+  // rate modal
+  $("#rateBtn")?.addEventListener("click", () => openReviewModal(ld.id));
 }
 
-/* ---------- Review Modal (fixed/centered, not broken) ---------- */
-function openReviewModal(landlordId){
-  const root = $("#modalRoot");
-  if (!root) return;
+function renderReviewList(landlordId){
+  const container = $("#reviews");
+  if(!container) return;
 
-  root.innerHTML = `
-    <div class="modalOverlay" role="dialog" aria-modal="true" aria-label="Leave a review">
-      <div class="modal">
-        <div class="modal__hd">
-          <div class="modal__title">Leave a review</div>
-          <button class="iconBtn" id="mClose" type="button" aria-label="Close">✕</button>
+  const revs = reviewsFor(landlordId)
+    .slice()
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  if(!revs.length){
+    container.innerHTML = `<div class="muted">No reviews yet. Be the first.</div>`;
+    return;
+  }
+
+  container.innerHTML = revs.map(r => {
+    const d = new Date(r.createdAt);
+    const date = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+    return `
+      <div class="rowCard card--inner" style="flex-direction:column;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            ${starsHTML(r.stars)}
+            <div style="font-weight:900;">${r.stars}/5</div>
+          </div>
+          <div class="tiny">${safeText(date)}</div>
         </div>
+        <div style="margin-top:10px; color:rgba(32,21,15,.72); font-weight:600;">${safeText(r.text)}</div>
 
-        <div class="modal__bd">
-          <div class="field">
-            <label>Rating</label>
-            <select class="select" id="mrating" style="width:100%;">
-              <option value="5">5 — Excellent</option>
-              <option value="4">4 — Good</option>
-              <option value="3">3 — Okay</option>
-              <option value="2">2 — Poor</option>
-              <option value="1">1 — Bad</option>
+        <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+          <button class="btn btn--outline" data-report="${safeText(r.id)}" type="button">Report</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  $$("[data-report]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      openModal({
+        title: "Report review",
+        body: `
+          <div class="muted">Thanks — reporting helps keep reviews useful and safe.</div>
+          <div class="field" style="margin-top:12px;">
+            <label>Reason</label>
+            <select id="reportReason">
+              <option>Spam</option>
+              <option>Harassment</option>
+              <option>Doxxing / personal info</option>
+              <option>False claim</option>
+              <option>Other</option>
             </select>
           </div>
+        `,
+        footer: `
+          <button class="btn btn--outline" data-close="1" type="button">Cancel</button>
+          <button class="btn btn--primary" data-close="1" type="button">Submit</button>
+        `
+      });
+    });
+  });
+}
 
-          <div class="field" style="margin-top:12px;">
-            <label>What happened?</label>
-            <textarea id="mtext" placeholder="Keep it factual and specific."></textarea>
-            <div class="tiny">Minimum 20 characters. Reviews are public.</div>
-          </div>
-        </div>
-
-        <div class="modal__ft">
-          <button class="btn" id="mCancel" type="button">Cancel</button>
-          <button class="btn btn--primary" id="mSubmit" type="button">Submit</button>
-        </div>
+function openReviewModal(landlordId){
+  openModal({
+    title: "Leave a review",
+    body: `
+      <div class="field">
+        <label>Rating</label>
+        <select id="rvStars">
+          <option value="5">5 — Excellent</option>
+          <option value="4">4 — Good</option>
+          <option value="3">3 — Okay</option>
+          <option value="2">2 — Poor</option>
+          <option value="1">1 — Bad</option>
+        </select>
       </div>
-    </div>
-  `;
 
-  $("#mClose")?.addEventListener("click", closeModal);
-  $("#mCancel")?.addEventListener("click", closeModal);
-  $(".modalOverlay")?.addEventListener("click", (e)=>{
-    if (e.target?.classList?.contains("modalOverlay")) closeModal();
+      <div class="field" style="margin-top:12px;">
+        <label>What happened?</label>
+        <textarea id="rvText" placeholder="Keep it factual and specific."></textarea>
+        <div class="tiny" style="margin-top:6px;">Minimum 20 characters.</div>
+      </div>
+    `,
+    footer: `
+      <button class="btn btn--outline" data-close="1" type="button">Cancel</button>
+      <button class="btn btn--primary" id="rvSubmit" type="button">Submit</button>
+    `
   });
 
-  $("#mSubmit")?.addEventListener("click", ()=>{
-    const rating = parseInt($("#mrating")?.value || "5", 10);
-    const text = ($("#mtext")?.value || "").trim();
-
-    if (text.length < 20){
-      alert("Please write at least 20 characters.");
+  $("#rvSubmit")?.addEventListener("click", () => {
+    const stars = parseInt($("#rvStars").value, 10);
+    const text = ($("#rvText").value || "").trim();
+    if(text.length < 20){
+      openModal({
+        title: "Add a bit more detail",
+        body: `<div class="muted">Please write at least 20 characters so the review is useful.</div>`,
+        footer: `<button class="btn btn--primary" data-close="1" type="button">OK</button>`
+      });
       return;
     }
 
-    const reviews = load(LS.reviews, []);
-    reviews.unshift({
-      id: uid(),
+    DB.reviews.unshift({
+      id: `rv_${Date.now().toString(36)}`,
       landlordId,
-      rating: clamp(rating,1,5),
+      stars,
       text,
-      createdAt: new Date().toISOString()
+      createdAt: nowISO()
     });
-    save(LS.reviews, reviews);
+    saveDB(DB);
 
     closeModal();
-    // re-render current landlord page
-    const cur = location.hash;
-    location.hash = "#/"; // force refresh trick
-    setTimeout(()=> { location.hash = cur; }, 0);
+    // re-render profile (so stars, histogram, tiers update)
+    route();
   });
 }
 
-function closeModal(){
-  const root = $("#modalRoot");
-  if (root) root.innerHTML = "";
-}
-
-/* ---------- How It Works ---------- */
+/* ---------- HOW + TRUST ---------- */
 function renderHow(){
-  setApp(`
+  const app = $("#app");
+  if(!app) return;
+
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
+        <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">HOW IT WORKS</div>
+              <div class="kicker">How it works</div>
               <h2>Simple, fast, and public</h2>
               <div class="muted">No reviewer accounts. Landlords verify to respond.</div>
             </div>
-            <a class="btn" href="#/">Home</a>
+            <a class="btn btn--outline" href="#/">Home</a>
           </div>
 
           <div class="bd">
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px;">
-              <div style="font-weight:900; margin-bottom:10px;">1) Look up</div>
-              <div class="muted" style="margin-top:0;">Search a building or landlord, read reviews, then add yours.</div>
-            </div>
+            <div class="list">
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Search</div>
+                <div class="rowSub">Find a landlord by name, entity, address, or borough.</div>
+              </div></div>
 
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px; margin-top:10px;">
-              <div style="font-weight:900; margin-bottom:10px;">2) Review</div>
-              <div class="muted" style="margin-top:0;">Post instantly (no account). Keep it factual, specific, and helpful.</div>
-            </div>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Review</div>
+                <div class="rowSub">Post instantly (no account required). Reviews are shown publicly.</div>
+              </div></div>
 
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px; margin-top:10px;">
-              <div style="font-weight:900; margin-bottom:10px;">3) Improve</div>
-              <div class="muted" style="margin-top:0;">Verified landlords can reply publicly and resolve issues transparently.</div>
-            </div>
-          </div>
-        </div>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Respond (verified landlords)</div>
+                <div class="rowSub">Landlords create accounts only in the Landlord Portal and verify documents before responding publicly.</div>
+              </div></div>
 
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Report issues</div>
+                <div class="rowSub">Spam, harassment, and personal info can be reported for review.</div>
+              </div></div>
+            </div>
           </div>
         </div>
       </div>
     </section>
-  `);
+
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
 }
 
-/* ---------- Trust & Safety ---------- */
 function renderTrust(){
-  setApp(`
+  const app = $("#app");
+  if(!app) return;
+
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
+        <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">TRUST & SAFETY</div>
+              <div class="kicker">Trust & Safety</div>
               <h2>Built for accuracy and accountability</h2>
               <div class="muted">Clear rules + verified landlord responses.</div>
             </div>
-            <a class="btn" href="#/">Home</a>
+            <a class="btn btn--outline" href="#/">Home</a>
           </div>
 
           <div class="bd">
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px;">
-              <div style="font-weight:900;">No reviewer accounts</div>
-              <div class="muted" style="margin-top:8px;">Tenants can post without accounts.</div>
-            </div>
+            <div class="list">
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">No reviewer accounts</div>
+                <div class="rowSub">Tenants can post without accounts; edits can be added later if you choose to implement edit links.</div>
+              </div></div>
 
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px; margin-top:10px;">
-              <div style="font-weight:900;">Verified landlord responses</div>
-              <div class="muted" style="margin-top:8px;">Landlords verify ownership/management before responding publicly.</div>
-            </div>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Verified landlord responses</div>
+                <div class="rowSub">Landlords upload documentation and are reviewed before responding publicly.</div>
+              </div></div>
 
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px; margin-top:10px;">
-              <div style="font-weight:900;">No doxxing / personal info</div>
-              <div class="muted" style="margin-top:8px;">Don’t post phone numbers, emails, or private details.</div>
-            </div>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">No doxxing / personal info</div>
+                <div class="rowSub">Do not post phone numbers, emails, or private details.</div>
+              </div></div>
 
-            <div class="card" style="box-shadow:none; border-radius:18px; padding:14px; margin-top:10px;">
-              <div style="font-weight:900;">Reporting</div>
-              <div class="muted" style="margin-top:8px;">Spam, harassment, and false claims can be reported for moderation.</div>
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Reporting</div>
+                <div class="rowSub">Every review can be reported for spam, harassment, or false claims.</div>
+              </div></div>
             </div>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
           </div>
         </div>
       </div>
     </section>
-  `);
+
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
 }
 
-/* ---------- Landlord Portal ---------- */
+/* ---------- PORTAL ---------- */
 function renderPortal(){
-  setApp(`
+  const app = $("#app");
+  if(!app) return;
+
+  app.innerHTML = `
     <section class="section">
       <div class="wrap">
-        <div class="card soft">
+        <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">LANDLORD PORTAL</div>
+              <div class="kicker">Landlord Portal</div>
               <h2>Sign in</h2>
               <div class="muted">Landlords verify documents before responding publicly.</div>
             </div>
-            <a class="btn" href="#/">Home</a>
+            <a class="btn btn--outline" href="#/">Home</a>
           </div>
 
           <div class="bd">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-              <div class="card" style="box-shadow:none;">
-                <div style="padding:16px;">
-                  <div class="kicker">Sign in</div>
+            <div class="split2">
+              <div class="card--inner" style="padding:16px;">
+                <div class="kicker">Sign in</div>
 
-                  <div class="field" style="margin-top:10px;">
-                    <label>Email</label>
-                    <input class="input" id="le" placeholder="you@company.com"/>
-                  </div>
-
-                  <div class="field" style="margin-top:10px;">
-                    <label>Password</label>
-                    <input class="input" id="lp" type="password" placeholder="Password"/>
-                  </div>
-
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">Sign in</button>
-
-                  <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
-
-                  <button class="btn btn--block ssoBtn" id="g">
-                    <span class="ssoIcon">${googleIcon()}</span>
-                    Continue with Google
-                  </button>
-
-                  <div style="height:8px;"></div>
-
-                  <button class="btn btn--block ssoBtn" id="a">
-                    <span class="ssoIcon">${appleIcon()}</span>
-                    Continue with Apple
-                  </button>
-
-                  <div style="height:8px;"></div>
-
-                  <button class="btn btn--block ssoBtn" id="m">
-                    <span class="ssoIcon">${msIcon()}</span>
-                    Continue with Microsoft
-                  </button>
+                <div class="field" style="margin-top:12px;">
+                  <label>Email</label>
+                  <input class="input" id="le" placeholder="you@company.com"/>
                 </div>
+                <div class="field" style="margin-top:12px;">
+                  <label>Password</label>
+                  <input class="input" id="lp" type="password" placeholder="Password"/>
+                </div>
+
+                <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login" type="button">Sign in</button>
+
+                <div class="tiny" style="margin:14px 0 10px; text-align:center;">or continue with</div>
+
+                <button class="btn btn--outline btn--block" id="g" type="button">${providerIcon("google")} Continue with Google</button>
+                <div style="height:8px;"></div>
+                <button class="btn btn--outline btn--block" id="a" type="button">${providerIcon("apple")} Continue with Apple</button>
+                <div style="height:8px;"></div>
+                <button class="btn btn--outline btn--block" id="m" type="button">${providerIcon("microsoft")} Continue with Microsoft</button>
               </div>
 
-              <div class="card" style="box-shadow:none;">
-                <div style="padding:16px;">
-                  <div class="kicker">Create account</div>
+              <div class="card--inner" style="padding:16px;">
+                <div class="kicker">Create account</div>
 
-                  <div class="field" style="margin-top:10px;">
-                    <label>Email</label>
-                    <input class="input" id="se" placeholder="you@company.com"/>
-                  </div>
+                <div class="field" style="margin-top:12px;">
+                  <label>Email</label>
+                  <input class="input" id="se" placeholder="you@company.com"/>
+                </div>
+                <div class="field" style="margin-top:12px;">
+                  <label>Password</label>
+                  <input class="input" id="sp" type="password" placeholder="Create a password"/>
+                </div>
 
-                  <div class="field" style="margin-top:10px;">
-                    <label>Password</label>
-                    <input class="input" id="sp" type="password" placeholder="Create a password"/>
-                  </div>
-
-                  <div class="field" style="margin-top:10px;">
-                    <label>Verification document (demo)</label>
+                <div class="field" style="margin-top:12px;">
+                  <label>Verification document (demo)</label>
+                  <div class="file">
                     <input id="doc" type="file"/>
-                    <div class="tiny" style="margin-top:6px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
                   </div>
-
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-
-                  <div class="tiny" style="margin-top:10px;">
-                    Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)
-                  </div>
+                  <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
                 </div>
+
+                <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup" type="button">Create account</button>
+                <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
               </div>
             </div>
 
-            <div class="card" style="box-shadow:none; margin-top:14px; border-radius:18px; padding:14px;">
-              <div style="font-weight:900;">Plans (demo copy)</div>
-              <div class="muted" style="margin-top:8px;">
-                Claimed — $39/mo • Verified — $99/mo • Certified/Pro — $299/mo
-              </div>
-              <div class="tiny" style="margin-top:8px;">Landlords must subscribe to claim or verify.</div>
+            <div class="card--inner" style="padding:14px; margin-top:14px;">
+              <div style="font-weight:850;">Plans (demo copy)</div>
+              <div class="muted" style="margin-top:6px;">Claimed — $39/mo • Verified — $99/mo • Certified/Pro — $299/mo</div>
+              <div class="tiny" style="margin-top:6px;">Landlords must subscribe to claim or verify.</div>
             </div>
-          </div>
-        </div>
 
-        <div class="footer">
-          <div>© 2026 casa</div>
-          <div style="display:flex; gap:14px;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
           </div>
         </div>
       </div>
     </section>
-  `);
 
-  $("#login")?.addEventListener("click", ()=>{
-    alert("Demo: landlord auth would run here.");
+    <div class="footer">
+      <div>© 2026 casa</div>
+      <div style="display:flex; gap:14px;">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  `;
+
+  $("#login")?.addEventListener("click", () => {
+    openModal({
+      title: "Demo",
+      body: `<div class="muted">Sign-in is demo-only right now.</div>`,
+      footer: `<button class="btn btn--primary" data-close="1" type="button">OK</button>`
+    });
   });
-  $("#signup")?.addEventListener("click", ()=>{
-    alert("Demo: landlord signup + verification wizard would run here.");
+
+  $("#signup")?.addEventListener("click", () => {
+    openModal({
+      title: "Demo",
+      body: `<div class="muted">Account creation + verification is demo-only right now.</div>`,
+      footer: `<button class="btn btn--primary" data-close="1" type="button">OK</button>`
+    });
   });
 
-  $("#g")?.addEventListener("click", ()=> alert("Demo: Google OAuth would run here."));
-  $("#a")?.addEventListener("click", ()=> alert("Demo: Apple OAuth would run here."));
-  $("#m")?.addEventListener("click", ()=> alert("Demo: Microsoft OAuth would run here."));
+  ["g","a","m"].forEach(id => {
+    $(`#${id}`)?.addEventListener("click", () => {
+      openModal({
+        title: "Demo",
+        body: `<div class="muted">OAuth is demo-only right now.</div>`,
+        footer: `<button class="btn btn--primary" data-close="1" type="button">OK</button>`
+      });
+    });
+  });
 }
 
-/* ---------- Icons (inline SVG) ---------- */
-function googleIcon(){
+function providerIcon(which){
+  const common = `style="width:16px;height:16px;display:inline-block" aria-hidden="true"`;
+  if(which === "google"){
+    return `
+      <svg ${common} viewBox="0 0 24 24">
+        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.6-2.5C16.9 2.9 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.9 0-.7-.1-1.2-.2-1.7H12z"/>
+      </svg>
+    `;
+  }
+  if(which === "apple"){
+    return `
+      <svg ${common} viewBox="0 0 24 24">
+        <path fill="#111" d="M16.7 13.3c0-2 1.7-3 1.8-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.8-2.7-.8-1.4 0-2.7.8-3.4 2.1-1.5 2.6-.4 6.4 1.1 8.5.7 1 1.6 2.1 2.7 2.1 1.1 0 1.5-.7 2.8-.7 1.3 0 1.6.7 2.8.7 1.2 0 2-.9 2.7-1.9.8-1.1 1.1-2.2 1.1-2.2-.1 0-2.8-1.1-2.8-4.0zM14.6 6.9c.6-.8 1-1.8.9-2.9-.9.1-2 .6-2.6 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2-.5 2.7-1.3z"/>
+      </svg>
+    `;
+  }
+  // microsoft
   return `
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.6 3.8-5.4 3.8A6.2 6.2 0 1 1 12 5.8c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.7 3.4 14.6 2.4 12 2.4A9.6 9.6 0 1 0 12 21.6c5.5 0 9.1-3.9 9.1-9.4 0-.6-.1-1-.1-1.5H12z"/>
-    </svg>`;
+    <svg ${common} viewBox="0 0 24 24">
+      <path fill="#F25022" d="M3 3h8v8H3z"/>
+      <path fill="#7FBA00" d="M13 3h8v8h-8z"/>
+      <path fill="#00A4EF" d="M3 13h8v8H3z"/>
+      <path fill="#FFB900" d="M13 13h8v8h-8z"/>
+    </svg>
+  `;
 }
-function appleIcon(){
-  return `
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path fill="#111" d="M16.6 13.2c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.8-2.6-.8-1.3 0-2.6.8-3.3 1.9-1.4 2.4-.4 6 1 8 .7 1 1.5 2 2.6 2 .9 0 1.3-.6 2.5-.6s1.6.6 2.6.6c1.1 0 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.4-.1 0-2-.8-2-3.2zM14.4 6.9c.6-.8 1-1.8.9-2.9-.9.1-2 .6-2.6 1.4-.6.7-1 1.8-.9 2.8 1 .1 2-.5 2.6-1.3z"/>
-    </svg>`;
-}
-function msIcon(){
-  return `
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path fill="#F25022" d="M2 2h9v9H2z"/>
-      <path fill="#7FBA00" d="M13 2h9v9h-9z"/>
-      <path fill="#00A4EF" d="M2 13h9v9H2z"/>
-      <path fill="#FFB900" d="M13 13h9v9h-9z"/>
-    </svg>`;
-}
-
-/* ---------- Utils ---------- */
-function fullAddress(l){
-  const a = l.address || {};
-  const parts = [
-    a.address || "",
-    a.unit ? `Unit ${a.unit}` : "",
-    a.city || "",
-    a.state || ""
-  ].filter(Boolean);
-  return parts.join(", ");
-}
-function compactLocation(l){
-  const a = l.address || {};
-  const cityState = [a.city, a.state].filter(Boolean).join(", ");
-  const addr = a.address ? a.address : "";
-  const parts = [addr, cityState].filter(Boolean);
-  return parts.join(" • ");
-}
-
-function escapeHTML(s){
-  return (s||"").replace(/[&<>"']/g, (c)=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
-}
-function escapeAttr(s){ return escapeHTML(s); }
-
-/* ---------- Boot ---------- */
-function boot(){
-  ensureSeed();
-  initMenu();
-  window.addEventListener("hashchange", route);
-  route();
-}
-
-boot();
