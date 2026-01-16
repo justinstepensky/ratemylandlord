@@ -42,10 +42,12 @@ body{
   display:grid;place-items:center;
   border:1px solid rgba(20,16,12,.08);
 }
+
+/* ✅ RESTORE SCRIPT LOGO (all lowercase stays as-is in HTML) */
 .brand__name{
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
+  font-family: "Snell Roundhand","Brush Script MT","Segoe Script","Apple Chancery",cursive;
   font-weight:700;
-  font-size:18px;
+  font-size:20px;
   letter-spacing:.2px;
 }
 
@@ -120,17 +122,24 @@ body{
   align-items:center;
   margin-top:14px;
 }
+
+/* ✅ INPUTS: fix sizes + match theme */
 .input{
   flex:1;
-  height:44px;
+  height:46px;
   border-radius:999px;
-  border:1px solid rgba(20,16,12,.14);
+  border:1px solid rgba(20,16,12,.12);
   padding:0 16px;
-  background: rgba(255,255,255,.78);
+  background: rgba(255,255,255,.70);
   outline:none;
-  font-weight:600;
+  font-weight:700;
+  font-size:14px;
 }
-.input:focus{box-shadow: 0 0 0 4px rgba(20,16,12,.08)}
+.input::placeholder{color:rgba(21,17,14,.42);font-weight:700}
+.input:focus{
+  box-shadow: 0 0 0 4px rgba(20,16,12,.08);
+  background: rgba(255,255,255,.85);
+}
 
 .tileRow{
   display:grid;
@@ -331,16 +340,9 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 }
 .modalTitle{font-weight:950}
 .modalBody{padding:14px 16px}
-.textarea{
-  width:100%;
-  border-radius:14px;
-  border:1px solid rgba(20,16,12,.14);
-  padding:12px 12px;
-  background: rgba(255,255,255,.9);
-  outline:none;
-  min-height:110px;
-  font-weight:600;
-}
+
+/* ✅ TEXTAREA matches theme (already replaced above) */
+
 .modalFoot{
   display:flex;justify-content:flex-end;gap:10px;
   padding:14px 16px;border-top:1px solid rgba(20,16,12,.10);
@@ -409,4 +411,17 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   .btn{font-size:13px;padding:10px 12px}
   .miniBtn{font-size:12px}
   .tileRow{grid-template-columns:1fr}
+}
+
+/* ✅ HOME: make Recent Highlights + Map each take up half of their banner (desktop only) */
+@media (min-width: 981px){
+  .splitRow .carousel,
+  .splitRow .mapBox{
+    width: 50%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .splitRow .mapBox .map{
+    height: 320px;
+  }
 }
