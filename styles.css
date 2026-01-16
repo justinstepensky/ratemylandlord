@@ -819,3 +819,35 @@ textarea{ resize: vertical; min-height: 90px; }
   flex: 0 0 auto;
   display:block;
 }
+/* --- Recent highlights carousel --- */
+.carousel{
+  overflow: hidden;
+}
+
+.carousel__track{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(320px, 1fr);
+  gap: 12px;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+
+  /* hide scrollbar (still scrollable) */
+  scrollbar-width: none;
+}
+.carousel__track::-webkit-scrollbar{ display:none; }
+
+.carousel__track > .smallCard{
+  scroll-snap-align: start;
+}
+
+/* better sizing on small screens */
+@media (max-width: 520px){
+  .carousel__track{ grid-auto-columns: 86vw; }
+}
