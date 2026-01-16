@@ -44,7 +44,71 @@ function starsRow(score) {
   out += `</div><div class="scoreText">${s}/5</div></div>`;
   return out;
 }
+function setupAutoCarousel(trackEl, opts = {}) {
+  const intervalMs = opts.intervalMs ?? 3200;
+  const stepPx = opts.stepPx ?? 360;
 
+  if (!trackEl) return;
+  let timer = null;
+  let paused = false;
+
+  const start = () => {
+    stop();
+    timer = setInterval(() => {
+      if (paused) return;
+
+      const max = trackEl.scrollWidth - trackEl.clientWidth;
+      const next = Math.min(trackEl.scrollLeft + stepPx, max);
+
+      // loop back to start when we hit the end
+      if (trackEl.scrollLeft >= max - 2) {
+        trackEl.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        trackEl.scrollTo({ left: next, behavior: "smooth" });
+      }
+    }, intervalMs);
+  };
+
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  };
+
+  // pause on hover / pointer interaction
+  trackEl.addEventListener("mouseenter", () => (paused = true));
+  trackEl.addEventListener("mouseleave", () => (paused = false));
+
+  // pause while user scrolls/dragging (debounced resume)
+  let resumeT = null;
+  const userPause = () => {
+    paused = true;
+    if (resumeT) clearTimeout(resumeT);
+    resumeT = setTimeout(() => (paused = false), 900);
+  };
+  trackEl.addEventListener("scroll", userPause, { passive: true });
+  trackEl.addEventListener("touchstart", () => (paused = true), { passive: true });
+  trackEl.addEventListener("touchend", userPause, { passive: true });
+  trackEl.addEventListener("pointerdown", () => (paused = true));
+  trackEl.addEventListener("pointerup", userPause);
+
+  // wheel scroll should move horizontally (nice “wheel” feel)
+  trackEl.addEventListener(
+    "wheel",
+    (e) => {
+      // allow normal page scroll if shift key is held
+      if (e.shiftKey) return;
+      // if horizontal intent already, let it pass
+      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      trackEl.scrollLeft += delta;
+      e.preventDefault();
+      userPause();
+    },
+    { passive: false }
+  );
+
+  start();
+  return { start, stop };
+}
 /* =========================================================
    Demo dataset (in-memory)
    ========================================================= */
@@ -243,7 +307,9 @@ function renderHome() {
               <a class="btn btn--outline" href="#/search">Browse all</a>
             </div>
             <div class="bd">
-              <div class="featuredGrid" id="featuredGrid"></div>
+             <div class="carousel" id="featuredCarousel" aria-label="Recent highlights carousel">
+  <div class="carousel__track" id="featuredGrid"></div>
+</div>
             </div>
           </div>
 
@@ -283,7 +349,9 @@ function renderHome() {
   // Featured cards
   const grid = $("#featuredGrid");
   if (grid) {
-    grid.innerHTML = landlords.slice(0, 3).map((r) => `
+    grid.innerHTML = landlords.slice(0, 3).map((r) => `join("");
+  setupAutoCarousel(grid, { intervalMs: 3000, stepPx: 380 });
+}
       <div class="smallCard">
         <div class="smallCard__top">
           <div>
