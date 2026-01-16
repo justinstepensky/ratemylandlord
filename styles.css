@@ -851,3 +851,70 @@ textarea{ resize: vertical; min-height: 90px; }
 @media (max-width: 520px){
   .carousel__track{ grid-auto-columns: 86vw; }
 }
+/* Half/half row for Home (highlights + map) */
+.gridHalf{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+@media (max-width: 980px){
+  .gridHalf{ grid-template-columns: 1fr; }
+}
+
+/* Carousel */
+.carousel{ overflow: hidden; }
+.carousel__track{
+  display:grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(320px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.carousel__track::-webkit-scrollbar{ display:none; }
+.carousel__track > .smallCard{ scroll-snap-align: start; }
+@media (max-width: 520px){
+  .carousel__track{ grid-auto-columns: 86vw; }
+}
+
+/* Map sizing (home + search) */
+.mapWrap{
+  margin-top: 0;
+  border: 1px solid rgba(35,24,16,.10);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255,249,240,.90);
+  box-shadow: 0 18px 45px rgba(35,24,16,.08);
+}
+#map, #homeMap{
+  height: 420px;
+  width: 100%;
+}
+@media (max-width: 980px){
+  #map, #homeMap{ height: 360px; }
+}
+
+/* Rent tile should not be clickable */
+.xCard--static{
+  cursor: default !important;
+  user-select: none;
+}
+.xCard--static:hover{ transform:none !important; }
+
+/* Social buttons */
+.socialBtn{
+  justify-content:flex-start;
+  gap: 10px;
+}
+.socialBtn__ic{
+  width: 22px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
