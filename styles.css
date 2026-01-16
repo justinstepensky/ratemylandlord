@@ -532,4 +532,55 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   .carouselSlide{ padding:12px !important; }
   .dots{ padding:10px 12px 12px !important; }
 }
-body{ outline: 6px solid red !important; }
+/* ===== CASA HOME LAYOUT FIX (force equal halves) ===== */
+@media (min-width: 981px){
+
+  /* Force the row to truly be 50/50 and allow shrinking */
+  .splitRow{
+    display:grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap:16px !important;
+    align-items:stretch !important;
+  }
+
+  /* Critical: prevents “skinny right column” collapse */
+  .splitRow > .card{
+    min-width:0 !important;
+    width:auto !important;
+    display:flex !important;
+    flex-direction:column !important;
+  }
+
+  .splitRow > .card > .pad{
+    flex:1 !important;
+    min-height:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+  }
+
+  /* Give both panes the same overall height */
+  .splitRow > .card{
+    min-height: 360px !important;
+  }
+
+  /* Make the content areas fill */
+  .splitRow .carousel,
+  .splitRow .mapBox{
+    flex:1 !important;
+    min-height:0 !important;
+  }
+
+  /* Make map fill its box (Leaflet needs a real height) */
+  .splitRow .mapBox{ display:flex !important; }
+  .splitRow .map{
+    flex:1 !important;
+    height: 100% !important;
+    min-height: 240px !important;
+  }
+}
+/* Force original CASA logo font */
+.brand__name{
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif !important;
+  font-weight:700 !important;
+  letter-spacing:.2px !important;
+}
