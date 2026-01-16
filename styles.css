@@ -532,3 +532,4 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   .carouselSlide{ padding:12px !important; }
   .dots{ padding:10px 12px 12px !important; }
 }
+body{ outline: 6px solid red !important; }
