@@ -458,7 +458,6 @@ function renderShell(content) {
     </div>
   `;
 }
-
 function renderHome() {
   const content = `
     <section class="pageCard card">
@@ -502,7 +501,7 @@ function renderHome() {
     </section>
 
     <section class="splitRow">
-      <div class="card">
+      <div class="card homePaneCard">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -513,11 +512,13 @@ function renderHome() {
             <a class="btn miniBtn" href="#/search">Browse all</a>
           </div>
 
-          ${renderHighlightsCarousel()}
+          <div class="homePaneBody">
+            ${renderHighlightsCarousel()}
+          </div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card homePaneCard">
         <div class="pad">
           <div class="sectionHead">
             <div>
@@ -528,8 +529,10 @@ function renderHome() {
             <a class="btn miniBtn" href="#/search">Open search</a>
           </div>
 
-          <div class="mapBox" style="margin-top:14px;">
-            <div class="map" id="homeMap"></div>
+          <div class="homePaneBody">
+            <div class="mapBox" style="margin-top:14px;">
+              <div class="map" id="homeMap"></div>
+            </div>
           </div>
         </div>
       </div>
