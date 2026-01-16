@@ -175,10 +175,10 @@ function casaCredential(landlordId) {
 function badgesHTML(l) {
   const parts = [];
   if (l.verified) {
-    parts.push(`<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
+    parts.push(`<img class="badgeImg" src="assets/badges/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
   }
   if (l.top) {
-    parts.push(`<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
+    parts.push(`<img class="badgeImg" src="assets/badges/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
   }
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
