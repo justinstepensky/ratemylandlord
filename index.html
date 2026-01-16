@@ -3,25 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>casa</title>
+  <title>CASA — Landlord Reputation</title>
+  <meta name="description" content="CASA is a trust credential for rental landlords and property managers. Search profiles, read reviews, and leave yours." />
 
-  <link rel="stylesheet" href="./styles.css" />
+  <!-- App CSS -->
+  <link rel="stylesheet" href="styles.css" />
 
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
+  <!-- Leaflet (OpenStreetMap) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </head>
 
 <body>
   <header class="nav" role="banner">
     <div class="wrap nav__inner">
-      <a class="brand" href="#/" aria-label="casa home">
+      <a class="brand" href="#/" aria-label="CASA home">
         <div class="brand__mark" aria-hidden="true">
-          <!-- Your original logo -->
+          <!-- YOUR OLD LOGO SVG -->
           <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
             <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
@@ -32,61 +30,56 @@
         </div>
         <div class="brand__text">
           <div class="brand__name">casa</div>
+          <!-- user wanted “landlord lookup + reviews” removed -->
         </div>
       </a>
 
       <nav class="nav__center" aria-label="Primary">
-        <a class="nav__link" href="#/search">Search</a>
-        <a class="nav__link" href="#/add">Add Landlord</a>
-        <a class="nav__link" href="#/how">How It Works</a>
-        <a class="nav__link" href="#/trust">Trust & Safety</a>
+        <a class="navlink" href="#/search">Search</a>
+        <a class="navlink" href="#/add">Add Landlord</a>
+        <a class="navlink" href="#/how">How It Works</a>
+        <a class="navlink" href="#/trust">Trust & Safety</a>
       </nav>
 
       <div class="nav__right">
-        <a class="btn btn--outline" href="#/portal">Landlord Portal</a>
+        <a class="btn btn--pill" href="#/portal">Landlord Portal</a>
 
-        <!-- Mobile menu button -->
-        <button class="btn btn--ghost nav__hamburger" id="menuBtn" type="button" aria-expanded="false" aria-controls="navDrawer">
+        <!-- Mobile Menu button -->
+        <button class="btn btn--ghost nav__menuBtn" id="menuBtn" type="button" aria-label="Open menu" aria-controls="mobileDrawer" aria-expanded="false">
           Menu
         </button>
       </div>
     </div>
 
-    <!-- Mobile drawer -->
-    <div class="navDrawer" id="navDrawer" aria-hidden="true">
-      <div class="navDrawer__inner">
-        <a class="navDrawer__link" href="#/search">Search</a>
-        <a class="navDrawer__link" href="#/add">Add Landlord</a>
-        <a class="navDrawer__link" href="#/how">How It Works</a>
-        <a class="navDrawer__link" href="#/trust">Trust & Safety</a>
-        <div class="navDrawer__sep"></div>
-        <a class="navDrawer__link" href="#/portal">Landlord Portal</a>
+    <!-- Mobile Drawer -->
+    <div class="drawer" id="mobileDrawer" aria-hidden="true">
+      <div class="drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="drawer__hd">
+          <div class="drawer__title">Menu</div>
+          <button class="iconBtn" id="menuClose" type="button" aria-label="Close menu">✕</button>
+        </div>
+        <div class="drawer__links">
+          <a class="drawer__link" href="#/search">Search</a>
+          <a class="drawer__link" href="#/add">Add Landlord</a>
+          <a class="drawer__link" href="#/how">How It Works</a>
+          <a class="drawer__link" href="#/trust">Trust & Safety</a>
+          <a class="drawer__link drawer__link--strong" href="#/portal">Landlord Portal</a>
+        </div>
       </div>
+      <button class="drawer__backdrop" id="menuBackdrop" aria-label="Close menu"></button>
     </div>
   </header>
 
   <main id="app" role="main"></main>
 
-  <div class="modalBackdrop" id="modalBackdrop" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal__head">
-        <div class="modal__title" id="modalTitle">Modal</div>
-        <button class="btn btn--ghost" id="modalClose" type="button" aria-label="Close">✕</button>
-      </div>
-      <div class="modal__body" id="modalBody"></div>
-      <div class="modal__foot" id="modalFoot"></div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
+  <!-- Modal root -->
+  <div id="modalRoot"></div>
 
   <!-- Leaflet JS -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-  <script src="./app.js"></script>
+  <!-- App JS -->
+  <script src="app.js"></script>
 </body>
 </html>
