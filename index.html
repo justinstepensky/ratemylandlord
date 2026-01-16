@@ -4,53 +4,87 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>casa</title>
-
-  <link rel="stylesheet" href="styles.css" />
-
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Leaflet (map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
+
 <body>
-  <header class="nav">
-    <div class="nav__wrap">
-      <a class="brand" href="#/">
+  <header class="nav" role="banner">
+    <div class="wrap nav__inner">
+      <!-- BRAND (keeps your original wavy mark) -->
+      <a class="brand" href="#/" aria-label="casa home">
         <div class="brand__mark" aria-hidden="true">
-          <div class="brand__markInner"></div>
+          <!-- YOUR ORIGINAL LOGO MARK -->
+          <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
+            <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
+            <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
+            <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
+            <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
+          </svg>
         </div>
-        <div class="brand__name">casa</div>
+        <div class="brand__text">
+          <div class="brand__name">casa</div>
+        </div>
       </a>
 
-      <nav class="nav__links" aria-label="Primary">
+      <!-- DESKTOP NAV -->
+      <nav class="nav__center" aria-label="Primary">
         <a class="nav__link" href="#/search">Search</a>
         <a class="nav__link" href="#/add">Add Landlord</a>
         <a class="nav__link" href="#/how">How It Works</a>
-        <a class="nav__link" href="#/trust">Trust &amp; Safety</a>
+        <a class="nav__link" href="#/trust">Trust & Safety</a>
       </nav>
 
-      <div class="nav__actions">
-        <a class="btn btn--pill btn--outline nav__portal" href="#/portal">Landlord Portal</a>
-        <button class="btn btn--pill btn--outline nav__menu" id="menuBtn" type="button">Menu</button>
+      <div class="nav__right">
+        <a class="btn btn--ghost btn--pill" href="#/portal">Landlord Portal</a>
+
+        <!-- MOBILE MENU BUTTON (hidden on desktop via CSS) -->
+        <button class="btn btn--ghost btn--pill nav__menuBtn" id="menuBtn" type="button" aria-label="Open menu">
+          Menu
+        </button>
       </div>
     </div>
   </header>
 
-  <main id="app"></main>
+  <!-- MOBILE MENU OVERLAY -->
+  <div class="overlay" id="menuOverlay" aria-hidden="true">
+    <div class="overlay__scrim" id="menuScrim"></div>
+    <div class="overlay__panel" role="dialog" aria-modal="true" aria-label="Menu">
+      <div class="overlay__head">
+        <div class="overlay__title">Menu</div>
+        <button class="iconBtn" id="menuClose" aria-label="Close menu">×</button>
+      </div>
 
-  <!-- Global modal root -->
-  <div id="modalRoot" class="modalRoot" aria-hidden="true"></div>
+      <div class="overlay__body">
+        <a class="menuItem" href="#/search">Search</a>
+        <a class="menuItem" href="#/add">Add Landlord</a>
+        <a class="menuItem" href="#/how">How It Works</a>
+        <a class="menuItem" href="#/trust">Trust & Safety</a>
+        <a class="btn btn--primary btn--block" href="#/portal">Landlord Portal</a>
+      </div>
+    </div>
+  </div>
 
-  <!-- Leaflet -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <main class="wrap" id="app" role="main"></main>
 
-  <script src="app.js"></script>
+  <!-- GLOBAL MODAL ROOT -->
+  <div class="modal" id="modalRoot" aria-hidden="true"></div>
+
+  <footer class="footer">
+    <div class="wrap footer__inner">
+      <div class="tiny">© <span id="year"></span> casa</div>
+      <div class="footer__links">
+        <a href="#/trust">Trust & Safety</a>
+        <a href="#/how">How it works</a>
+        <a href="#/search">Search</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
