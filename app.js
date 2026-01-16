@@ -1,13 +1,10 @@
 /* =========================================================
-   casa — app.js (copy/paste whole file)
-   GitHub Pages friendly SPA (hash routing)
-   - Home + Search + Add + How + Trust + Portal
-   - Search page includes:
-       • Borough filter (Manhattan/Brooklyn/Queens/Bronx/Staten Island)
-       • Min rating + sort
-       • Map browse with markers showing current star rating
-   Map uses Leaflet if available (recommended). If Leaflet is
-   not loaded, it will gracefully fall back to list-only view.
+   casa — app.js (FULL FILE)
+   - Hash-router SPA for GitHub Pages
+   - Pages: Home, Search (filters + map), Add, How, Trust, Portal,
+            Landlord profile, Write review (demo)
+   - NO reviewer accounts
+   - Landlord Portal is demo-only (email + password + OAuth buttons)
    ========================================================= */
 
 const $ = (sel) => document.querySelector(sel);
@@ -21,6 +18,14 @@ function esc(s) {
     .replaceAll("'", "&#39;");
 }
 
+function setActiveNav() {
+  const h = location.hash || "#/";
+  document.querySelectorAll(".nav__link, .navDrawer__link").forEach((a) => {
+    const href = a.getAttribute("href") || "";
+    a.classList.toggle("isActive", href && h.startsWith(href));
+  });
+}
+
 function toast(msg) {
   let t = $("#toast");
   if (!t) {
@@ -32,35 +37,37 @@ function toast(msg) {
   t.textContent = msg;
   t.style.display = "block";
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => (t.style.display = "none"), 2400);
+  window.__toastTimer = setTimeout(() => (t.style.display = "none"), 2200);
 }
 
-/* ---------- Stars ---------- */
+/* ---------- Stars (horizontal) ---------- */
 function starSVG(on) {
   return `
-    <svg class="star" viewBox="0 0 24 24" fill="${on ? "var(--starOn)" : "var(--starOff)"}" aria-hidden="true">
-      <path d="M12 17.3l-6.18 3.6 1.64-7.03L2 9.24l7.19-.62L12 2l2.81 6.62 7.19.62-5.46 4.63 1.64 7.03z"/>
+    <svg class="star" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="${on ? "var(--starOn)" : "var(--starOff)"}"
+        d="M12 17.3l-6.18 3.6 1.64-7.03L2 9.24l7.19-.62L12 2l2.81 6.62 7.19.62-5.46 4.63 1.64 7.03z"/>
     </svg>
   `;
 }
 
 function starsRow(score) {
   const s = Math.max(0, Math.min(5, Number(score) || 0));
-  let out = `<div class="starRow"><div class="stars">`;
+  let out = `<div class="starRow"><div class="starStars">`;
   for (let i = 1; i <= 5; i++) out += starSVG(i <= s);
   out += `</div><div class="scoreText">${s}/5</div></div>`;
   return out;
 }
 
-/* ---------- Hover bubble icon (no emojis) ---------- */
+/* ---------- Bubble icons (no emojis) ---------- */
 function bubble(tip) {
   return `<span class="bubbleIcon" data-tip="${esc(tip)}" aria-label="${esc(tip)}"></span>`;
 }
 
 /* =========================================================
-   Demo dataset (add more; include borough + lat/lng for map)
+   Demo dataset (in-memory)
+   Each landlord needs: id, name, addr, borough, lat, lng, score, date, text
    ========================================================= */
-const demoFeatured = [
+const landlords = [
   {
     id: "northside",
     name: "Northside Properties",
@@ -96,20 +103,9 @@ const demoFeatured = [
   },
 ];
 
-/* ---------- Minimal suggestion pool ---------- */
-const suggestPool = [
-  "ABC Management",
-  "123 Main St",
-  "John Doe",
-  "Northside Properties",
-  "Park Ave Management",
-  "Elmhurst Holdings",
-];
-
 /* =========================================================
-   Pages
+   HOME
    ========================================================= */
-
 function renderHome() {
   const app = $("#app");
   if (!app) return;
@@ -127,17 +123,17 @@ function renderHome() {
 
             <div class="heroSearch">
               <div class="heroSearch__bar">
-                <input id="homeSearch" placeholder="Search landlord name, management company, or address..." />
+                <input id="homeQ" placeholder="Search landlord name, management company, or address..." />
                 <div class="suggest" id="homeSuggest"></div>
               </div>
-              <button class="btn btn--primary" id="goSearch">Search</button>
-              <button class="btn btn--outline" id="goAdd">Add a landlord</button>
+              <button class="btn btn--primary" id="homeGo">Search</button>
+              <a class="btn btn--outline" href="#/add">Add a landlord</a>
             </div>
 
             <div class="trustLine">No account required to review. Verified landlords can respond.</div>
 
             <div class="cards3" style="margin-top:14px;">
-              <div class="xCard" data-acc="1">
+              <div class="xCard">
                 <div class="xCard__top">
                   <div class="xCard__title"><span class="xCard__icon">1</span> Look Up</div>
                   <span class="badge">Tap</span>
@@ -148,7 +144,7 @@ function renderHome() {
                 </div>
               </div>
 
-              <div class="xCard" data-acc="2">
+              <div class="xCard">
                 <div class="xCard__top">
                   <div class="xCard__title"><span class="xCard__icon">2</span> Review</div>
                   <span class="badge">No sign-up needed</span>
@@ -159,7 +155,7 @@ function renderHome() {
                 </div>
               </div>
 
-              <div class="xCard" data-acc="3">
+              <div class="xCard">
                 <div class="xCard__top">
                   <div class="xCard__title"><span class="xCard__icon">3</span> Improve</div>
                   <span class="badge badge--verified">Verified responses</span>
@@ -215,7 +211,7 @@ function renderHome() {
 
             <div style="margin-top:14px;">
               <div class="kicker">Landlord Portal</div>
-              <div class="tiny" style="margin-top:6px;">Landlords must verify identity before responding.</div>
+              <div class="tiny" style="margin-top:6px;">Landlords verify documents before responding.</div>
               <a class="btn btn--ghost btn--block" href="#/portal" style="margin-top:10px;">Open portal</a>
             </div>
           </aside>
@@ -233,87 +229,68 @@ function renderHome() {
     </section>
   `;
 
-  // accordion
-  document.querySelectorAll(".xCard").forEach((c) =>
-    c.addEventListener("click", () => c.classList.toggle("open"))
-  );
+  // accordion toggle
+  document.querySelectorAll(".xCard").forEach((c) => {
+    c.addEventListener("click", () => c.classList.toggle("open"));
+  });
 
   // featured
   const grid = $("#featuredGrid");
   if (grid) {
-    grid.innerHTML = demoFeatured
-      .slice(0, 3)
-      .map(
-        (r) => `
-        <div class="smallCard">
-          <div class="smallCard__top">
-            <div>
-              <div class="smallCard__name">${esc(r.name)}</div>
-              <div class="smallCard__addr">${esc(r.addr)}</div>
-            </div>
-            <div class="smallCard__time">${esc(r.date)}</div>
+    grid.innerHTML = landlords.slice(0, 3).map((r) => `
+      <div class="smallCard">
+        <div class="smallCard__top">
+          <div>
+            <div class="smallCard__name">${esc(r.name)}</div>
+            <div class="smallCard__addr">${esc(r.addr)}</div>
           </div>
-          ${starsRow(r.score)}
-          <div class="smallCard__text">${esc(r.text)}</div>
-          <div class="smallCard__foot">
-            <span class="tiny">${esc(r.borough || "")}</span>
-            <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View Landlord</a>
-          </div>
+          <div class="smallCard__time">${esc(r.date)}</div>
         </div>
-      `
-      )
-      .join("");
+        ${starsRow(r.score)}
+        <div class="smallCard__text">${esc(r.text)}</div>
+        <div class="smallCard__foot">
+          <span class="tiny">${esc(r.borough || "")}</span>
+          <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View Landlord</a>
+        </div>
+      </div>
+    `).join("");
   }
 
-  // buttons
-  const goSearch = $("#goSearch");
-  const goAdd = $("#goAdd");
-  const input = $("#homeSearch");
-  if (goSearch && input) {
-    goSearch.onclick = () =>
-      (location.hash = "#/search?q=" + encodeURIComponent(input.value.trim()));
-  }
-  if (goAdd) goAdd.onclick = () => (location.hash = "#/add");
+  // search action
+  const homeQ = $("#homeQ");
+  const homeGo = $("#homeGo");
+  homeGo?.addEventListener("click", () => {
+    const q = (homeQ?.value || "").trim();
+    location.hash = "#/search?q=" + encodeURIComponent(q);
+  });
+  homeQ?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") homeGo?.click();
+  });
 
   // suggestions
   const sug = $("#homeSuggest");
-  if (input && sug) {
-    input.addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      if (!q) {
-        sug.classList.remove("open");
-        sug.innerHTML = "";
-        return;
-      }
-      const m = suggestPool
-        .filter((x) => x.toLowerCase().includes(q))
-        .slice(0, 6);
-      if (!m.length) {
-        sug.classList.remove("open");
-        sug.innerHTML = "";
-        return;
-      }
-      sug.innerHTML = m
-        .map((x) => `<button type="button" data-v="${esc(x)}">${esc(x)}</button>`)
-        .join("");
+  const pool = landlords.map(l => l.name).concat(["ABC Management", "123 Main St", "John Doe"]);
+  if (homeQ && sug) {
+    homeQ.addEventListener("input", () => {
+      const q = homeQ.value.trim().toLowerCase();
+      if (!q) { sug.classList.remove("open"); sug.innerHTML = ""; return; }
+      const hits = pool.filter(x => x.toLowerCase().includes(q)).slice(0, 6);
+      if (!hits.length) { sug.classList.remove("open"); sug.innerHTML = ""; return; }
+      sug.innerHTML = hits.map(x => `<button type="button" data-v="${esc(x)}">${esc(x)}</button>`).join("");
       sug.classList.add("open");
-      sug.querySelectorAll("button").forEach((b) => {
-        b.onclick = () => {
-          input.value = b.dataset.v;
-          sug.classList.remove("open");
-        };
+      sug.querySelectorAll("button").forEach(b => {
+        b.onclick = () => { homeQ.value = b.dataset.v; sug.classList.remove("open"); };
       });
     });
-
     document.addEventListener("click", (e) => {
-      if (!sug.contains(e.target) && e.target !== input) {
-        sug.classList.remove("open");
-      }
+      if (!sug.contains(e.target) && e.target !== homeQ) sug.classList.remove("open");
     });
   }
 }
 
-/* ---------- Search with Borough + Map ---------- */
+/* =========================================================
+   SEARCH (filters + map)
+   ========================================================= */
 function renderSearch() {
   const app = $("#app");
   if (!app) return;
@@ -378,22 +355,24 @@ function renderSearch() {
               </div>
             </div>
 
-            <div class="mapWrap" id="mapWrap">
+            <div class="mapWrap">
               <div id="map"></div>
             </div>
 
-            <div id="results"></div>
-
-            <div class="tiny" style="margin-top:10px;">
-              Tip: For the map to show pins, each landlord needs <b>lat</b> and <b>lng</b>.
+            <div id="mapFallback" class="box" style="margin-top:12px; display:none;">
+              <div style="font-weight:1000;">Map library not loaded</div>
+              <div class="tiny" style="margin-top:6px;">
+                Add Leaflet includes to <b>index.html</b> (2 lines) to enable the map.
+              </div>
             </div>
+
+            <div id="results"></div>
           </div>
         </div>
       </div>
     </section>
   `;
 
-  const mapWrap = $("#mapWrap");
   let map = null;
   let layerGroup = null;
 
@@ -402,12 +381,15 @@ function renderSearch() {
   }
 
   function ensureMap() {
-    if (!mapWrap) return;
+    const fb = $("#mapFallback");
     if (!leafletAvailable()) {
-      // Graceful fallback: hide map if Leaflet not loaded
-      mapWrap.style.display = "none";
+      // hide the empty map div so it doesn't look broken
+      const mapDiv = $("#map");
+      if (mapDiv) mapDiv.style.display = "none";
+      if (fb) fb.style.display = "block";
       return;
     }
+    if (fb) fb.style.display = "none";
     if (map) return;
 
     map = window.L.map("map", { scrollWheelZoom: false }).setView([40.73, -73.97], 11);
@@ -425,13 +407,13 @@ function renderSearch() {
     if (!map || !layerGroup) return;
 
     layerGroup.clearLayers();
-    const points = [];
+    const pts = [];
 
     list.forEach((x) => {
       if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
 
-      const marker = window.L.marker([x.lat, x.lng]).addTo(layerGroup);
-      marker.bindPopup(`
+      const m = window.L.marker([x.lat, x.lng]).addTo(layerGroup);
+      m.bindPopup(`
         <div style="min-width:220px;">
           <div style="font-weight:1000;">${esc(x.name)}</div>
           <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
@@ -444,11 +426,11 @@ function renderSearch() {
         </div>
       `);
 
-      points.push([x.lat, x.lng]);
+      pts.push([x.lat, x.lng]);
     });
 
-    if (points.length) {
-      const bounds = window.L.latLngBounds(points);
+    if (pts.length) {
+      const bounds = window.L.latLngBounds(pts);
       map.fitBounds(bounds.pad(0.18));
     } else {
       map.setView([40.73, -73.97], 11);
@@ -456,7 +438,6 @@ function renderSearch() {
   }
 
   function parseDate(d) {
-    // demo: parses "1/5/2026" (MM/DD/YYYY)
     const parts = String(d || "").split("/");
     if (parts.length !== 3) return new Date(0);
     const mm = Number(parts[0]) - 1;
@@ -471,71 +452,55 @@ function renderSearch() {
     const minr = Number($("#minr").value || 0);
     const sort = ($("#sort").value || "relevance");
 
-    let list = demoFeatured.slice();
+    let list = landlords.slice();
 
     if (query) {
-      list = list.filter(
-        (x) =>
-          x.name.toLowerCase().includes(query) ||
-          x.addr.toLowerCase().includes(query)
+      list = list.filter((x) =>
+        x.name.toLowerCase().includes(query) ||
+        x.addr.toLowerCase().includes(query)
       );
     }
 
-    if (borough) {
-      list = list.filter((x) => (x.borough || "") === borough);
-    }
+    if (borough) list = list.filter((x) => (x.borough || "") === borough);
+    if (minr) list = list.filter((x) => (Number(x.score) || 0) >= minr);
 
-    if (minr) {
-      list = list.filter((x) => (Number(x.score) || 0) >= minr);
-    }
-
-    if (sort === "rating") {
-      list.sort((a, b) => (b.score || 0) - (a.score || 0));
-    } else if (sort === "newest") {
-      list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
-    }
+    if (sort === "rating") list.sort((a, b) => (b.score || 0) - (a.score || 0));
+    if (sort === "newest") list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
     const results = $("#results");
     if (results) {
       results.innerHTML = list.length
-        ? list
-            .map(
-              (x) => `
-              <div class="rowCard">
-                <div style="flex:1;">
-                  <div class="rowTitle">${esc(x.name)}</div>
-                  <div class="rowSub">${esc(x.addr)}</div>
-                  <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
-                  ${starsRow(x.score)}
-                </div>
-                <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
-                  <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
-                  <a class="btn btn--outline" href="#/review/${esc(x.id)}">Write review</a>
-                </div>
+        ? list.map((x) => `
+            <div class="rowCard">
+              <div style="flex:1;">
+                <div class="rowTitle">${esc(x.name)}</div>
+                <div class="rowSub">${esc(x.addr)}</div>
+                <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
+                ${starsRow(x.score)}
               </div>
-            `
-            )
-            .join("")
-        : `
-          <div class="box" style="margin-top:12px;">
-            <div style="font-weight:1000;">No results</div>
-            <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
-            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-              <a class="btn btn--primary" href="#/add">Add a landlord</a>
-              <a class="btn btn--ghost" href="#/">Back to home</a>
+              <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
+                <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
+                <a class="btn btn--outline" href="#/review/${esc(x.id)}">Write review</a>
+              </div>
             </div>
-          </div>
-        `;
+          `).join("")
+        : `
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:1000;">No results</div>
+              <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
+              <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+                <a class="btn btn--primary" href="#/add">Add a landlord</a>
+                <a class="btn btn--ghost" href="#/">Back to home</a>
+              </div>
+            </div>
+          `;
     }
 
     setMarkers(list);
   }
 
   $("#doSearch")?.addEventListener("click", run);
-  $("#q")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") run();
-  });
-
+  $("#q")?.addEventListener("keydown", (e) => (e.key === "Enter" ? run() : null));
   ["borough", "minr", "sort"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", run);
   });
@@ -543,7 +508,9 @@ function renderSearch() {
   run();
 }
 
-/* ---------- Add landlord ---------- */
+/* =========================================================
+   ADD LANDLORD (demo adds to memory)
+   ========================================================= */
 function renderAdd() {
   const app = $("#app");
   if (!app) return;
@@ -587,7 +554,7 @@ function renderAdd() {
               </div>
               <div class="field">
                 <label>Coordinates (optional for map)</label>
-                <input id="coords" placeholder="lat,lng  (e.g., 40.7081,-73.9571)" />
+                <input id="coords" placeholder="lat,lng (e.g., 40.7081,-73.9571)" />
               </div>
             </div>
 
@@ -602,7 +569,7 @@ function renderAdd() {
             </div>
 
             <div class="tiny" style="margin-top:10px;">
-              Demo mode: this adds to the in-memory list (won’t persist after refresh unless you add storage).
+              Demo mode: this adds to memory only (won’t persist after refresh).
             </div>
           </div>
         </div>
@@ -615,18 +582,27 @@ function renderAdd() {
     const addr = ($("#addr").value || "").trim();
     const borough = ($("#boro").value || "").trim();
     const coords = ($("#coords").value || "").trim();
+    const notes = ($("#notes").value || "").trim();
 
     if (!name || !addr) return toast("Add name + address.");
 
-    let lat = null, lng = null;
+    let lat, lng;
     if (coords.includes(",")) {
       const [a, b] = coords.split(",").map((x) => Number(x.trim()));
-      if (!Number.isNaN(a) && !Number.isNaN(b)) { lat = a; lng = b; }
+      if (!Number.isNaN(a) && !Number.isNaN(b)) {
+        lat = a;
+        lng = b;
+      }
     }
 
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || ("landlord-" + Date.now());
+    const id =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 48) || "landlord-" + Date.now();
 
-    demoFeatured.unshift({
+    landlords.unshift({
       id,
       name,
       addr,
@@ -635,7 +611,7 @@ function renderAdd() {
       lng: typeof lng === "number" ? lng : undefined,
       score: 0,
       date: new Date().toLocaleDateString(),
-      text: ($("#notes").value || "").trim() || "New listing (no reviews yet).",
+      text: notes || "New listing (no reviews yet).",
     });
 
     toast("Added (demo): " + name);
@@ -643,7 +619,161 @@ function renderAdd() {
   });
 }
 
-/* ---------- How it works ---------- */
+/* =========================================================
+   LANDLORD PROFILE
+   ========================================================= */
+function renderLandlord(id) {
+  const app = $("#app");
+  if (!app) return;
+
+  const l = landlords.find((x) => x.id === id);
+  if (!l) {
+    app.innerHTML = `
+      <section class="section"><div class="wrap">
+        <div class="card pad">
+          <h2>Not found</h2>
+          <div class="muted">That landlord profile doesn’t exist.</div>
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn btn--primary" href="#/search">Search</a>
+            <a class="btn btn--ghost" href="#/">Home</a>
+          </div>
+        </div>
+      </div></section>`;
+    return;
+  }
+
+  app.innerHTML = `
+    <section class="section">
+      <div class="wrap">
+        <div class="card">
+          <div class="hd">
+            <div>
+              <div class="kicker">Landlord</div>
+              <h2>${esc(l.name)}</h2>
+              <div class="muted">${esc(l.addr)}</div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn btn--outline" href="#/search">Back</a>
+              <a class="btn btn--primary" href="#/review/${esc(l.id)}">Write review</a>
+            </div>
+          </div>
+
+          <div class="bd">
+            <div class="rowCard">
+              <div style="flex:1;">
+                <div class="rowTitle">Overall rating</div>
+                ${starsRow(l.score)}
+                <div class="tiny" style="margin-top:6px;">${esc(l.borough || "")}</div>
+              </div>
+              <div class="box" style="flex:1;">
+                <div style="font-weight:1000;">Latest highlight</div>
+                <div class="tiny" style="margin-top:6px;">${esc(l.date)}</div>
+                <div style="margin-top:10px; font-weight:850; color:rgba(35,24,16,.78); line-height:1.35;">
+                  ${esc(l.text)}
+                </div>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:1000;">Reviews (demo)</div>
+              <div class="tiny" style="margin-top:6px;">
+                This demo stores one highlight per landlord. Next step is adding a reviews array per landlord.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+/* =========================================================
+   WRITE REVIEW (demo)
+   ========================================================= */
+function renderReview(id) {
+  const app = $("#app");
+  if (!app) return;
+
+  const l = landlords.find((x) => x.id === id);
+  if (!l) return renderLandlord(id);
+
+  app.innerHTML = `
+    <section class="section">
+      <div class="wrap">
+        <div class="card">
+          <div class="hd">
+            <div>
+              <div class="kicker">Write a review</div>
+              <h2>${esc(l.name)}</h2>
+              <div class="muted">${esc(l.addr)}</div>
+            </div>
+            <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Back</a>
+          </div>
+
+          <div class="bd">
+            <div class="split2">
+              <div class="field">
+                <label>Overall rating</label>
+                <select id="rScore">
+                  <option value="5">5 — Excellent</option>
+                  <option value="4">4 — Good</option>
+                  <option value="3">3 — Okay</option>
+                  <option value="2">2 — Bad</option>
+                  <option value="1">1 — Terrible</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Borough (for filtering)</label>
+                <select id="rBoro">
+                  <option value="">Use existing</option>
+                  <option>Manhattan</option>
+                  <option>Brooklyn</option>
+                  <option>Queens</option>
+                  <option>Bronx</option>
+                  <option>Staten Island</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field" style="margin-top:12px;">
+              <label>What happened?</label>
+              <textarea id="rText" placeholder="Stick to facts: repairs, communication, safety, deposit, etc."></textarea>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+              <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Cancel</a>
+              <button class="btn btn--primary" id="submitReview">Submit review</button>
+            </div>
+
+            <div class="tiny" style="margin-top:10px;">
+              Demo mode: this replaces the landlord’s highlight + score.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+
+  $("#submitReview")?.addEventListener("click", () => {
+    const score = Number($("#rScore").value || 0);
+    const text = ($("#rText").value || "").trim();
+    const boro = ($("#rBoro").value || "").trim();
+
+    if (!text) return toast("Write a short description.");
+
+    l.score = Math.max(1, Math.min(5, score || 0));
+    l.text = text;
+    l.date = new Date().toLocaleDateString();
+    if (boro) l.borough = boro;
+
+    toast("Posted (demo).");
+    location.hash = "#/landlord/" + encodeURIComponent(l.id);
+  });
+}
+
+/* =========================================================
+   HOW / TRUST
+   ========================================================= */
 function renderHow() {
   const app = $("#app");
   if (!app) return;
@@ -664,22 +794,22 @@ function renderHow() {
           <div class="bd">
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">1) Search</div>
-              <div class="rowSub">Find a landlord by name, company, address, or borough.</div>
+              <div class="rowSub">Find a landlord by name, company, address, borough, or the map.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">2) Review</div>
-              <div class="rowSub">Post instantly. You’ll receive an edit link (no account required).</div>
+              <div class="rowSub">Post instantly (no account). Keep it factual and specific.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">3) Respond (verified landlords)</div>
+              <div class="rowTitle">3) Verified landlord responses</div>
               <div class="rowSub">Landlords create accounts only in the Landlord Portal and verify documents before responding publicly.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">4) Report issues</div>
-              <div class="rowSub">Spam, harassment, and personal info can be reported for review.</div>
+              <div class="rowTitle">4) Reporting</div>
+              <div class="rowSub">Report spam, harassment, or personal information.</div>
             </div></div>
           </div>
         </div>
@@ -688,7 +818,6 @@ function renderHow() {
   `;
 }
 
-/* ---------- Trust & Safety ---------- */
 function renderTrust() {
   const app = $("#app");
   if (!app) return;
@@ -709,22 +838,22 @@ function renderTrust() {
           <div class="bd">
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">No reviewer accounts</div>
-              <div class="rowSub">Tenants can post without accounts; edits use an edit link.</div>
+              <div class="rowSub">Tenants can post without accounts. Reviews should be factual and specific.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">Verified landlord responses</div>
-              <div class="rowSub">Landlords upload documentation and are reviewed before responding publicly.</div>
+              <div class="rowSub">Landlords verify documents before responding publicly.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">No doxxing / personal info</div>
+              <div class="rowTitle">No personal info</div>
               <div class="rowSub">Do not post phone numbers, emails, or private details.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">Reporting</div>
-              <div class="rowSub">Spam, harassment, and inaccurate listings can be reported for moderation.</div>
+              <div class="rowSub">Report spam, harassment, or inaccurate listings for moderation.</div>
             </div></div>
           </div>
         </div>
@@ -733,7 +862,9 @@ function renderTrust() {
   `;
 }
 
-/* ---------- Landlord Portal ---------- */
+/* =========================================================
+   LANDLORD PORTAL (demo)
+   ========================================================= */
 function renderPortal() {
   const app = $("#app");
   if (!app) return;
@@ -805,5 +936,71 @@ function renderPortal() {
   $("#login")?.addEventListener("click", () => {
     const e = ($("#le").value || "").trim();
     const p = ($("#lp").value || "").trim();
-    if (!e || !p) return
+    if (!e || !p) return toast("Enter email + password.");
+    toast("Signed in (demo).");
+  });
 
+  $("#signup")?.addEventListener("click", () => {
+    const e = ($("#se").value || "").trim();
+    const p = ($("#sp").value || "").trim();
+    const f = $("#doc")?.files?.[0];
+    if (!e || !p) return toast("Enter email + password.");
+    if (!f) return toast("Upload a verification document.");
+    toast("Submitted for verification (demo).");
+  });
+
+  ["g", "a", "m"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", () => toast("OAuth (demo only)."));
+  });
+}
+
+/* =========================================================
+   ROUTER
+   ========================================================= */
+function route() {
+  setActiveNav();
+
+  const raw = location.hash || "#/";
+  const [pathPart] = raw.replace(/^#/, "").split("?");
+  const parts = pathPart.split("/").filter(Boolean);
+
+  // close mobile drawer if open
+  const drawer = document.getElementById("navDrawer");
+  if (drawer?.classList.contains("open")) {
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+
+  if (parts.length === 0) return renderHome();
+
+  const page = parts[0];
+
+  if (page === "search") return renderSearch();
+  if (page === "add") return renderAdd();
+  if (page === "how") return renderHow();
+  if (page === "trust") return renderTrust();
+  if (page === "portal") return renderPortal();
+
+  if (page === "landlord" && parts[1]) return renderLandlord(parts[1]);
+  if (page === "review" && parts[1]) return renderReview(parts[1]);
+
+  // fallback
+  renderHome();
+}
+
+/* =========================================================
+   Boot
+   ========================================================= */
+function boot() {
+  window.addEventListener("hashchange", route);
+
+  // if someone loads without hash
+  if (!location.hash) location.hash = "#/";
+  route();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
