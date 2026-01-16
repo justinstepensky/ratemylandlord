@@ -584,3 +584,41 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   font-weight: 600 !important;
   letter-spacing: -0.02em !important;
 }
+/* ===== Interactive star picker (CASA theme) ===== */
+.starInput{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  margin-top:2px;
+}
+
+.starBtn{
+  width:38px;
+  height:38px;
+  border-radius:999px;
+  border:1px solid rgba(20,16,12,.12);
+  background: rgba(255,255,255,.65);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  padding:0;
+  transition: transform .06s ease, background .12s ease;
+}
+
+.starBtn:hover{
+  background: rgba(255,255,255,.9);
+  transform: translateY(-1px);
+}
+
+.starBtn:active{ transform: translateY(0px); }
+
+.starGlyph{
+  font-size:18px;
+  line-height:1;
+  color: rgba(20,16,12,.22); /* empty star */
+}
+
+/* filled stars */
+.starBtn.isOn .starGlyph{
+  color: rgba(20,14,10,.98); /* filled = your primary ink */
+}
