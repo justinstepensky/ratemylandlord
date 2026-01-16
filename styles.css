@@ -484,3 +484,51 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   .miniBtn{font-size:12px}
   .tileRow{grid-template-columns:1fr}
 }
+/* ===== CASA FIX PACK (keeps original theme) ===== */
+
+/* (A) Logo font: restore your original premium serif (your old theme) */
+.brand__name{
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif !important;
+  font-weight:700 !important;
+  font-size:18px !important;
+  letter-spacing:.2px !important;
+}
+
+/* (B) Home: force Recent Highlights + Map to be the SAME SIZE panes */
+@media (min-width: 981px){
+  .splitRow{
+    grid-template-columns: 1fr 1fr !important;
+    align-items: stretch !important;
+  }
+
+  /* Make both cards equal-height panes */
+  .splitRow > .card{
+    display:flex !important;
+    flex-direction:column !important;
+    min-height: 360px !important;  /* shared height */
+  }
+
+  .splitRow > .card > .pad{
+    flex:1 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    min-height:0 !important;
+  }
+
+  /* The “content block” inside each pane should fill the remaining space */
+  .splitRow > .card .carousel,
+  .splitRow > .card .mapBox{
+    flex:1 !important;
+    min-height:0 !important;
+  }
+
+  /* Map should stretch to fill its container */
+  .splitRow > .card .map{
+    height: 100% !important;
+    min-height: 240px !important;
+  }
+
+  /* Keep carousel tidy so it doesn’t feel like a giant banner */
+  .carouselSlide{ padding:12px !important; }
+  .dots{ padding:10px 12px 12px !important; }
+}
