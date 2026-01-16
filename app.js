@@ -106,6 +106,11 @@ function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
+function starStaticHTML(value, sizePx = 16) {
+  const v = Math.max(0, Math.min(5, Number(value) || 0));
+  return `<span class="starStatic" style="--rating:${v};--starSize:${sizePx}px"></span>`;
+}
+
 /* Recency-weighted average:
    weight halves every 180 days (simple credibility)
 */
@@ -117,7 +122,7 @@ function weightedAverageStars(reviews) {
   for (const r of reviews) {
     const ageDays = Math.max(0, (now - r.createdAt) / (1000*60*60*24));
     const w = Math.pow(0.5, ageDays / halfLifeDays);
-    num += r.stars * w;
+    num += Number(r.stars) * w;
     den += w;
   }
   if (!den) return null;
@@ -125,7 +130,9 @@ function weightedAverageStars(reviews) {
 }
 
 function landlordReviews(landlordId) {
-  return DB.reviews.filter(r => r.landlordId === landlordId).sort((a,b)=>b.createdAt-a.createdAt);
+  return DB.reviews
+    .filter(r => r.landlordId === landlordId)
+    .sort((a,b)=>b.createdAt-a.createdAt);
 }
 
 function ratingStats(landlordId) {
@@ -135,7 +142,10 @@ function ratingStats(landlordId) {
   const avg = weightedAverageStars(rs);
   const avgRounded = round1(avg);
   const dist = [0,0,0,0,0]; // 1..5
-  for (const r of rs) dist[r.stars - 1] += 1;
+  for (const r of rs) {
+    const s = Math.round(Number(r.stars) || 0);
+    if (s >= 1 && s <= 5) dist[s - 1] += 1;
+  }
   return { count, avg, avgRounded, dist };
 }
 
@@ -172,13 +182,14 @@ function casaCredential(landlordId) {
   return "CASA Rated";
 }
 
+/* FIX: correct badge paths to match your actual assets */
 function badgesHTML(l) {
   const parts = [];
   if (l.verified) {
-    parts.push(`<img class="badgeImg" src="assets/badges/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
+    parts.push(`<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
   }
   if (l.top) {
-    parts.push(`<img class="badgeImg" src="assets/badges/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
+    parts.push(`<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
   }
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
@@ -296,7 +307,6 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
   const avgText = (avg == null) ? "—" : avg.toFixed(1);
-  const starVis = (avg == null) ? "☆☆☆☆☆" : (avg >= 4 ? "★★★★☆" : avg >= 3 ? "★★★☆☆" : avg >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
   const addr = `${esc(l.address.line1)} • ${esc(l.address.city)} • ${esc(l.address.state)} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
 
@@ -310,7 +320,7 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
         <div class="lcMeta">${esc(addr)}</div>
 
         <div class="lcRow">
-          <span class="stars">${starVis}</span>
+          ${avg == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(avg, 16)}
           <span class="ratingNum">${avgText}</span>
           <span class="muted">(${count} review${count===1?"":"s"})</span>
           <span class="muted">Rating reflects review recency.</span>
@@ -366,7 +376,6 @@ function renderHighlightsCarousel() {
     const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
     const avgText = (st.avgRounded == null) ? "—" : st.avgRounded.toFixed(1);
-    const starVis = (st.avgRounded == null) ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
     return `
       <div class="carouselSlide">
@@ -379,7 +388,7 @@ function renderHighlightsCarousel() {
             <div class="lcMeta">${fmtDate(r.createdAt)}</div>
 
             <div class="lcRow">
-              <span class="stars">${starVis}</span>
+              ${st.avgRounded == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(st.avgRounded, 16)}
               <span class="ratingNum">${avgText}</span>
               <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
             </div>
@@ -906,7 +915,6 @@ function renderPortal() {
                 <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
               </div>
 
-              <!-- ADD oauth here too (your request #5) -->
               <div class="tiny" style="text-align:center;margin-top:10px;">or continue with</div>
               <div class="oauth" style="margin-top:10px;">
                 <button class="oauthBtn" id="oauthGoogle2">
@@ -952,104 +960,106 @@ function renderPortal() {
 
   // demo auth
   const demo = (label) => alert(`${label} (demo)`);
-  ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2"].forEach(id=>{
-    $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
+  ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2","psignin","signup"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("click", () => demo(id));
   });
-  $("#psignin").addEventListener("click", ()=>demo("Sign in"));
-  $("#signup").addEventListener("click", ()=>demo("Create account"));
 }
-
+/* -----------------------------
+   Landlord page
+------------------------------ */
 function renderLandlord(id) {
   const l = DB.landlords.find(x => x.id === id);
-  if (!l) return renderHome();
+  if (!l) {
+    renderShell(`
+      <section class="pageCard card">
+        <div class="pad">
+          <div class="kicker">Not found</div>
+          <div class="pageTitle">Landlord not found</div>
+          <div class="pageSub">This landlord may have been removed.</div>
+          <div style="margin-top:14px;">
+            <a class="btn btn--primary" href="#/search">Back to search</a>
+          </div>
+        </div>
+      </section>
+    `);
+    return;
+  }
 
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-  const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+  const tier = cardTier(st.avgRounded ?? 0, st.count);
+  const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
-  const cred = casaCredential(l.id);
-  const badgeRow = badgesHTML(l);
+  const addr = `${esc(l.address.line1)}${l.address.unit ? " • " + esc(l.address.unit) : ""} • ${esc(l.address.city)} • ${esc(l.address.state)}${l.borough ? " • " + esc(l.borough) : ""}`;
 
-  const distTotal = st.dist.reduce((a,b)=>a+b,0);
+  const credential = casaCredential(l.id);
+  const rs = landlordReviews(l.id);
+
+  const histo = renderHistogram(st);
+
   const content = `
     <section class="pageCard card">
       <div class="pad">
-        <div class="profileHead">
+        <div class="topRow">
           <div>
             <div class="kicker">Landlord</div>
-            <div class="profileNameRow">
-              <h1 class="profileName">${esc(l.name)}</h1>
-              ${badgeRow}
-            </div>
+            <div class="profileHead">
+              <div>
+                <div class="profileNameRow">
+                  <h1 class="profileName">${esc(l.name)}</h1>
+                  ${badgesHTML(l)}
+                </div>
 
-            <div class="profileStats">
-              <span class="stars">${starVis}</span>
-              <span class="ratingNum">${avgText}</span>
-              <span class="muted">${st.count ? `${st.count} review${st.count===1?"":"s"}` : "No ratings"}</span>
-              <span class="muted">Rating reflects review recency.</span>
-              <span class="pill">${esc(cred === "CASA Rated" ? "CASA Rated" : (st.count ? "Not yet CASA Rated" : "Unrated"))}</span>
-            </div>
+                <div class="profileStats">
+                  ${st.avgRounded == null ? `<span class="stars">☆☆☆☆☆</span>` : starStaticHTML(st.avgRounded, 18)}
+                  <span class="ratingNum" style="font-size:18px;">${avgText}</span>
+                  <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
+                  ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
+                </div>
 
-            <div class="addrLine">
-              ${esc(l.address.line1)}${l.address.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address.city)}, ${esc(l.address.state)}
-            </div>
-          </div>
+                <div class="addrLine">${esc(addr)}</div>
+                <div class="muted" style="margin-top:10px;">
+                  <b>${esc(credential)}</b> • Rating reflects review recency.
+                </div>
+              </div>
 
-          <div style="display:flex;gap:10px;align-items:center">
-            <a class="btn" href="#/search">Back</a>
-            <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <a class="btn" href="#/search">Back</a>
+                <button class="btn btn--primary" id="leaveReview">Leave a review</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="hr"></div>
-
         <div class="twoCol">
           <div>
-            <div class="kicker">Location</div>
-            <div class="mapBox" style="margin-top:10px;">
-              <div class="map" id="profileMap" style="height:280px;"></div>
-            </div>
-            <button class="btn" style="margin-top:10px;" id="centerProfile">Center on map</button>
+            <div class="kicker">Rating distribution</div>
+            ${histo}
 
-            <div class="histo">
-              <div class="kicker" style="margin-top:18px;">Rating distribution</div>
-              ${[5,4,3,2,1].map(star=>{
-                const count = st.dist[star-1] || 0;
-                const pct = distTotal ? Math.round((count/distTotal)*100) : 0;
-                return `
-                  <div class="hRow">
-                    <div class="muted">${star}★</div>
-                    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-                    <div class="muted">${count}</div>
-                  </div>
-                `;
-              }).join("")}
+            <div class="hr"></div>
+
+            <div class="kicker">Reviews</div>
+            <div class="list" id="reviewList">
+              ${rs.length ? rs.map(r => reviewCardHTML(r)).join("") : `<div class="muted">No reviews yet.</div>`}
             </div>
           </div>
 
           <div>
-            <div class="kicker">Reviews</div>
-            <div class="list" style="margin-top:10px;">
-              ${
-                landlordReviews(l.id).length
-                ? landlordReviews(l.id).map(r => `
-                  <div class="lc" style="background:rgba(255,255,255,.72)">
-                    <div class="lcLeft">
-                      <div class="lcRow">
-                        <span class="stars">${"★".repeat(r.stars)}${"☆".repeat(5-r.stars)}</span>
-                        <span class="ratingNum">${r.stars}/5</span>
-                      </div>
-                      <div class="smallNote" style="margin-top:10px;font-size:14px;font-weight:700;color:rgba(21,17,14,.78)">
-                        ${esc(r.text)}
-                      </div>
-                      <button class="btn miniBtn" style="margin-top:10px;" data-report="${esc(r.id)}">Report</button>
-                    </div>
-                    <div class="muted">${fmtDate(r.createdAt)}</div>
-                  </div>
-                `).join("")
-                : `<div class="muted">No reviews yet. Be the first.</div>`
-              }
+            <div class="kicker">Map</div>
+            <div class="mapBox" style="margin-top:10px;">
+              <div class="map" id="landlordMap" style="height:320px;"></div>
             </div>
+
+            <div class="hr"></div>
+
+            <div class="kicker">Trust & Safety</div>
+            <div class="muted" style="font-weight:700;line-height:1.55;margin-top:8px;">
+              Keep reviews factual. No phone numbers, emails, or private info.
+            </div>
+
+            <button class="btn" style="margin-top:12px;" id="reportBtn">Report this listing</button>
           </div>
         </div>
       </div>
@@ -1057,46 +1067,92 @@ function renderLandlord(id) {
   `;
   renderShell(content);
 
-  // Map
+  // map
   setTimeout(() => {
-    const map = initLeafletMap($("#profileMap"), [l.lat ?? 40.73, l.lng ?? -73.95], 12);
-    let marker = null;
-    if (typeof l.lat === "number" && typeof l.lng === "number") {
-      marker = L.marker([l.lat, l.lng]).addTo(map);
-    }
-    $("#centerProfile").addEventListener("click", () => {
-      map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
-      marker?.openPopup?.();
-    });
+    const mapEl = $("#landlordMap");
+    if (!mapEl) return;
+    const lat = typeof l.lat === "number" ? l.lat : 40.73;
+    const lng = typeof l.lng === "number" ? l.lng : -73.95;
+    const map = initLeafletMap(mapEl, [lat, lng], 13);
+    L.marker([lat, lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b>`);
   }, 0);
 
-  // Report
-  document.querySelectorAll("[data-report]").forEach(btn => {
+  $("#leaveReview").addEventListener("click", () => openReviewModal(l.id));
+  $("#reportBtn").addEventListener("click", () => openReportModal(l.id));
+
+  // attach report handlers on review cards
+  document.querySelectorAll("[data-report-review]").forEach(btn => {
     btn.addEventListener("click", () => {
-      alert("Report submitted (demo).");
+      const rid = btn.dataset.reportReview;
+      openReportModal(l.id, rid);
     });
   });
-
-  // Review modal (fixed so map never blocks it)
-  $("#rateBtn").addEventListener("click", () => openReviewModal(l.id));
 }
 
+function renderHistogram(st) {
+  const total = st.count || 0;
+  const dist = st.dist || [0,0,0,0,0]; // 1..5
+  // Show 5..1 rows
+  const rows = [5,4,3,2,1].map((star) => {
+    const n = dist[star - 1] || 0;
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    return `
+      <div class="hRow">
+        <div style="font-weight:900;">${star}</div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div style="font-weight:900;text-align:right;">${n}</div>
+      </div>
+    `;
+  }).join("");
+
+  return `<div class="histo">${rows}</div>`;
+}
+
+function reviewCardHTML(r) {
+  return `
+    <div class="lc" style="align-items:flex-start;">
+      <div class="lcLeft">
+        <div class="lcRow">
+          ${starStaticHTML(r.stars, 16)}
+          <span class="ratingNum">${Number(r.stars).toFixed(1)}/5</span>
+          <span class="muted">${fmtDate(r.createdAt)}</span>
+        </div>
+        <div class="smallNote">${esc(r.text)}</div>
+      </div>
+      <div class="lcRight">
+        <button class="btn miniBtn" data-report-review="${esc(r.id)}">Report</button>
+      </div>
+    </div>
+  `;
+}
+
+/* -----------------------------
+   Review Modal (stars with half-star)
+------------------------------ */
 function openReviewModal(landlordId) {
+  let rating = 5.0;
+
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">Leave a review</div>
       <button class="iconBtn" id="mClose" aria-label="Close">×</button>
     </div>
+
     <div class="modalBody">
       <div class="field">
         <label>Rating</label>
-        <select class="input" id="mStars" style="height:44px;">
-          <option value="5">5 — Excellent</option>
-          <option value="4">4 — Good</option>
-          <option value="3">3 — Okay</option>
-          <option value="2">2 — Poor</option>
-          <option value="1">1 — Terrible</option>
-        </select>
+
+        <div class="starPicker" id="starPicker" aria-label="Star rating">
+          ${[1,2,3,4,5].map(i => `
+            <button class="starBtn isFull" type="button" data-star="${i}" aria-label="${i} stars">
+              <span class="hit hitL" data-value="${i - 0.5}"></span>
+              <span class="hit hitR" data-value="${i}"></span>
+            </button>
+          `).join("")}
+          <div class="tiny" id="starLabel" style="margin-left:10px;font-weight:900;">5.0 / 5</div>
+        </div>
+
+        <div class="tiny" style="margin-top:8px;">Tip: click the left half for half-stars.</div>
       </div>
 
       <div class="field">
@@ -1105,17 +1161,43 @@ function openReviewModal(landlordId) {
         <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
+
     <div class="modalFoot">
       <button class="btn" id="mCancel">Cancel</button>
       <button class="btn btn--primary" id="mSubmit">Submit</button>
     </div>
   `);
 
-  $("#mClose").addEventListener("click", closeModal);
-  $("#mCancel").addEventListener("click", closeModal);
+  const close = () => closeModal();
+  $("#mClose").addEventListener("click", close);
+  $("#mCancel").addEventListener("click", close);
+
+  const picker = $("#starPicker");
+  const label = $("#starLabel");
+
+  function paintStars(val) {
+    rating = Math.max(0.5, Math.min(5, Number(val) || 5));
+    label.textContent = `${rating.toFixed(1)} / 5`;
+
+    const stars = Array.from(picker.querySelectorAll(".starBtn"));
+    stars.forEach((btn, idx) => {
+      const starNum = idx + 1;
+      btn.classList.remove("isFull", "isHalf");
+      if (rating >= starNum) btn.classList.add("isFull");
+      else if (rating >= starNum - 0.5) btn.classList.add("isHalf");
+    });
+  }
+
+  // delegate clicks (left half / right half)
+  picker.addEventListener("click", (e) => {
+    const v = e.target?.dataset?.value;
+    if (!v) return;
+    paintStars(Number(v));
+  });
+
+  paintStars(5);
 
   $("#mSubmit").addEventListener("click", () => {
-    const stars = Number($("#mStars").value);
     const text = $("#mText").value.trim();
 
     if (!text || text.length < 20) {
@@ -1126,18 +1208,72 @@ function openReviewModal(landlordId) {
     DB.reviews.push({
       id: "r" + Math.random().toString(16).slice(2),
       landlordId,
-      stars,
+      stars: rating, // half-star supported
       text,
       createdAt: Date.now()
     });
     saveDB(DB);
 
     closeModal();
-    // re-render landlord page
     route();
   });
 }
 
 /* -----------------------------
-   Boot
+   Report Modal (listing or review)
 ------------------------------ */
+function openReportModal(landlordId, reviewId = null) {
+  openModal(`
+    <div class="modalHead">
+      <div class="modalTitle">Report</div>
+      <button class="iconBtn" id="rClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="field">
+        <label>Reason</label>
+        <select class="input" id="rReason">
+          <option value="spam">Spam / promotion</option>
+          <option value="harassment">Harassment / hate</option>
+          <option value="privacy">Personal info / doxxing</option>
+          <option value="inaccurate">Inaccurate listing</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Details (optional)</label>
+        <textarea class="textarea" id="rText" placeholder="Briefly explain what’s wrong."></textarea>
+      </div>
+
+      <div class="tiny">Reports are reviewed. Do not include private information.</div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="rCancel">Cancel</button>
+      <button class="btn btn--primary" id="rSubmit">Submit report</button>
+    </div>
+  `);
+
+  const close = () => closeModal();
+  $("#rClose").addEventListener("click", close);
+  $("#rCancel").addEventListener("click", close);
+
+  $("#rSubmit").addEventListener("click", () => {
+    const reason = $("#rReason").value;
+    const details = $("#rText").value.trim();
+
+    DB.flags.push({
+      id: "f" + Math.random().toString(16).slice(2),
+      landlordId,
+      reviewId,
+      reason,
+      details,
+      createdAt: Date.now()
+    });
+    saveDB(DB);
+
+    closeModal();
+    alert("Report submitted. Thank you.");
+  });
+}
