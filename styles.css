@@ -622,3 +622,62 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 .starBtn.isOn .starGlyph{
   color: rgba(20,14,10,.98); /* filled = your primary ink */
 }
+/* ===== Star Picker: horizontal + gold fill ===== */
+.starPicker{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:nowrap;
+  justify-content:flex-start;
+}
+
+.starBtn{
+  width:44px;
+  height:44px;
+  border-radius:999px;
+  border:1px solid rgba(20,16,12,.14);
+  background: rgba(255,255,255,.78);
+  cursor:pointer;
+  position:relative;
+  display:grid;
+  place-items:center;
+  padding:0;
+  overflow:hidden;
+}
+
+.starBtn:hover{ background: rgba(255,255,255,.92); }
+
+.starBase,
+.starFill{
+  position:absolute;
+  font-size:18px;
+  line-height:1;
+  user-select:none;
+}
+
+.starBase{ color: rgba(20,16,12,.22); }  /* gray */
+.starFill{
+  color:#b88900;            /* gold */
+  width: var(--fill, 0%);   /* 0/50/100 */
+  overflow:hidden;
+  white-space:nowrap;
+  left:50%;
+  transform: translateX(-50%);
+}
+
+/* click targets for half stars */
+.hit{
+  position:absolute;
+  top:0;bottom:0;
+  width:50%;
+  z-index:3;
+}
+.hitL{left:0}
+.hitR{right:0}
+
+.starValue{
+  margin-left:8px;
+  font-weight:900;
+  font-size:13px;
+  color: rgba(21,17,14,.72);
+}
