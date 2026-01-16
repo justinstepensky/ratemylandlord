@@ -1151,17 +1151,26 @@ function bindStarPicker(defaultValue = 5) {
   });
 }
 
-/* Review modal (NOW stars + halves) */
+/* Review modal (Interactive stars + halves UI, stores 1..5 int) */
 function openReviewModal(landlordId) {
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">Leave a review</div>
       <button class="iconBtn" id="mClose" aria-label="Close">×</button>
     </div>
+
     <div class="modalBody">
       <div class="field">
         <label>Rating</label>
+
+        <!-- this gets updated by the star picker -->
+        <input type="hidden" id="mStars" value="5" />
+
         ${starPickerHTML(5)}
+
+        <div class="tiny" style="margin-top:8px;">
+          Click a star (half-steps supported). Stored as 1–5.
+        </div>
       </div>
 
       <div class="field">
@@ -1170,22 +1179,26 @@ function openReviewModal(landlordId) {
         <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
+
     <div class="modalFoot">
       <button class="btn" id="mCancel">Cancel</button>
       <button class="btn btn--primary" id="mSubmit">Submit</button>
     </div>
   `);
 
+  // close
   $("#mClose").addEventListener("click", closeModal);
   $("#mCancel").addEventListener("click", closeModal);
 
-  // init star picker
+  // init star picker UI (must set #mStars and color the stars)
+  // expects your existing starPickerHTML() to render a container with id="mStarPicker"
+  // and clickable elements with data-star values.
   bindStarPicker(5);
 
   $("#mSubmit").addEventListener("click", () => {
-    // store as integer 1..5 (your DB is integer-based)
-    const raw = Number($("#mStars").value); // 0.5 increments
-    const starsInt = Math.max(1, Math.min(5, Math.round(raw))); // round halves to nearest whole for storage
+    // star picker stores 0.5 increments in #mStars; DB stores integer 1..5
+    const raw = Number($("#mStars").value); // e.g. 4.5
+    const starsInt = Math.max(1, Math.min(5, Math.round(raw))); // 4.5 -> 5, 4.4 -> 4
     const text = $("#mText").value.trim();
 
     if (!text || text.length < 20) {
@@ -1203,11 +1216,6 @@ function openReviewModal(landlordId) {
     saveDB(DB);
 
     closeModal();
-    // re-render landlord page
     route();
   });
 }
-
-/* -----------------------------
-   Boot
------------------------------- */
