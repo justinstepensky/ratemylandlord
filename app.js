@@ -1,231 +1,279 @@
-/* CASA — single-file SPA (GitHub Pages friendly)
-   - No reviewer accounts
-   - Landlord Portal demo auth
-   - Leaflet map with pins (OSM)
-   - Borough filter
-*/
+/* =========================
+   casa — app.js (SPA)
+   ========================= */
 
-const $ = (s) => document.querySelector(s);
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 
-const STORAGE = {
+const LS_KEYS = {
   landlords: "casa_landlords_v1",
-  reviews: "casa_reviews_v1",
-  editTokens: "casa_edit_tokens_v1"
+  reviews: "casa_reviews_v1"
 };
 
-const BOROUGHS = ["All boroughs","Manhattan","Brooklyn","Queens","Bronx","Staten Island"];
+const BOROUGHS = ["All boroughs", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
 
-const BOROUGH_CENTERS = {
-  Manhattan: [40.7831, -73.9712],
-  Brooklyn: [40.6782, -73.9442],
-  Queens: [40.7282, -73.7949],
-  Bronx: [40.8448, -73.8648],
-  "Staten Island": [40.5795, -74.1502],
-  NYC: [40.730610, -73.935242]
-};
+function uid(prefix="id"){
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
 
-let homeMap = null;
-let searchMap = null;
+function nowISO(){ return new Date().toISOString(); }
 
 function toast(msg){
   const el = $("#toast");
-  if (!el) return alert(msg);
+  if (!el) return;
   el.textContent = msg;
   el.style.display = "block";
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => (el.style.display = "none"), 2400);
+  toast._t = setTimeout(() => (el.style.display = "none"), 2200);
 }
 
-function esc(s){
-  return String(s ?? "").replace(/[&<>"']/g, (m) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[m]));
-}
-
-function uid(prefix="id"){
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-}
-
-function loadJSON(key, fallback){
-  try{
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  }catch{
-    return fallback;
-  }
-}
-
-function saveJSON(key, val){
-  localStorage.setItem(key, JSON.stringify(val));
-}
-
-/* ---------- Demo data bootstrap ---------- */
+/* ---------- Seed data ---------- */
 function seedIfEmpty(){
   const landlords = loadLandlords();
   const reviews = loadReviews();
-  if (landlords.length) return;
+  if (landlords.length || reviews.length) return;
 
-  const seedLandlords = [
+  const L = [
     {
       id: uid("ll"),
       name: "Northside Properties",
-      entity: "Northside Properties LLC",
+      entity: "",
       address: "123 Main St",
-      unit: "4B",
+      unit: "",
       city: "Brooklyn",
       state: "NY",
       borough: "Brooklyn",
-      lat: 40.7146,
+      lat: 40.7163,
       lng: -73.9568,
-      createdAt: "2026-01-05"
+      createdAt: nowISO()
     },
     {
       id: uid("ll"),
       name: "Park Ave Management",
-      entity: "Park Ave Management",
+      entity: "Park Ave Management LLC",
       address: "22 Park Ave",
       unit: "",
       city: "New York",
       state: "NY",
       borough: "Manhattan",
-      lat: 40.7406,
-      lng: -73.9846,
-      createdAt: "2025-12-18"
+      lat: 40.7412,
+      lng: -73.9862,
+      createdAt: nowISO()
     },
     {
       id: uid("ll"),
       name: "Elmhurst Holdings",
-      entity: "Elmhurst Holdings",
+      entity: "",
       address: "86-12 Broadway",
       unit: "",
-      city: "Elmhurst",
+      city: "Queens",
       state: "NY",
       borough: "Queens",
-      lat: 40.7420,
-      lng: -73.8820,
-      createdAt: "2025-11-30"
+      lat: 40.7429,
+      lng: -73.8836,
+      createdAt: nowISO()
     }
   ];
 
-  const seedReviews = [
+  const R = [
     {
       id: uid("rv"),
-      landlordId: seedLandlords[0].id,
-      createdAt: "2026-01-05",
-      borough: "Brooklyn",
-      overall: 4,
-      categories: { repairs: 5, communication: 4, cleanliness: 4, noise: 3, fairness: 4 },
-      text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently."
+      landlordId: L[0].id,
+      rating: 4,
+      text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
+      createdAt: "2026-01-05T12:00:00.000Z"
     },
     {
       id: uid("rv"),
-      landlordId: seedLandlords[1].id,
-      createdAt: "2025-12-18",
-      borough: "Manhattan",
-      overall: 3,
-      categories: { repairs: 3, communication: 2, cleanliness: 4, noise: 4, fairness: 3 },
-      text: "Great location, but communication was slow. Security deposit itemization took weeks."
+      landlordId: L[1].id,
+      rating: 3,
+      text: "Great location, but communication was slow. Security deposit itemization took weeks.",
+      createdAt: "2025-12-18T12:00:00.000Z"
     },
     {
       id: uid("rv"),
-      landlordId: seedLandlords[2].id,
-      createdAt: "2025-11-30",
-      borough: "Queens",
-      overall: 5,
-      categories: { repairs: 5, communication: 5, cleanliness: 4, noise: 4, fairness: 5 },
-      text: "Responsive management. Clear lease terms and quick repairs."
+      landlordId: L[2].id,
+      rating: 5,
+      text: "Responsive management. Clear lease terms and quick repairs.",
+      createdAt: "2025-11-30T12:00:00.000Z"
     }
   ];
 
-  saveJSON(STORAGE.landlords, seedLandlords);
-  saveJSON(STORAGE.reviews, seedReviews);
-  saveJSON(STORAGE.editTokens, {});
+  saveLandlords(L);
+  saveReviews(R);
 }
 
-function loadLandlords(){ return loadJSON(STORAGE.landlords, []); }
-function saveLandlords(v){ saveJSON(STORAGE.landlords, v); }
-function loadReviews(){ return loadJSON(STORAGE.reviews, []); }
-function saveReviews(v){ saveJSON(STORAGE.reviews, v); }
-function loadTokens(){ return loadJSON(STORAGE.editTokens, {}); }
-function saveTokens(v){ saveJSON(STORAGE.editTokens, v); }
+/* ---------- Storage ---------- */
+function loadLandlords(){
+  try { return JSON.parse(localStorage.getItem(LS_KEYS.landlords) || "[]"); }
+  catch { return []; }
+}
+function saveLandlords(list){
+  localStorage.setItem(LS_KEYS.landlords, JSON.stringify(list));
+}
+function loadReviews(){
+  try { return JSON.parse(localStorage.getItem(LS_KEYS.reviews) || "[]"); }
+  catch { return []; }
+}
+function saveReviews(list){
+  localStorage.setItem(LS_KEYS.reviews, JSON.stringify(list));
+}
 
-/* ---------- Ratings helpers ---------- */
-function avgRatingForLandlord(landlordId){
+/* ---------- Stars ---------- */
+function starSVG(on=true){
+  const fill = on ? "var(--starOn)" : "var(--starOff)";
+  return `
+    <svg class="star" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="${fill}" d="M12 17.27l-5.18 3.05 1.39-5.81L3.5 9.24l6-.51L12 3.25l2.5 5.48 6 .51-4.71 5.27 1.39 5.81z"/>
+    </svg>
+  `;
+}
+function starsRow(rating){
+  const n = Math.max(0, Math.min(5, Number(rating || 0)));
+  return `
+    <div class="starRow">
+      <div class="starStars">
+        ${[1,2,3,4,5].map(i => starSVG(i <= n)).join("")}
+      </div>
+      <div class="scoreText">${n ? `${n}/5` : "No ratings"}</div>
+    </div>
+  `;
+}
+function avgRatingFor(landlordId){
   const reviews = loadReviews().filter(r => r.landlordId === landlordId);
-  if (!reviews.length) return null;
-  const sum = reviews.reduce((a,r)=>a+(Number(r.overall)||0),0);
-  return sum / reviews.length;
+  if (!reviews.length) return 0;
+  const sum = reviews.reduce((a,r)=>a + Number(r.rating||0), 0);
+  return Math.round((sum / reviews.length) * 10) / 10;
 }
 
-function starsRow(val){
-  const n = Math.round(val || 0);
-  const out = [];
-  for (let i=1;i<=5;i++){
-    out.push(`<svg class="star" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="${i<=n ? "var(--starOn)" : "var(--starOff)"}" d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
-    </svg>`);
-  }
-  return `<div class="starStars">${out.join("")}</div>`;
-}
-
-/* ---------- URL helpers ---------- */
+/* ---------- Routing ---------- */
 function parseHash(){
-  const raw = location.hash || "#/";
-  const [path, qs] = raw.replace(/^#/, "").split("?");
-  const params = new URLSearchParams(qs || "");
+  const raw = (location.hash || "#/").slice(1);
+  const [path, queryString] = raw.split("?");
+  const params = new URLSearchParams(queryString || "");
   return { path: path || "/", params };
 }
-function nav(to){ location.hash = to; }
 
-/* ---------- Maps ---------- */
-function destroyMap(which){
-  try{
-    if (which === "home" && homeMap){
-      homeMap.remove(); homeMap = null;
-    }
-    if (which === "search" && searchMap){
-      searchMap.remove(); searchMap = null;
-    }
-  }catch{}
+function route(){
+  seedIfEmpty();
+  const { path, params } = parseHash();
+
+  // close menu on route
+  closeDrawer();
+
+  if (path === "/") return renderHome();
+  if (path === "/search") return renderSearch(params);
+  if (path === "/add") return renderAdd();
+  if (path === "/how") return renderHow();
+  if (path === "/trust") return renderTrust();
+  if (path === "/portal") return renderPortal();
+  if (path === "/landlord") return renderLandlord(params.get("id"));
+  return renderHome();
 }
 
-function initLeafletMap(containerId, which, opts={}){
-  const el = document.getElementById(containerId);
-  if (!el) return null;
-
-  destroyMap(which);
-
-  const center = opts.center || BOROUGH_CENTERS.NYC;
-  const zoom = opts.zoom || 11;
-
-  const map = L.map(containerId, { zoomControl: true }).setView(center, zoom);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-
-  if (which === "home") homeMap = map;
-  if (which === "search") searchMap = map;
-
-  return map;
+/* ---------- Mobile menu ---------- */
+function openDrawer(){
+  const drawer = $("#navDrawer");
+  const btn = $("#menuBtn");
+  if (!drawer || !btn) return;
+  drawer.classList.add("open");
+  drawer.setAttribute("aria-hidden","false");
+  btn.setAttribute("aria-expanded","true");
+}
+function closeDrawer(){
+  const drawer = $("#navDrawer");
+  const btn = $("#menuBtn");
+  if (!drawer || !btn) return;
+  drawer.classList.remove("open");
+  drawer.setAttribute("aria-hidden","true");
+  btn.setAttribute("aria-expanded","false");
+}
+function toggleDrawer(){
+  const drawer = $("#navDrawer");
+  if (!drawer) return;
+  drawer.classList.contains("open") ? closeDrawer() : openDrawer();
 }
 
-function addPins(map, landlords, onClick){
-  landlords.forEach(l => {
-    if (typeof l.lat !== "number" || typeof l.lng !== "number") return;
-    const marker = L.marker([l.lat, l.lng]).addTo(map);
-    marker.on("click", () => onClick?.(l));
-    const rating = avgRatingForLandlord(l.id);
-    const rText = rating ? `${rating.toFixed(1)}/5` : "No ratings";
-    marker.bindPopup(`<b>${esc(l.name)}</b><br/>${esc(l.borough || "")}<br/>${esc(rText)}`);
+function wireMenu(){
+  const btn = $("#menuBtn");
+  const drawer = $("#navDrawer");
+  if (!btn || !drawer) return;
+
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleDrawer();
+  });
+
+  // close on link click
+  drawer.addEventListener("click", (e) => {
+    const a = e.target.closest("a");
+    if (a) closeDrawer();
+  });
+
+  // close on outside click
+  document.addEventListener("click", (e) => {
+    const isOpen = drawer.classList.contains("open");
+    if (!isOpen) return;
+    const withinNav = e.target.closest(".nav");
+    if (!withinNav) closeDrawer();
+  });
+
+  // escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeDrawer();
   });
 }
 
-function setMapView(map, lat, lng, zoom=14){
-  if (!map) return;
-  map.setView([lat, lng], zoom, { animate: true });
+/* ---------- Modal ---------- */
+function modalOpen(title, bodyHTML, footHTML){
+  $("#modalTitle").textContent = title;
+  $("#modalBody").innerHTML = bodyHTML || "";
+  $("#modalFoot").innerHTML = footHTML || "";
+  $("#modalBackdrop").classList.add("open");
+  $("#modalBackdrop").setAttribute("aria-hidden","false");
+}
+function modalClose(){
+  $("#modalBackdrop").classList.remove("open");
+  $("#modalBackdrop").setAttribute("aria-hidden","true");
+}
+function wireModal(){
+  $("#modalClose")?.addEventListener("click", modalClose);
+  $("#modalBackdrop")?.addEventListener("click", (e) => {
+    if (e.target.id === "modalBackdrop") modalClose();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") modalClose();
+  });
 }
 
-/* ---------- UI: Home ---------- */
+/* ---------- Maps (Leaflet) ---------- */
+let _leaflet = { home: null, search: null, add: null, profile: null };
+
+function initMap(el, { center=[40.73, -73.98], zoom=11 } = {}){
+  const map = L.map(el, { zoomControl: true, scrollWheelZoom: true }).setView(center, zoom);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  return map;
+}
+
+function setMarkers(map, landlords, onClick){
+  const group = L.layerGroup().addTo(map);
+  landlords.forEach(l => {
+    if (typeof l.lat !== "number" || typeof l.lng !== "number") return;
+    const m = L.marker([l.lat, l.lng]).addTo(group);
+    m.on("click", () => onClick?.(l));
+  });
+  return group;
+}
+
+function flyTo(map, l){
+  if (!map || !l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
+  map.flyTo([l.lat, l.lng], Math.max(map.getZoom(), 13), { duration: 0.6 });
+}
+
+/* ---------- Home ---------- */
 function renderHome(){
   const app = $("#app");
   if (!app) return;
@@ -233,13 +281,22 @@ function renderHome(){
   const landlords = loadLandlords();
   const reviews = loadReviews()
     .slice()
-    .sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))
-    .slice(0, 12);
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const highlights = reviews
+    .slice(0, 8)
+    .map(r => {
+      const l = landlords.find(x => x.id === r.landlordId);
+      if (!l) return null;
+      const when = new Date(r.createdAt);
+      const date = `${when.getMonth()+1}/${when.getDate()}/${when.getFullYear()}`;
+      return { l, r, date };
+    })
+    .filter(Boolean);
 
   app.innerHTML = `
     <section class="section">
       <div class="wrap">
-
         <div class="card">
           <div class="pad hero">
             <div class="kicker">CASA</div>
@@ -249,64 +306,98 @@ function renderHome(){
             <div class="heroSearch">
               <div class="heroSearch__bar">
                 <input id="homeQ" placeholder="Search landlord name, management company, or address..." />
-                <div class="suggest" id="homeSuggest"></div>
               </div>
-              <button class="btn btn--primary" id="homeSearchBtn">Search</button>
+              <button class="btn btn--primary" id="homeSearch">Search</button>
               <a class="btn btn--outline" href="#/add">Add a landlord</a>
             </div>
 
             <div class="trustLine">No account required to review. Verified landlords can respond.</div>
 
-            <div class="cards3" style="margin-top:10px;">
-              <div class="xCard" data-open="search">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">⌕</span> Search
-                  </div>
+            <div class="tiles" style="margin-top:10px;">
+              <div class="tile" id="tileSearch" role="button" tabindex="0">
+                <div class="tile__top">
+                  <div class="tile__icon">⌕</div>
+                  <div>Search</div>
                 </div>
-                <div class="xCard__body">Search by name, entity or address</div>
               </div>
 
-              <div class="xCard" data-open="review">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">★</span> Review
-                  </div>
+              <div class="tile" id="tileReview" role="button" tabindex="0">
+                <div class="tile__top">
+                  <div class="tile__icon">★</div>
+                  <div>Review</div>
                 </div>
-                <div class="xCard__body">Leave a rating based on select categories</div>
               </div>
 
-              <div class="xCard" data-open="rent" style="opacity:.92; cursor:default;">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">⌂</span> Rent
-                  </div>
+              <div class="tile" aria-disabled="true">
+                <div class="tile__top">
+                  <div class="tile__icon">⌂</div>
+                  <div>Rent</div>
                 </div>
-                <div class="xCard__body"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="halfRow">
-          <!-- Recent highlights frame -->
-          <div class="card highlightsFrame">
+        <div style="height:14px;"></div>
+
+        <div class="split">
+          <!-- Highlights -->
+          <div class="card">
             <div class="hd">
               <div>
-                <div class="kicker">Featured reviews</div>
+                <div class="kicker">Featured Reviews</div>
                 <h2>Recent highlights</h2>
                 <div class="muted">Browse ratings and landlord profiles.</div>
               </div>
               <a class="btn btn--ghost" href="#/search">Browse all</a>
             </div>
-            <div class="bd" style="padding-top:8px;">
-              <div class="highlightsViewport">
-                <div class="highlightsTrack" id="highlightsTrack"></div>
+
+            <div class="bd">
+              <div class="frame">
+                <div class="frame__fill">
+                  ${highlights.length ? `
+                    <div class="carousel" id="hlCarousel">
+                      <div class="carousel__track" id="hlTrack">
+                        ${highlights.map((h) => `
+                          <div class="carousel__item">
+                            <div>
+                              <div style="display:flex; justify-content:space-between; gap:10px;">
+                                <div>
+                                  <div class="rowTitle" style="margin:0;">${escapeHTML(h.l.name)}</div>
+                                  <div class="rowSub">${escapeHTML(h.l.address)} • ${escapeHTML(h.l.city)}, ${escapeHTML(h.l.state)}</div>
+                                </div>
+                                <div class="tiny">${h.date}</div>
+                              </div>
+                              ${starsRow(h.r.rating)}
+                              <div class="rowSub" style="margin-top:8px;">${escapeHTML(h.r.text)}</div>
+                              <div class="tiny" style="margin-top:10px;">${escapeHTML(h.l.borough || "")}</div>
+                            </div>
+
+                            <div style="display:flex; justify-content:flex-end;">
+                              <a class="btn btn--outline" href="#/landlord?id=${encodeURIComponent(h.l.id)}">View</a>
+                            </div>
+                          </div>
+                        `).join("")}
+                      </div>
+
+                      <div class="carouselDots" id="hlDots">
+                        ${highlights.map((_, i) => `<button class="dot ${i===0?"active":""}" data-i="${i}" aria-label="Go to ${i+1}"></button>`).join("")}
+                      </div>
+                    </div>
+                  ` : `
+                    <div class="rowCard" style="height:100%; align-items:center; justify-content:center;">
+                      <div style="text-align:center;">
+                        <div class="rowTitle">No highlights yet</div>
+                        <div class="rowSub">Be the first to post a review.</div>
+                      </div>
+                    </div>
+                  `}
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Map frame -->
+          <!-- Map -->
           <div class="card">
             <div class="hd">
               <div>
@@ -316,148 +407,124 @@ function renderHome(){
               </div>
               <a class="btn btn--ghost" href="#/search">Open search</a>
             </div>
+
             <div class="bd">
-              <div class="mapFrame">
-                <div id="homeMap" class="mapBoxTall"></div>
+              <div class="frame">
+                <div class="frame__fill">
+                  <div class="mapBox" id="homeMap"></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="footer wrap">
-          <div class="tiny">© ${new Date().getFullYear()} casa</div>
-          <div style="display:flex; gap:14px; flex-wrap:wrap;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
-          </div>
-        </div>
-
+        <div class="tiny" style="margin-top:18px;">© 2026 casa</div>
       </div>
     </section>
   `;
 
-  // Accordion behavior for tiles
-  document.querySelectorAll(".xCard").forEach(card => {
-    card.addEventListener("click", () => {
-      const key = card.getAttribute("data-open");
-      if (key === "rent") return;
-      // toggle only clicked
-      document.querySelectorAll(".xCard").forEach(c => c.classList.remove("open"));
-      card.classList.add("open");
-    });
+  // hero search
+  $("#homeSearch")?.addEventListener("click", () => {
+    const q = ($("#homeQ")?.value || "").trim();
+    location.hash = `#/search?q=${encodeURIComponent(q)}`;
+  });
+  $("#homeQ")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#homeSearch")?.click();
   });
 
-  // Search actions
-  const qEl = $("#homeQ");
-  const sEl = $("#homeSuggest");
-  const btn = $("#homeSearchBtn");
-
-  function buildSuggest(q){
-    const qq = (q||"").trim().toLowerCase();
-    if (!qq){
-      sEl.classList.remove("open");
-      sEl.innerHTML = "";
-      return;
-    }
-    const hits = landlords
-      .filter(l =>
-        (l.name||"").toLowerCase().includes(qq) ||
-        (l.entity||"").toLowerCase().includes(qq) ||
-        (fullAddress(l)||"").toLowerCase().includes(qq)
-      )
-      .slice(0,5);
-
-    if (!hits.length){
-      sEl.classList.remove("open");
-      sEl.innerHTML = "";
-      return;
-    }
-    sEl.innerHTML = hits.map(l => `
-      <button type="button" data-id="${l.id}">
-        ${esc(l.name)} <span class="tiny">• ${esc(l.borough||"")}</span>
-      </button>
-    `).join("");
-    sEl.classList.add("open");
-
-    sEl.querySelectorAll("button").forEach(b => {
-      b.addEventListener("click", () => nav(`#/landlord?id=${b.dataset.id}`));
-    });
-  }
-
-  qEl?.addEventListener("input", e => buildSuggest(e.target.value));
-  qEl?.addEventListener("focus", e => buildSuggest(e.target.value));
-  document.addEventListener("click", (e) => {
-    if (!sEl.contains(e.target) && e.target !== qEl) sEl.classList.remove("open");
+  // tiles
+  $("#tileSearch")?.addEventListener("click", () => location.hash = "#/search");
+  $("#tileReview")?.addEventListener("click", () => {
+    // take them to search so they can pick landlord to review
+    location.hash = "#/search";
+    toast("Pick a landlord to leave a review.");
   });
 
-  btn?.addEventListener("click", () => {
-    const q = (qEl?.value || "").trim();
-    nav(`#/search?q=${encodeURIComponent(q)}&b=${encodeURIComponent("All boroughs")}`);
-  });
-
-  qEl?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter"){
-      e.preventDefault();
-      btn?.click();
-    }
-  });
-
-  // Fill highlights carousel
-  const track = $("#highlightsTrack");
-  if (track){
-    track.innerHTML = reviews.map(r => smallReviewCard(r)).join("");
-  }
-
-  // Init map + pins
+  // map
   setTimeout(() => {
-    const map = initLeafletMap("homeMap", "home", { center: BOROUGH_CENTERS.NYC, zoom: 11 });
-    if (!map) return;
+    const el = $("#homeMap");
+    if (!el) return;
 
-    addPins(map, landlords, (l) => nav(`#/landlord?id=${l.id}`));
+    // destroy old
+    if (_leaflet.home) { try { _leaflet.home.remove(); } catch {} _leaflet.home = null; }
+
+    _leaflet.home = initMap(el, { center:[40.73,-73.98], zoom:11 });
+    setMarkers(_leaflet.home, loadLandlords(), (l) => {
+      location.hash = `#/landlord?id=${encodeURIComponent(l.id)}`;
+    });
   }, 0);
+
+  // carousel autoplay + dots
+  setupHighlightsCarousel();
 }
 
-function fullAddress(l){
-  const parts = [
-    l.address,
-    l.unit ? `Unit ${l.unit}` : "",
-    l.city,
-    l.state
-  ].filter(Boolean);
-  return parts.join(", ");
+function setupHighlightsCarousel(){
+  const track = $("#hlTrack");
+  const dots = $("#hlDots");
+  if (!track || !dots) return;
+
+  const items = $$(".carousel__item", track);
+  if (!items.length) return;
+
+  let idx = 0;
+  let timer = null;
+
+  function setActive(i){
+    idx = Math.max(0, Math.min(items.length-1, i));
+    const left = items[idx].offsetLeft;
+    track.scrollTo({ left, behavior: "smooth" });
+    $$(".dot", dots).forEach(d => d.classList.remove("active"));
+    $(`.dot[data-i="${idx}"]`, dots)?.classList.add("active");
+  }
+
+  dots.addEventListener("click", (e) => {
+    const btn = e.target.closest(".dot");
+    if (!btn) return;
+    const i = Number(btn.dataset.i || 0);
+    setActive(i);
+    restart();
+  });
+
+  // update active on manual scroll
+  track.addEventListener("scroll", () => {
+    const s = track.scrollLeft;
+    // pick nearest
+    let best = 0;
+    let bestDist = Infinity;
+    items.forEach((it, i) => {
+      const dist = Math.abs(it.offsetLeft - s);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    idx = best;
+    $$(".dot", dots).forEach(d => d.classList.remove("active"));
+    $(`.dot[data-i="${idx}"]`, dots)?.classList.add("active");
+  }, { passive:true });
+
+  function start(){
+    stop();
+    timer = setInterval(() => {
+      const next = (idx + 1) % items.length;
+      setActive(next);
+    }, 4200);
+  }
+  function stop(){
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+  function restart(){
+    start();
+  }
+
+  // pause on hover/touch
+  track.addEventListener("mouseenter", stop);
+  track.addEventListener("mouseleave", start);
+  track.addEventListener("touchstart", stop, { passive:true });
+  track.addEventListener("touchend", start);
+
+  start();
 }
 
-function smallReviewCard(r){
-  const l = loadLandlords().find(x => x.id === r.landlordId);
-  const date = r.createdAt ? new Date(r.createdAt) : null;
-  const dateStr = date && !isNaN(date) ? `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}` : "";
-
-  return `
-    <div class="smallCard">
-      <div class="smallCard__top">
-        <div>
-          <div class="smallCard__name">${esc(l?.name || "Unknown")}</div>
-          <div class="smallCard__addr">${esc(fullAddress(l || {}))}${l?.borough ? ` • ${esc(l.borough)}` : ""}</div>
-          <div class="starRow">
-            ${starsRow(r.overall)}
-            <div class="scoreText">${esc(r.overall)}/5</div>
-          </div>
-        </div>
-        <div class="smallCard__time">${esc(dateStr)}</div>
-      </div>
-
-      <div class="smallCard__text">${esc(r.text || "").slice(0, 140)}${(r.text||"").length>140 ? "…" : ""}</div>
-
-      <div class="smallCard__foot">
-        <div class="tiny">${esc(r.borough || l?.borough || "")}</div>
-        <a class="btn btn--outline" href="#/landlord?id=${encodeURIComponent(r.landlordId)}">View</a>
-      </div>
-    </div>
-  `;
-}
-
-/* ---------- Search (MAP ON TOP) ---------- */
+/* ---------- Search (map on top) ---------- */
 function renderSearch(params){
   const app = $("#app");
   if (!app) return;
@@ -467,10 +534,10 @@ function renderSearch(params){
   const b = (params.get("b") || "All boroughs").trim();
 
   const filtered = landlords.filter(l => {
-    const matchB = (b === "All boroughs") ? true : (l.borough === b);
-    const hay = `${l.name||""} ${l.entity||""} ${fullAddress(l)||""}`.toLowerCase();
+    const hay = `${l.name} ${l.entity||""} ${l.address||""} ${l.city||""} ${l.state||""}`.toLowerCase();
     const matchQ = q ? hay.includes(q.toLowerCase()) : true;
-    return matchB && matchQ;
+    const matchB = (b === "All boroughs") ? true : ((l.borough || "") === b);
+    return matchQ && matchB;
   });
 
   app.innerHTML = `
@@ -487,227 +554,96 @@ function renderSearch(params){
           </div>
 
           <div class="bd">
-
-            <div class="heroSearch" style="justify-content:flex-start; margin-top:2px;">
-              <div class="heroSearch__bar" style="max-width: 720px;">
-                <input id="sq" value="${esc(q)}" placeholder="Search landlord name, management company, or address..." />
+            <div class="heroSearch" style="justify-content:flex-start;">
+              <div class="heroSearch__bar" style="flex: 1.2;">
+                <input id="sq" value="${escapeAttr(q)}" placeholder="Search landlord name, management company, or address..." />
               </div>
 
-              <div class="field" style="min-width: 220px; margin:0;">
-                <label class="tiny" style="display:block; margin-left:6px;">Borough</label>
+              <div class="field" style="margin:0; min-width:240px;">
+                <label style="margin:0 0 6px; display:block;">Borough</label>
                 <select id="sb">
-                  ${BOROUGHS.map(x => `<option ${x===b ? "selected":""}>${esc(x)}</option>`).join("")}
+                  ${BOROUGHS.map(x => `<option ${x===b?"selected":""}>${x}</option>`).join("")}
                 </select>
               </div>
 
-              <button class="btn btn--primary" id="sgo">Search</button>
+              <button class="btn btn--primary" id="sGo">Search</button>
             </div>
+
+            <div style="height:12px;"></div>
 
             <!-- MAP ON TOP -->
-            <div style="margin-top:14px;">
-              <div class="mapFrame">
-                <div id="searchMap" class="mapBoxTall"></div>
+            <div class="mapBox" id="searchMap" style="height:340px;"></div>
+
+            <div style="height:12px;"></div>
+
+            ${filtered.length ? filtered.map(l => {
+              const avg = avgRatingFor(l.id);
+              const boro = l.borough || "";
+              return `
+                <div class="rowCard">
+                  <div style="flex:1;">
+                    <div style="display:flex; justify-content:space-between; gap:10px;">
+                      <div>
+                        <div class="rowTitle">${escapeHTML(l.name)}</div>
+                        <div class="rowSub">${escapeHTML(l.address)} • ${escapeHTML(l.city)}, ${escapeHTML(l.state)}</div>
+                      </div>
+                      <div class="tiny">${boro ? escapeHTML(boro) : ""}</div>
+                    </div>
+                    ${starsRow(avg)}
+                  </div>
+
+                  <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
+                    <a class="btn btn--outline" href="#/landlord?id=${encodeURIComponent(l.id)}">View</a>
+                    <button class="btn btn--ghost" data-center="${escapeAttr(l.id)}">Center on map</button>
+                  </div>
+                </div>
+              `;
+            }).join("") : `
+              <div class="rowCard" style="justify-content:center;">
+                <div style="text-align:center;">
+                  <div class="rowTitle">No matches</div>
+                  <div class="rowSub">Try a different search or borough.</div>
+                </div>
               </div>
-            </div>
-
-            <!-- RESULTS BELOW -->
-            <div id="results" style="margin-top:14px;">
-              ${filtered.length ? filtered.map(l => landlordRow(l, true)).join("") : `
-                <div class="box">No matches. Try a different name or borough.</div>
-              `}
-            </div>
-
+            `}
           </div>
         </div>
       </div>
     </section>
   `;
 
-  // Search handlers
-  $("#sgo")?.addEventListener("click", () => {
-    const nq = ($("#sq").value || "").trim();
-    const nb = ($("#sb").value || "All boroughs").trim();
-    nav(`#/search?q=${encodeURIComponent(nq)}&b=${encodeURIComponent(nb)}`);
+  $("#sGo")?.addEventListener("click", () => {
+    const nq = ($("#sq")?.value || "").trim();
+    const nb = ($("#sb")?.value || "All boroughs").trim();
+    location.hash = `#/search?q=${encodeURIComponent(nq)}&b=${encodeURIComponent(nb)}`;
   });
   $("#sq")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter"){ e.preventDefault(); $("#sgo")?.click(); }
+    if (e.key === "Enter") $("#sGo")?.click();
   });
-  $("#sb")?.addEventListener("change", () => $("#sgo")?.click());
 
-  // Init map + pins
+  // map init
   setTimeout(() => {
-    const center = (b !== "All boroughs" && BOROUGH_CENTERS[b]) ? BOROUGH_CENTERS[b] : BOROUGH_CENTERS.NYC;
-    const map = initLeafletMap("searchMap", "search", { center, zoom: b==="All boroughs" ? 11 : 12 });
-    if (!map) return;
+    const el = $("#searchMap");
+    if (!el) return;
+    if (_leaflet.search) { try { _leaflet.search.remove(); } catch {} _leaflet.search = null; }
 
-    addPins(map, filtered, (l) => nav(`#/landlord?id=${l.id}`));
-
-    // Expose for center buttons
-    window.__searchCenter = (landlordId) => {
-      const l = loadLandlords().find(x => x.id === landlordId);
-      if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
-      setMapView(map, l.lat, l.lng, 14);
-    };
+    _leaflet.search = initMap(el, { center:[40.73,-73.98], zoom:10 });
+    setMarkers(_leaflet.search, filtered, (l) => {
+      location.hash = `#/landlord?id=${encodeURIComponent(l.id)}`;
+    });
   }, 0);
+
+  // center buttons
+  $$(".btn[data-center]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-center");
+      const l = loadLandlords().find(x => x.id === id);
+      flyTo(_leaflet.search, l);
+    });
+  });
 }
 
-function landlordRow(l, showCenter){
-  const rating = avgRatingForLandlord(l.id);
-  const rText = rating ? `${rating.toFixed(1)}/5` : "No ratings";
-  const date = l.createdAt ? new Date(l.createdAt) : null;
-  const dateStr = date && !isNaN(date) ? `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}` : "";
-
-  return `
-    <div class="rowCard">
-      <div style="flex:1; min-width:0;">
-        <div style="display:flex; justify-content:space-between; gap:10px;">
-          <div>
-            <div class="rowTitle">${esc(l.name)}</div>
-            <div class="rowSub">${esc(fullAddress(l))}${l.borough ? ` • ${esc(l.borough)}` : ""}</div>
-          </div>
-          <div class="tiny">${esc(dateStr)}</div>
-        </div>
-
-        <div class="starRow">
-          ${starsRow(rating || 0)}
-          <div class="scoreText">${esc(rText)}</div>
-        </div>
-
-        <div class="tagRow">
-          ${l.borough ? `<span class="tag">${esc(l.borough)}</span>` : ""}
-          ${l.entity ? `<span class="tag">${esc(l.entity)}</span>` : ""}
-        </div>
-      </div>
-
-      <div style="display:flex; flex-direction:column; gap:8px; justify-content:flex-end;">
-        <a class="btn btn--outline" href="#/landlord?id=${encodeURIComponent(l.id)}">View</a>
-        ${showCenter ? `<button class="btn btn--ghost" data-center="${esc(l.id)}">Center on map</button>` : ""}
-      </div>
-    </div>
-  `;
-}
-
-/* attach center buttons after any renderSearch */
-document.addEventListener("click", (e) => {
-  const btn = e.target?.closest?.("button[data-center]");
-  if (!btn) return;
-  const id = btn.getAttribute("data-center");
-  window.__searchCenter?.(id);
-});
-
-/* ---------- Landlord Profile ---------- */
-function renderLandlord(params){
-  const app = $("#app");
-  if (!app) return;
-
-  const id = params.get("id");
-  const landlords = loadLandlords();
-  const l = landlords.find(x => x.id === id);
-
-  if (!l){
-    app.innerHTML = `
-      <section class="section">
-        <div class="wrap">
-          <div class="card">
-            <div class="hd">
-              <div>
-                <div class="kicker">Not found</div>
-                <h2>Landlord not found</h2>
-                <div class="muted">Try searching again.</div>
-              </div>
-              <a class="btn btn--ghost" href="#/search">Search</a>
-            </div>
-          </div>
-        </div>
-      </section>
-    `;
-    return;
-  }
-
-  const reviews = loadReviews().filter(r => r.landlordId === l.id)
-    .slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
-
-  const rating = avgRatingForLandlord(l.id);
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Landlord</div>
-              <h2>${esc(l.name)}</h2>
-              <div class="muted">${esc(fullAddress(l))}${l.borough ? ` • ${esc(l.borough)}` : ""}</div>
-              <div class="starRow" style="margin-top:10px;">
-                ${starsRow(rating || 0)}
-                <div class="scoreText">${rating ? `${rating.toFixed(1)}/5` : "No ratings yet"}</div>
-              </div>
-            </div>
-
-            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
-              <a class="btn btn--ghost" href="#/search">Back</a>
-              <a class="btn btn--primary" href="#/review?landlordId=${encodeURIComponent(l.id)}">Rate this landlord</a>
-            </div>
-          </div>
-
-          <div class="bd">
-            <div class="mapFrame">
-              <div id="landlordMap" class="mapBox"></div>
-            </div>
-
-            <div style="margin-top:14px;">
-              <h2 style="font-size:22px; margin-bottom:8px;">Reviews</h2>
-              ${reviews.length ? reviews.map(r => reviewCard(r)).join("") : `
-                <div class="box">No reviews yet. Be the first to post a rating.</div>
-              `}
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-  `;
-
-  setTimeout(() => {
-    const center = (typeof l.lat==="number" && typeof l.lng==="number") ? [l.lat, l.lng] : BOROUGH_CENTERS.NYC;
-    const map = initLeafletMap("landlordMap", "search", { center, zoom: 14 }); // reuse slot safely
-    if (!map) return;
-    if (typeof l.lat==="number" && typeof l.lng==="number"){
-      L.marker([l.lat, l.lng]).addTo(map);
-      setMapView(map, l.lat, l.lng, 14);
-    }
-  }, 0);
-}
-
-function reviewCard(r){
-  const date = r.createdAt ? new Date(r.createdAt) : null;
-  const dateStr = date && !isNaN(date) ? `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()}` : "";
-
-  return `
-    <div class="smallCard" style="margin-top:12px;">
-      <div class="smallCard__top">
-        <div>
-          <div class="starRow">
-            ${starsRow(r.overall)}
-            <div class="scoreText">${esc(r.overall)}/5</div>
-          </div>
-        </div>
-        <div class="smallCard__time">${esc(dateStr)}</div>
-      </div>
-
-      <div class="tagRow">
-        ${Object.entries(r.categories || {}).map(([k,v]) => `<span class="tag">${esc(cap(k))}: ${esc(v)}/5</span>`).join("")}
-      </div>
-
-      <div class="smallCard__text">${esc(r.text || "")}</div>
-    </div>
-  `;
-}
-
-function cap(s){ return (s||"").slice(0,1).toUpperCase() + (s||"").slice(1); }
-
-/* ---------- Add Landlord (NO LAT/LNG, ADD FIRST, THEN RATE BUTTON ON PROFILE) ---------- */
+/* ---------- Add landlord (no borough field, no lat/lng inputs) ---------- */
 function renderAdd(){
   const app = $("#app");
   if (!app) return;
@@ -727,68 +663,50 @@ function renderAdd(){
 
           <div class="bd">
             <div class="split2">
-
               <div>
                 <div class="field">
                   <label>Landlord / Company name <span class="tiny">*</span></label>
-                  <input id="aname" placeholder="e.g., Park Ave Management"/>
+                  <input id="an" placeholder="e.g., Park Ave Management" />
                 </div>
 
                 <div class="field" style="margin-top:10px;">
                   <label>Entity (optional)</label>
-                  <input id="aentity" placeholder="e.g., Park Ave Management LLC"/>
+                  <input id="ae" placeholder="e.g., Park Ave Management LLC" />
                 </div>
 
                 <div class="split2" style="margin-top:10px;">
                   <div class="field">
                     <label>Address <span class="tiny">*</span></label>
-                    <input id="aaddr" placeholder="Street address"/>
+                    <input id="aa" placeholder="Street address" />
                   </div>
                   <div class="field">
                     <label>Unit (optional)</label>
-                    <input id="aunit" placeholder="Apt / Unit"/>
+                    <input id="au" placeholder="Apt / Unit" />
                   </div>
                 </div>
 
                 <div class="split2" style="margin-top:10px;">
                   <div class="field">
                     <label>City <span class="tiny">*</span></label>
-                    <input id="acity" placeholder="City"/>
+                    <input id="ac" placeholder="City" />
                   </div>
                   <div class="field">
                     <label>State <span class="tiny">*</span></label>
-                    <input id="astate" placeholder="NY"/>
+                    <input id="as" placeholder="NY" />
                   </div>
                 </div>
 
-                <div class="field" style="margin-top:10px;">
-                  <label>Borough</label>
-                  <select id="aboro">
-                    ${BOROUGHS.filter(x=>x!=="All boroughs").map(x=>`<option>${esc(x)}</option>`).join("")}
-                  </select>
-                  <div class="tiny" style="margin-top:6px;">Optional, but helps map placement.</div>
+                <button class="btn btn--primary btn--block" id="addBtn" style="margin-top:12px;">Add landlord</button>
+                <div class="tiny" style="margin-top:10px;">
+                  Tip: Click the map to drop a pin (optional). We won’t show coordinates in the form.
                 </div>
-
-                <button class="btn btn--primary btn--block" style="margin-top:12px;" id="addBtn">
-                  Add landlord
-                </button>
-
-                <div class="tiny" style="margin-top:10px;">After adding, you’ll be taken to the landlord page where you can rate them.</div>
               </div>
 
               <div>
                 <div class="kicker">Place the pin (optional)</div>
-                <div class="muted">Click the map to set a location. You won’t enter coordinates.</div>
-
-                <div class="mapFrame" style="margin-top:10px;">
-                  <div id="addMap" class="mapBox"></div>
-                </div>
-
-                <div class="tiny" style="margin-top:8px;">
-                  Tip: If you don’t pick a pin, we’ll place it near the borough center.
-                </div>
+                <div class="muted" style="margin-bottom:10px;">Click the map to set a location.</div>
+                <div class="mapBox" id="addMap" style="height:320px;"></div>
               </div>
-
             </div>
           </div>
         </div>
@@ -796,202 +714,82 @@ function renderAdd(){
     </section>
   `;
 
-  // map picker
-  let picked = null;
-
+  // map for pin
+  let pin = { lat: null, lng: null };
   setTimeout(() => {
-    const b = ($("#aboro")?.value || "Manhattan");
-    const center = BOROUGH_CENTERS[b] || BOROUGH_CENTERS.NYC;
-    const map = initLeafletMap("addMap", "search", { center, zoom: 12 });
-    if (!map) return;
+    const el = $("#addMap");
+    if (!el) return;
+
+    if (_leaflet.add) { try { _leaflet.add.remove(); } catch {} _leaflet.add = null; }
+    _leaflet.add = initMap(el, { center:[40.73,-73.98], zoom:10 });
 
     let marker = null;
-    map.on("click", (e) => {
-      picked = { lat: e.latlng.lat, lng: e.latlng.lng };
+    _leaflet.add.on("click", (e) => {
+      pin.lat = e.latlng.lat;
+      pin.lng = e.latlng.lng;
       if (marker) marker.remove();
-      marker = L.marker([picked.lat, picked.lng]).addTo(map);
-    });
-
-    $("#aboro")?.addEventListener("change", () => {
-      const nb = $("#aboro").value;
-      const c = BOROUGH_CENTERS[nb] || BOROUGH_CENTERS.NYC;
-      setMapView(map, c[0], c[1], 12);
+      marker = L.marker([pin.lat, pin.lng]).addTo(_leaflet.add);
+      toast("Pin added.");
     });
   }, 0);
 
   $("#addBtn")?.addEventListener("click", () => {
-    const name = ($("#aname").value || "").trim();
-    const entity = ($("#aentity").value || "").trim();
-    const address = ($("#aaddr").value || "").trim();
-    const unit = ($("#aunit").value || "").trim();
-    const city = ($("#acity").value || "").trim();
-    const state = ($("#astate").value || "").trim();
-    const borough = ($("#aboro").value || "").trim();
+    const name = ($("#an")?.value || "").trim();
+    const entity = ($("#ae")?.value || "").trim();
+    const address = ($("#aa")?.value || "").trim();
+    const unit = ($("#au")?.value || "").trim();
+    const city = ($("#ac")?.value || "").trim();
+    const state = ($("#as")?.value || "").trim();
 
-    // required: address, city, state
-    if (!name) return toast("Please enter a landlord/company name.");
-    if (!address) return toast("Address is required.");
-    if (!city) return toast("City is required.");
-    if (!state) return toast("State is required.");
-
-    const id = uid("ll");
-    let latlng = picked;
-
-    // if not picked, place near borough center with small offset
-    if (!latlng){
-      const c = BOROUGH_CENTERS[borough] || BOROUGH_CENTERS.NYC;
-      const jitter = () => (Math.random() - 0.5) * 0.03; // ~ small NYC shift
-      latlng = { lat: c[0] + jitter(), lng: c[1] + jitter() };
+    if (!name || !address || !city || !state){
+      toast("Please fill the required fields (name, address, city, state).");
+      return;
     }
 
-    const landlords = loadLandlords();
-    landlords.unshift({
-      id, name, entity, address, unit, city, state, borough,
-      lat: latlng.lat,
-      lng: latlng.lng,
-      createdAt: new Date().toISOString().slice(0,10)
-    });
-    saveLandlords(landlords);
+    const l = {
+      id: uid("ll"),
+      name,
+      entity,
+      address,
+      unit,
+      city,
+      state,
+      borough: "",               // no borough field on add page
+      lat: (typeof pin.lat === "number") ? pin.lat : null,
+      lng: (typeof pin.lng === "number") ? pin.lng : null,
+      createdAt: nowISO()
+    };
 
-    toast("Added. Nice.");
-    nav(`#/landlord?id=${encodeURIComponent(id)}`);
+    const list = loadLandlords();
+    list.unshift(l);
+    saveLandlords(list);
+
+    toast("Landlord added.");
+    location.hash = `#/landlord?id=${encodeURIComponent(l.id)}&new=1`;
   });
 }
 
-/* ---------- Review flow ---------- */
-function renderReview(params){
+/* ---------- Landlord profile ---------- */
+function renderLandlord(id){
   const app = $("#app");
   if (!app) return;
 
-  const landlordId = params.get("landlordId");
-  const l = loadLandlords().find(x => x.id === landlordId);
+  const landlords = loadLandlords();
+  const l = landlords.find(x => x.id === id);
   if (!l){
-    toast("Landlord not found.");
-    nav("#/search");
-    return;
-  }
-
-  const categories = [
-    ["repairs","Repairs"],
-    ["communication","Communication"],
-    ["cleanliness","Cleanliness"],
-    ["noise","Noise"],
-    ["fairness","Fairness"]
-  ];
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Review</div>
-              <h2>Rate ${esc(l.name)}</h2>
-              <div class="muted">${esc(fullAddress(l))}${l.borough ? ` • ${esc(l.borough)}` : ""}</div>
-            </div>
-            <a class="btn btn--ghost" href="#/landlord?id=${encodeURIComponent(l.id)}">Back</a>
-          </div>
-
-          <div class="bd">
-            <div class="card" style="box-shadow:none;">
-              <div class="pad">
-
-                <div class="field">
-                  <label>Overall rating</label>
-                  <select id="overall">
-                    ${[5,4,3,2,1].map(n=>`<option value="${n}">${n}</option>`).join("")}
-                  </select>
-                </div>
-
-                <div class="split2" style="margin-top:12px;">
-                  ${categories.map(([k,label]) => `
-                    <div class="field">
-                      <label>${esc(label)}</label>
-                      <select id="c_${esc(k)}">
-                        ${[5,4,3,2,1].map(n=>`<option value="${n}">${n}</option>`).join("")}
-                      </select>
-                    </div>
-                  `).join("")}
-                </div>
-
-                <div class="field" style="margin-top:12px;">
-                  <label>What happened?</label>
-                  <textarea id="text" placeholder="Keep it specific and useful. Avoid personal info."></textarea>
-                </div>
-
-                <button class="btn btn--primary btn--block" style="margin-top:12px;" id="post">
-                  Post review
-                </button>
-
-                <div class="tiny" style="margin-top:10px;">
-                  No account required. After posting, you’ll get an edit link (demo).
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-
-  $("#post")?.addEventListener("click", () => {
-    const overall = Number($("#overall").value || 0);
-    const text = ($("#text").value || "").trim();
-
-    if (!overall) return toast("Select an overall rating.");
-    if (!text) return toast("Please write a short review.");
-
-    const cats = {};
-    ["repairs","communication","cleanliness","noise","fairness"].forEach(k => {
-      cats[k] = Number($(`#c_${k}`).value || 0);
-    });
-
-    const reviews = loadReviews();
-    const id = uid("rv");
-    const createdAt = new Date().toISOString().slice(0,10);
-    reviews.unshift({
-      id, landlordId: l.id, createdAt,
-      borough: l.borough,
-      overall,
-      categories: cats,
-      text
-    });
-    saveReviews(reviews);
-
-    // demo edit token
-    const token = uid("edit");
-    const tokens = loadTokens();
-    tokens[token] = id;
-    saveTokens(tokens);
-
-    toast("Posted. Edit link copied (demo).");
-    try{
-      navigator.clipboard.writeText(`${location.origin}${location.pathname}#/edit?token=${encodeURIComponent(token)}`);
-    }catch{}
-
-    nav(`#/landlord?id=${encodeURIComponent(l.id)}`);
-  });
-}
-
-/* ---------- Edit review (demo) ---------- */
-function renderEdit(params){
-  const app = $("#app");
-  if (!app) return;
-
-  const token = params.get("token");
-  const tokens = loadTokens();
-  const reviewId = tokens[token];
-  const reviews = loadReviews();
-  const r = reviews.find(x => x.id === reviewId);
-  if (!r){
     app.innerHTML = `
       <section class="section">
         <div class="wrap">
           <div class="card">
             <div class="hd">
-              <div><div class="kicker">Edit</div><h2>Invalid edit link</h2></div>
-              <a class="btn btn--ghost" href="#/">Home</a>
+              <div>
+                <div class="kicker">Landlord</div>
+                <h2>Not found</h2>
+              </div>
+              <a class="btn btn--ghost" href="#/search">Back</a>
+            </div>
+            <div class="bd">
+              <div class="rowSub">This landlord doesn’t exist yet.</div>
             </div>
           </div>
         </div>
@@ -1000,7 +798,11 @@ function renderEdit(params){
     return;
   }
 
-  const l = loadLandlords().find(x => x.id === r.landlordId);
+  const reviews = loadReviews()
+    .filter(r => r.landlordId === l.id)
+    .sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+
+  const avg = avgRatingFor(l.id);
 
   app.innerHTML = `
     <section class="section">
@@ -1008,43 +810,131 @@ function renderEdit(params){
         <div class="card">
           <div class="hd">
             <div>
-              <div class="kicker">Edit review</div>
-              <h2>${esc(l?.name || "Landlord")}</h2>
-              <div class="muted">Update your review (demo).</div>
+              <div class="kicker">Landlord</div>
+              <h2>${escapeHTML(l.name)}</h2>
+              <div class="muted">${escapeHTML(l.address)}${l.unit ? `, ${escapeHTML(l.unit)}` : ""} • ${escapeHTML(l.city)}, ${escapeHTML(l.state)}</div>
+              ${starsRow(avg)}
             </div>
-            <a class="btn btn--ghost" href="#/landlord?id=${encodeURIComponent(r.landlordId)}">Back</a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn btn--ghost" href="#/search">Back</a>
+              <button class="btn btn--primary" id="rateNow">Rate this landlord</button>
+            </div>
           </div>
 
           <div class="bd">
-            <div class="field">
-              <label>Overall rating</label>
-              <select id="overall">
-                ${[5,4,3,2,1].map(n=>`<option value="${n}" ${n===r.overall?"selected":""}>${n}</option>`).join("")}
-              </select>
-            </div>
+            <div class="split2">
+              <div>
+                <div class="kicker">Location</div>
+                <div class="mapBox" id="profileMap" style="height:320px; margin-top:10px;"></div>
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                  <button class="btn btn--outline" id="centerProfile">Center on map</button>
+                </div>
+              </div>
 
-            <div class="field" style="margin-top:12px;">
-              <label>Review</label>
-              <textarea id="text">${esc(r.text || "")}</textarea>
+              <div>
+                <div class="kicker">Reviews</div>
+                ${reviews.length ? reviews.map(r => {
+                  const d = new Date(r.createdAt);
+                  const date = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+                  return `
+                    <div class="rowCard">
+                      <div style="flex:1;">
+                        <div style="display:flex; justify-content:space-between; gap:10px;">
+                          <div class="rowTitle" style="margin:0;">Rating</div>
+                          <div class="tiny">${date}</div>
+                        </div>
+                        ${starsRow(r.rating)}
+                        <div class="rowSub" style="margin-top:8px;">${escapeHTML(r.text)}</div>
+                      </div>
+                    </div>
+                  `;
+                }).join("") : `
+                  <div class="rowCard" style="justify-content:center;">
+                    <div style="text-align:center;">
+                      <div class="rowTitle">No reviews yet</div>
+                      <div class="rowSub">Be the first to post a review.</div>
+                    </div>
+                  </div>
+                `}
+              </div>
             </div>
-
-            <button class="btn btn--primary" style="margin-top:12px;" id="save">Save</button>
           </div>
         </div>
       </div>
     </section>
   `;
 
-  $("#save")?.addEventListener("click", () => {
-    r.overall = Number($("#overall").value || r.overall);
-    r.text = ($("#text").value || "").trim();
-    saveReviews(reviews);
-    toast("Saved.");
-    nav(`#/landlord?id=${encodeURIComponent(r.landlordId)}`);
+  // map
+  setTimeout(() => {
+    const el = $("#profileMap");
+    if (!el) return;
+
+    if (_leaflet.profile) { try { _leaflet.profile.remove(); } catch {} _leaflet.profile = null; }
+
+    const center = (typeof l.lat === "number" && typeof l.lng === "number")
+      ? [l.lat, l.lng]
+      : [40.73, -73.98];
+
+    _leaflet.profile = initMap(el, { center, zoom: (typeof l.lat === "number" ? 13 : 11) });
+    if (typeof l.lat === "number" && typeof l.lng === "number"){
+      L.marker([l.lat, l.lng]).addTo(_leaflet.profile);
+    }
+  }, 0);
+
+  $("#centerProfile")?.addEventListener("click", () => flyTo(_leaflet.profile, l));
+  $("#rateNow")?.addEventListener("click", () => openRateModal(l));
+}
+
+function openRateModal(l){
+  modalOpen(
+    "Leave a review",
+    `
+      <div class="field">
+        <label>Rating</label>
+        <select id="rStars">
+          <option value="5">5 — Excellent</option>
+          <option value="4">4 — Good</option>
+          <option value="3">3 — Okay</option>
+          <option value="2">2 — Poor</option>
+          <option value="1">1 — Bad</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>What happened?</label>
+        <textarea id="rText" placeholder="Keep it factual and specific."></textarea>
+      </div>
+    `,
+    `
+      <button class="btn btn--ghost" type="button" id="cancelRate">Cancel</button>
+      <button class="btn btn--primary" type="button" id="submitRate">Submit</button>
+    `
+  );
+
+  $("#cancelRate")?.addEventListener("click", modalClose);
+  $("#submitRate")?.addEventListener("click", () => {
+    const rating = Number($("#rStars")?.value || 0);
+    const text = ($("#rText")?.value || "").trim();
+    if (!rating || !text){
+      toast("Please add a rating and a short description.");
+      return;
+    }
+    const list = loadReviews();
+    list.unshift({
+      id: uid("rv"),
+      landlordId: l.id,
+      rating,
+      text,
+      createdAt: nowISO()
+    });
+    saveReviews(list);
+    modalClose();
+    toast("Review posted.");
+    // refresh view
+    location.hash = `#/landlord?id=${encodeURIComponent(l.id)}`;
   });
 }
 
-/* ---------- How + Trust ---------- */
+/* ---------- How / Trust (simple, styled) ---------- */
 function renderHow(){
   const app = $("#app");
   if (!app) return;
@@ -1065,12 +955,12 @@ function renderHow(){
           <div class="bd">
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">Search</div>
-              <div class="rowSub">Find a landlord by name, entity, address, or borough.</div>
+              <div class="rowSub">Find a landlord by name, entity, or address.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">Review</div>
-              <div class="rowSub">Post instantly. You’ll receive an edit link (no account required).</div>
+              <div class="rowSub">Leave a rating and write what happened.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
@@ -1109,7 +999,7 @@ function renderTrust(){
           <div class="bd">
             <div class="rowCard"><div style="flex:1;">
               <div class="rowTitle">No reviewer accounts</div>
-              <div class="rowSub">Tenants can post without accounts; edits use an edit link.</div>
+              <div class="rowSub">Tenants can post without accounts; edits can be added later via the landlord page.</div>
             </div></div>
 
             <div class="rowCard"><div style="flex:1;">
@@ -1133,7 +1023,7 @@ function renderTrust(){
   `;
 }
 
-/* ---------- Landlord Portal ---------- */
+/* ---------- Landlord Portal (logos + styled file input) ---------- */
 function renderPortal(){
   const app = $("#app");
   if (!app) return;
@@ -1153,41 +1043,35 @@ function renderPortal(){
 
           <div class="bd">
             <div class="split2">
-              <!-- Sign in -->
               <div class="card" style="box-shadow:none;">
                 <div class="pad">
                   <div class="kicker">Sign in</div>
-
                   <div class="field" style="margin-top:10px;">
                     <label>Email</label>
                     <input id="le" placeholder="you@company.com"/>
                   </div>
-
                   <div class="field" style="margin-top:10px;">
                     <label>Password</label>
                     <input id="lp" type="password" placeholder="Password"/>
                   </div>
-
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">
-                    Sign in
-                  </button>
+                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">Sign in</button>
 
                   <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
-
-                  ${oauthButtons("g","a","m")}
+                  ${providerButton("Google")}
+                  <div style="height:8px;"></div>
+                  ${providerButton("Apple")}
+                  <div style="height:8px;"></div>
+                  ${providerButton("Microsoft")}
                 </div>
               </div>
 
-              <!-- Create account -->
               <div class="card" style="box-shadow:none;">
                 <div class="pad">
                   <div class="kicker">Create account</div>
-
                   <div class="field" style="margin-top:10px;">
                     <label>Email</label>
                     <input id="se" placeholder="you@company.com"/>
                   </div>
-
                   <div class="field" style="margin-top:10px;">
                     <label>Password</label>
                     <input id="sp" type="password" placeholder="Create a password"/>
@@ -1195,30 +1079,24 @@ function renderPortal(){
 
                   <div class="field" style="margin-top:10px;">
                     <label>Verification document (demo)</label>
-
-                    <div class="fileRow" style="margin-top:6px;">
-                      <input id="doc" type="file" class="fileInput" />
-                      <div class="fileFake">
-                        <span class="fileBtn">Choose file</span>
-                        <span class="fileName" id="docName">No file chosen</span>
-                      </div>
+                    <div class="fileWrap">
+                      <input id="doc" type="file"/>
                     </div>
-
-                    <div class="tiny" style="margin-top:6px;">Lease header, LLC registration, management agreement, etc.</div>
+                    <div class="tiny fileHint">Lease header, LLC registration, management agreement, etc.</div>
                   </div>
 
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">
-                    Create account
-                  </button>
+                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
 
                   <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
-
-                  ${oauthButtons("sg","sa","sm")}
+                  ${providerButton("Google","signup")}
+                  <div style="height:8px;"></div>
+                  ${providerButton("Apple","signup")}
+                  <div style="height:8px;"></div>
+                  ${providerButton("Microsoft","signup")}
 
                   <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -1226,105 +1104,83 @@ function renderPortal(){
     </section>
   `;
 
-  // file name display
-  $("#doc")?.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    const name = f ? f.name : "No file chosen";
-    const el = $("#docName");
-    if (el) el.textContent = name;
-  });
-
+  // wire buttons (demo)
   $("#login")?.addEventListener("click", () => {
-    const e = ($("#le").value || "").trim();
-    const p = ($("#lp").value || "").trim();
-    if (!e || !p) return toast("Enter email + password.");
+    const e = ($("#le")?.value || "").trim();
+    const p = ($("#lp")?.value || "").trim();
+    if (!e || !p) return toast("Enter email and password.");
     toast("Signed in (demo).");
   });
 
   $("#signup")?.addEventListener("click", () => {
-    const e = ($("#se").value || "").trim();
-    const p = ($("#sp").value || "").trim();
-    if (!e || !p) return toast("Enter email + password.");
+    const e = ($("#se")?.value || "").trim();
+    const p = ($("#sp")?.value || "").trim();
+    if (!e || !p) return toast("Enter email and password.");
     toast("Account created (demo).");
   });
 
-  ["g","a","m","sg","sa","sm"].forEach(id => {
-    $(`#${id}`)?.addEventListener("click", () => toast("Demo: OAuth not configured."));
+  $$("#g, #a, #m, #g2, #a2, #m2").forEach(btn => {
+    btn.addEventListener("click", () => toast("SSO coming soon (demo)."));
   });
 }
 
-function oauthButtons(gId, aId, mId){
-  // inline SVG logos, no external assets
+function providerButton(name, variant="signin"){
+  const id = (name === "Google" ? (variant==="signup"?"g2":"g")
+    : name === "Apple" ? (variant==="signup"?"a2":"a")
+    : (variant==="signup"?"m2":"m"));
+
+  const logo = providerLogo(name);
+
   return `
-    <button class="btn btn--outline btn--block oauthBtn" id="${esc(gId)}">
-      <span class="oauthIcon" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <path fill="#EA4335" d="M24 9.5c3.54 0 6.02 1.53 7.4 2.81l5.41-5.41C33.69 4.06 29.28 2 24 2 14.73 2 6.98 7.39 3.36 15.21l6.64 5.16C11.61 14.25 17.31 9.5 24 9.5z"/>
-          <path fill="#4285F4" d="M46.1 24.5c0-1.57-.14-3.08-.4-4.5H24v9h12.4c-.54 2.9-2.18 5.36-4.62 7.02l7.06 5.48C42.96 37.36 46.1 31.45 46.1 24.5z"/>
-          <path fill="#FBBC05" d="M10 28.37c-.49-1.46-.77-3.02-.77-4.62 0-1.6.28-3.16.77-4.62l-6.64-5.16C1.98 17.39 1.2 20.11 1.2 23.75c0 3.64.78 6.36 2.16 9.78L10 28.37z"/>
-          <path fill="#34A853" d="M24 46c5.28 0 9.72-1.74 12.96-4.72l-7.06-5.48c-1.96 1.32-4.47 2.1-5.9 2.1-6.69 0-12.39-4.75-14-10.87l-6.64 5.16C6.98 40.61 14.73 46 24 46z"/>
-        </svg>
-      </span>
-      Continue with Google
-    </button>
-
-    <div style="height:8px;"></div>
-
-    <button class="btn btn--outline btn--block oauthBtn" id="${esc(aId)}">
-      <span class="oauthIcon" aria-hidden="true" style="color: var(--ink);">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-             xmlns="http://www.w3.org/2000/svg">
-          <path fill="currentColor" d="M16.365 1.43c0 1.14-.41 2.2-1.19 3.07-.77.87-2.05 1.54-3.17 1.44-.14-1.1.45-2.26 1.16-3.07.79-.91 2.14-1.58 3.2-1.44z"/>
-          <path fill="currentColor" d="M20.8 17.02c-.55 1.27-.82 1.84-1.53 2.97-.99 1.55-2.39 3.48-4.12 3.5-1.54.01-1.94-1-4.03-1-2.09 0-2.53.98-4.06 1.02-1.72.06-3.04-1.72-4.03-3.27C1.2 17.7.0 13.03 1.85 9.82c.99-1.72 2.71-2.73 4.53-2.73 1.78 0 2.89 1 4.35 1 1.42 0 2.28-1 4.33-1 1.62 0 3.34.89 4.31 2.43-3.76 2.06-3.15 7.43.43 8.5z"/>
-        </svg>
-      </span>
-      Continue with Apple
-    </button>
-
-    <div style="height:8px;"></div>
-
-    <button class="btn btn--outline btn--block oauthBtn" id="${esc(mId)}">
-      <span class="oauthIcon" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <path fill="#F35325" d="M6 6h17v17H6z"/>
-          <path fill="#81BC06" d="M25 6h17v17H25z"/>
-          <path fill="#05A6F0" d="M6 25h17v17H6z"/>
-          <path fill="#FFBA08" d="M25 25h17v17H25z"/>
-        </svg>
-      </span>
-      Continue with Microsoft
+    <button class="btn btn--outline btn--block providerBtn" id="${id}" type="button">
+      <span class="providerLogo" aria-hidden="true">${logo}</span>
+      <span>Continue with ${name}</span>
     </button>
   `;
 }
 
-/* ---------- Router ---------- */
-function route(){
-  const { path, params } = parseHash();
-
-  // close drawer on nav
-  $("#navDrawer")?.classList.remove("open");
-
-  if (path === "/" || path === "") return renderHome();
-  if (path === "/search") return renderSearch(params);
-  if (path === "/add") return renderAdd();
-  if (path === "/landlord") return renderLandlord(params);
-  if (path === "/review") return renderReview(params);
-  if (path === "/edit") return renderEdit(params);
-  if (path === "/how") return renderHow();
-  if (path === "/trust") return renderTrust();
-  if (path === "/portal") return renderPortal();
-
-  // fallback
-  renderHome();
+function providerLogo(name){
+  if (name === "Google"){
+    return `
+      <svg viewBox="0 0 48 48">
+        <path fill="#EA4335" d="M24 9.5c3.1 0 5.9 1.1 8.1 3l5.5-5.5C34.2 3.7 29.4 1.8 24 1.8 14.7 1.8 6.7 7.1 2.9 14.8l6.6 5.1C11.3 13.6 17.1 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-2.8-.4-4.1H24v7.7h12.6c-.3 2-1.6 5-4.5 7.1l6.9 5.4c4-3.7 6.1-9.2 6.1-16.1z"/>
+        <path fill="#FBBC05" d="M9.5 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.7-4.6l-6.6-5.1C1.4 17.3.6 20.6.6 24s.8 6.7 2.2 9.6l6.7-5z"/>
+        <path fill="#34A853" d="M24 46.2c5.4 0 10-1.8 13.4-4.9l-6.9-5.4c-1.9 1.3-4.5 2.2-6.5 2.2-6.9 0-12.7-4.1-14.9-10l-6.7 5C6.7 40.9 14.7 46.2 24 46.2z"/>
+      </svg>
+    `;
+  }
+  if (name === "Apple"){
+    return `
+      <svg viewBox="0 0 24 24">
+        <path fill="#111" d="M16.7 13.2c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.8-2.7-.8-1.4 0-2.7.8-3.4 2-1.4 2.4-.4 6 1 8  .7 1 1.5 2.1 2.6 2 1-.1 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.7 1.1 0 1.8-1 2.5-2 .8-1.1 1.1-2.2 1.1-2.2s-2.1-.8-2.1-3.1zM14.9 7c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.6.7-1 1.7-.9 2.7 1 .1 1.9-.5 2.5-1.3z"/>
+      </svg>
+    `;
+  }
+  // Microsoft
+  return `
+    <svg viewBox="0 0 24 24">
+      <path fill="#F25022" d="M2 2h9v9H2z"/><path fill="#7FBA00" d="M13 2h9v9h-9z"/>
+      <path fill="#00A4EF" d="M2 13h9v9H2z"/><path fill="#FFB900" d="M13 13h9v9h-9z"/>
+    </svg>
+  `;
 }
 
-function wireNav(){
-  $("#hamburger")?.addEventListener("click", () => {
-    $("#navDrawer")?.classList.toggle("open");
-  });
+/* ---------- helpers ---------- */
+function escapeHTML(str=""){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
+function escapeAttr(str=""){ return escapeHTML(str).replaceAll("\n"," "); }
 
-seedIfEmpty();
-wireNav();
+/* ---------- boot ---------- */
 window.addEventListener("hashchange", route);
-route();
+window.addEventListener("DOMContentLoaded", () => {
+  wireMenu();
+  wireModal();
+  route();
+});
