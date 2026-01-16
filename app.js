@@ -307,7 +307,7 @@ function renderHome() {
               <a class="btn btn--outline" href="#/search">Browse all</a>
             </div>
             <div class="bd">
-             <div class="carousel" id="featuredCarousel" aria-label="Recent highlights carousel">
+      <div class="carousel" id="featuredCarousel" aria-label="Recent highlights carousel">
   <div class="carousel__track" id="featuredGrid"></div>
 </div>
             </div>
@@ -348,28 +348,29 @@ function renderHome() {
 
   // Featured cards
   const grid = $("#featuredGrid");
-  if (grid) {
-    grid.innerHTML = landlords.slice(0, 3).map((r) => `join("");
+const grid = document.getElementById("featuredGrid");
+if (grid) {
+  grid.innerHTML = landlords.slice(0, 10).map((r) => `
+    <div class="smallCard">
+      <div class="smallCard__top">
+        <div>
+          <div class="smallCard__name">${esc(r.name)}</div>
+          <div class="smallCard__addr">${esc(r.addr)}</div>
+        </div>
+        <div class="smallCard__time">${esc(r.date)}</div>
+      </div>
+      ${starsRow(r.score)}
+      <div class="smallCard__text">${esc(r.text)}</div>
+      <div class="smallCard__foot">
+        <span class="tiny">${esc(r.borough || "")}</span>
+        <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View</a>
+      </div>
+    </div>
+  `).join("");
+
+  // ✅ IMPORTANT: this line must be OUTSIDE the template string
   setupAutoCarousel(grid, { intervalMs: 3000, stepPx: 380 });
 }
-      <div class="smallCard">
-        <div class="smallCard__top">
-          <div>
-            <div class="smallCard__name">${esc(r.name)}</div>
-            <div class="smallCard__addr">${esc(r.addr)}</div>
-          </div>
-          <div class="smallCard__time">${esc(r.date)}</div>
-        </div>
-        ${starsRow(r.score)}
-        <div class="smallCard__text">${esc(r.text)}</div>
-        <div class="smallCard__foot">
-          <span class="tiny">${esc(r.borough || "")}</span>
-          <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View</a>
-        </div>
-      </div>
-    `).join("");
-  }
-
   // Home search
   const homeQ = $("#homeQ");
   $("#homeGo")?.addEventListener("click", () => {
