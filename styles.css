@@ -43,7 +43,7 @@ body{
   border:1px solid rgba(20,16,12,.08);
 }
 
-/* ✅ RESTORE SCRIPT LOGO (all lowercase stays as-is in HTML) */
+/* Restore script logo */
 .brand__name{
   font-family: "Snell Roundhand","Brush Script MT","Segoe Script","Apple Chancery",cursive;
   font-weight:700;
@@ -123,22 +123,40 @@ body{
   margin-top:14px;
 }
 
-/* ✅ INPUTS: fix sizes + match theme */
+/* Premium inputs */
 .input{
   flex:1;
   height:46px;
   border-radius:999px;
   border:1px solid rgba(20,16,12,.12);
   padding:0 16px;
-  background: rgba(255,255,255,.70);
+  background: rgba(255,255,255,.72);
   outline:none;
-  font-weight:700;
+  font-weight:800;
   font-size:14px;
 }
-.input::placeholder{color:rgba(21,17,14,.42);font-weight:700}
+.input::placeholder{color:rgba(21,17,14,.42);font-weight:800}
 .input:focus{
   box-shadow: 0 0 0 4px rgba(20,16,12,.08);
-  background: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.86);
+}
+
+/* Make selects match the theme */
+select.input{
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  appearance:none;
+  padding-right:44px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(21,17,14,.55) 50%),
+    linear-gradient(135deg, rgba(21,17,14,.55) 50%, transparent 50%),
+    linear-gradient(to right, transparent, transparent);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat:no-repeat;
 }
 
 .tileRow{
@@ -168,7 +186,19 @@ body{
 .tilePanel{margin-top:10px;padding:14px;border-radius:18px;background: rgba(255,255,255,.55);border:1px solid rgba(20,16,12,.08)}
 
 /* split row under hero */
-.splitRow{display:grid;grid-template-columns: 1fr 1fr;gap:16px;margin-top:16px}
+.splitRow{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:16px;
+  margin-top:16px;
+
+  /* Fix: don't stretch cards to same height */
+  align-items: start;
+}
+.splitRow > .card{
+  align-self: start;
+}
+
 .sectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .sectionTitle{margin:0;font-size:34px;line-height:1.05}
 .sectionDesc{margin:6px 0 0;color:rgba(21,17,14,.6);font-weight:600}
@@ -182,7 +212,9 @@ body{
   border:1px solid rgba(20,16,12,.08);
   overflow:hidden;
   position:relative;
-  min-height:170px;
+
+  /* Fix: don’t force big empty height */
+  min-height: unset;
 }
 .carouselTrack{
   display:flex;
@@ -341,11 +373,90 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 .modalTitle{font-weight:950}
 .modalBody{padding:14px 16px}
 
-/* ✅ TEXTAREA matches theme (already replaced above) */
+/* Premium textarea (modal uses this) */
+.textarea{
+  width:100%;
+  border-radius:16px;
+  border:1px solid rgba(20,16,12,.12);
+  padding:12px 14px;
+  background: rgba(255,255,255,.72);
+  outline:none;
+  min-height:120px;
+  font-weight:800;
+  font-size:14px;
+  line-height:1.45;
+  resize:vertical;
+}
+.textarea::placeholder{color:rgba(21,17,14,.42);font-weight:800}
+.textarea:focus{
+  box-shadow: 0 0 0 4px rgba(20,16,12,.08);
+  background: rgba(255,255,255,.86);
+}
 
 .modalFoot{
   display:flex;justify-content:flex-end;gap:10px;
   padding:14px 16px;border-top:1px solid rgba(20,16,12,.10);
+}
+
+/* Star rating picker (half-star supported) */
+.starPicker{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.starBtn{
+  position:relative;
+  width:30px;height:30px;
+  border:0;
+  background:transparent;
+  padding:0;
+  cursor:pointer;
+}
+.starBtn::before{
+  content:"☆";
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  font-size:26px;
+  color:rgba(21,17,14,.30);
+}
+.starBtn::after{
+  content:"★";
+  position:absolute;inset:0;
+  display:grid;place-items:center;
+  font-size:26px;
+  color:rgba(21,17,14,.92);
+  width:0;
+  overflow:hidden;
+}
+.starBtn.isHalf::after{width:50%}
+.starBtn.isFull::after{width:100%}
+.starBtn .hit{position:absolute;top:0;bottom:0;width:50%}
+.starBtn .hitL{left:0}
+.starBtn .hitR{right:0}
+
+/* Static stars display anywhere (supports halves) */
+.starStatic{
+  --rating: 0;
+  --starSize: 16px;
+  position:relative;
+  display:inline-block;
+  font-size: var(--starSize);
+  line-height:1;
+  letter-spacing:1px;
+}
+.starStatic::before{
+  content:"★★★★★";
+  color:rgba(21,17,14,.28);
+}
+.starStatic::after{
+  content:"★★★★★";
+  color:rgba(21,17,14,.92);
+  position:absolute;
+  left:0;top:0;
+  width: calc((var(--rating) / 5) * 100%);
+  overflow:hidden;
+  white-space:nowrap;
 }
 
 /* drawer (mobile menu) */
@@ -413,7 +524,7 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   .tileRow{grid-template-columns:1fr}
 }
 
-/* ✅ HOME: make Recent Highlights + Map each take up half of their banner (desktop only) */
+/* Home: make Recent Highlights + Map each take half of their card width (desktop) */
 @media (min-width: 981px){
   .splitRow .carousel,
   .splitRow .mapBox{
