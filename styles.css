@@ -361,4 +361,47 @@ textarea{ resize: vertical; min-height: 90px; }
   .split2{ grid-template-columns: 1fr; }
   .carousel__track{ grid-auto-columns: 86vw; }
 }
+/* --- Recent highlights: full-frame carousel like the map --- */
+.highlightsFrame{
+  display:flex;
+  flex-direction:column;
+  min-height: 420px; /* matches map vibe */
+}
+
+.highlightsViewport{
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;          /* room for scrollbar */
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.highlightsTrack{
+  display:flex;
+  gap: 12px;
+  padding: 2px;
+  min-width: 100%;
+}
+
+.highlightsTrack .smallCard{
+  flex: 0 0 360px;               /* card width */
+  scroll-snap-align: start;
+}
+
+/* make scrollbar visible and clean */
+.highlightsViewport::-webkit-scrollbar{
+  height: 10px;
+}
+.highlightsViewport::-webkit-scrollbar-track{
+  background: rgba(35,24,16,.06);
+  border-radius: 999px;
+}
+.highlightsViewport::-webkit-scrollbar-thumb{
+  background: rgba(35,24,16,.18);
+  border-radius: 999px;
+}
+.highlightsViewport::-webkit-scrollbar-thumb:hover{
+  background: rgba(35,24,16,.26);
+}
 
