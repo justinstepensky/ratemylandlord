@@ -878,6 +878,12 @@
     <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
   </div>
 </div>
+$("#doc")?.addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  const name = f ? f.name : "No file chosen";
+  const el = $("#docName");
+  if (el) el.textContent = name;
+});
 
     $("#login")?.addEventListener("click", () => {
       const e = ($("#le").value || "").trim();
