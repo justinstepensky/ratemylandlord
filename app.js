@@ -1095,22 +1095,27 @@ function renderLandlord(id) {
 }
 
 /* -----------------------------
-   Star picker (HALF star)
+   Star picker (HALF-star)
+   - Horizontal row
+   - Gold fill indicates selection
+   - Hover preview + click set
+   - Stores 0.5 increments in #mStars
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
-  // value is 0.5 increments from 0.5..5
-  const v = Number(defaultValue) || 5;
+  const v = Math.max(0.5, Math.min(5, Number(defaultValue) || 5));
+
   return `
     <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
-      ${[1,2,3,4,5].map(i => {
-        return `
-          <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
-            <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
-            <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
-            ★
-          </button>
-        `;
-      }).join("")}
+      ${[1,2,3,4,5].map(i => `
+        <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
+          <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
+          <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
+
+          <span class="starBase">★</span>
+          <span class="starFill">★</span>
+        </button>
+      `).join("")}
+
       <span class="starValue" id="starValue">${v.toFixed(1)}</span>
       <input type="hidden" id="mStars" value="${v}">
     </div>
@@ -1119,33 +1124,51 @@ function starPickerHTML(defaultValue = 5) {
 }
 
 function applyStarPickerVisual(value) {
-  const v = Number(value) || 0;
+  const v = Math.max(0.5, Math.min(5, Number(value) || 0));
   const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
+
   btns.forEach(btn => {
-    const s = Number(btn.dataset.star);
-    btn.classList.toggle("isFull", v >= s);
-    btn.classList.toggle("isHalf", v === (s - 0.5));
+    const s = Number(btn.dataset.star); // 1..5
+    const fill = btn.querySelector(".starFill");
+
+    // set fill percent: 0, 50, 100
+    let pct = 0;
+    if (v >= s) pct = 100;
+    else if (v >= s - 0.5) pct = 50;
+
+    btn.style.setProperty("--fill", `${pct}%`);
+    btn.classList.toggle("isOn", pct > 0);
+
+    // fill width controlled by CSS using --fill
+    if (fill) fill.style.width = `${pct}%`;
   });
+
   const out = $("#starValue");
   if (out) out.textContent = v.toFixed(1);
+
   const hidden = $("#mStars");
   if (hidden) hidden.value = String(v);
 }
 
 function bindStarPicker(defaultValue = 5) {
-  let current = Number(defaultValue) || 5;
+  let current = Math.max(0.5, Math.min(5, Number(defaultValue) || 5));
   applyStarPickerVisual(current);
 
   // hover preview
   document.querySelectorAll("#starPicker .hit").forEach(hit => {
-    hit.addEventListener("mouseenter", () => applyStarPickerVisual(hit.dataset.value));
+    hit.addEventListener("mouseenter", () => {
+      applyStarPickerVisual(hit.dataset.value);
+    });
   });
-  $("#starPicker").addEventListener("mouseleave", () => applyStarPickerVisual(current));
+
+  $("#starPicker").addEventListener("mouseleave", () => {
+    applyStarPickerVisual(current);
+  });
 
   // click set
   document.querySelectorAll("#starPicker .hit").forEach(hit => {
     hit.addEventListener("click", () => {
-      current = Number(hit.dataset.value);
+      current = Math.max(0.5, Math.min(5, Number(hit.dataset.value) || current));
       applyStarPickerVisual(current);
     });
   });
@@ -1162,12 +1185,7 @@ function openReviewModal(landlordId) {
     <div class="modalBody">
       <div class="field">
         <label>Rating</label>
-
-        <!-- this gets updated by the star picker -->
-        <input type="hidden" id="mStars" value="5" />
-
         ${starPickerHTML(5)}
-
         <div class="tiny" style="margin-top:8px;">
           Click a star (half-steps supported). Stored as 1–5.
         </div>
@@ -1190,15 +1208,13 @@ function openReviewModal(landlordId) {
   $("#mClose").addEventListener("click", closeModal);
   $("#mCancel").addEventListener("click", closeModal);
 
-  // init star picker UI (must set #mStars and color the stars)
-  // expects your existing starPickerHTML() to render a container with id="mStarPicker"
-  // and clickable elements with data-star values.
+  // init star picker
   bindStarPicker(5);
 
   $("#mSubmit").addEventListener("click", () => {
-    // star picker stores 0.5 increments in #mStars; DB stores integer 1..5
+    // picker stores 0.5 increments; DB stores integer 1..5
     const raw = Number($("#mStars").value); // e.g. 4.5
-    const starsInt = Math.max(1, Math.min(5, Math.round(raw))); // 4.5 -> 5, 4.4 -> 4
+    const starsInt = Math.max(1, Math.min(5, Math.round(raw)));
     const text = $("#mText").value.trim();
 
     if (!text || text.length < 20) {
@@ -1219,3 +1235,4 @@ function openReviewModal(landlordId) {
     route();
   });
 }
+
