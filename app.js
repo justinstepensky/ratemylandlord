@@ -1,1022 +1,915 @@
 /* =========================================================
    casa — app.js (FULL FILE)
+   Hash-router SPA, GitHub Pages friendly
+   - Home (hero + tiles + featured carousel + home map)
+   - Search (filters + map)
+   - Add / How / Trust / Portal
+   - Featured carousel autoplay
+   - Leaflet map supported (fallback if Leaflet missing)
    ========================================================= */
 
-const $ = (sel) => document.querySelector(sel);
+(() => {
+  "use strict";
 
-function esc(s) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+  /* ---------- helpers ---------- */
+  const $ = (sel) => document.querySelector(sel);
 
-function toast(msg) {
-  let t = $("#toast");
-  if (!t) {
-    t = document.createElement("div");
-    t.id = "toast";
-    t.className = "toast";
-    document.body.appendChild(t);
+  function esc(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
-  t.textContent = msg;
-  t.style.display = "block";
-  clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => (t.style.display = "none"), 2200);
-}
 
-/* ---------- Stars (horizontal) ---------- */
-function starSVG(on) {
-  return `
-    <svg class="star" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="${on ? "var(--starOn)" : "var(--starOff)"}"
-        d="M12 17.3l-6.18 3.6 1.64-7.03L2 9.24l7.19-.62L12 2l2.81 6.62 7.19.62-5.46 4.63 1.64 7.03z"/>
-    </svg>
-  `;
-}
+  function toast(msg) {
+    let t = $("#toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "toast";
+      t.className = "toast";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => (t.style.display = "none"), 2200);
+  }
 
-function starsRow(score) {
-  const s = Math.max(0, Math.min(5, Number(score) || 0));
-  let out = `<div class="starRow"><div class="starStars">`;
-  for (let i = 1; i <= 5; i++) out += starSVG(i <= s);
-  out += `</div><div class="scoreText">${s}/5</div></div>`;
-  return out;
-}
-function setupAutoCarousel(trackEl, opts = {}) {
-  const intervalMs = opts.intervalMs ?? 3200;
-  const stepPx = opts.stepPx ?? 360;
+  /* ---------- stars ---------- */
+  function starSVG(on) {
+    return `
+      <svg class="star" viewBox="0 0 24 24" fill="${on ? "var(--starOn)" : "var(--starOff)"}" aria-hidden="true">
+        <path d="M12 17.3l-6.18 3.6 1.64-7.03L2 9.24l7.19-.62L12 2l2.81 6.62 7.19.62-5.46 4.63 1.64 7.03z"/>
+      </svg>
+    `;
+  }
 
-  if (!trackEl) return;
-  let timer = null;
-  let paused = false;
+  function starsRow(score) {
+    const s = Math.max(0, Math.min(5, Number(score) || 0));
+    let out = `<div class="starRow"><div class="stars">`;
+    for (let i = 1; i <= 5; i++) out += starSVG(i <= s);
+    out += `</div><div class="scoreText">${s}/5</div></div>`;
+    return out;
+  }
 
-  const start = () => {
-    stop();
-    timer = setInterval(() => {
-      if (paused) return;
+  /* ---------- autoplay carousel ---------- */
+  function setupAutoCarousel(trackEl, opts = {}) {
+    const intervalMs = opts.intervalMs ?? 3200;
+    const stepPx = opts.stepPx ?? 380;
 
-      const max = trackEl.scrollWidth - trackEl.clientWidth;
-      const next = Math.min(trackEl.scrollLeft + stepPx, max);
+    if (!trackEl) return;
+    let timer = null;
+    let paused = false;
 
-      // loop back to start when we hit the end
-      if (trackEl.scrollLeft >= max - 2) {
-        trackEl.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        trackEl.scrollTo({ left: next, behavior: "smooth" });
-      }
-    }, intervalMs);
-  };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
 
-  const stop = () => {
-    if (timer) clearInterval(timer);
-    timer = null;
-  };
+    const start = () => {
+      stop();
+      timer = setInterval(() => {
+        if (paused) return;
 
-  // pause on hover / pointer interaction
-  trackEl.addEventListener("mouseenter", () => (paused = true));
-  trackEl.addEventListener("mouseleave", () => (paused = false));
+        const max = trackEl.scrollWidth - trackEl.clientWidth;
+        const next = Math.min(trackEl.scrollLeft + stepPx, max);
 
-  // pause while user scrolls/dragging (debounced resume)
-  let resumeT = null;
-  const userPause = () => {
-    paused = true;
-    if (resumeT) clearTimeout(resumeT);
-    resumeT = setTimeout(() => (paused = false), 900);
-  };
-  trackEl.addEventListener("scroll", userPause, { passive: true });
-  trackEl.addEventListener("touchstart", () => (paused = true), { passive: true });
-  trackEl.addEventListener("touchend", userPause, { passive: true });
-  trackEl.addEventListener("pointerdown", () => (paused = true));
-  trackEl.addEventListener("pointerup", userPause);
+        if (trackEl.scrollLeft >= max - 2) {
+          trackEl.scrollTo({ left: 0, behavior: "smooth" });
+        } else {
+          trackEl.scrollTo({ left: next, behavior: "smooth" });
+        }
+      }, intervalMs);
+    };
 
-  // wheel scroll should move horizontally (nice “wheel” feel)
-  trackEl.addEventListener(
-    "wheel",
-    (e) => {
-      // allow normal page scroll if shift key is held
-      if (e.shiftKey) return;
-      // if horizontal intent already, let it pass
-      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      trackEl.scrollLeft += delta;
-      e.preventDefault();
-      userPause();
+    trackEl.addEventListener("mouseenter", () => (paused = true));
+    trackEl.addEventListener("mouseleave", () => (paused = false));
+
+    let resumeT = null;
+    const userPause = () => {
+      paused = true;
+      if (resumeT) clearTimeout(resumeT);
+      resumeT = setTimeout(() => (paused = false), 900);
+    };
+
+    trackEl.addEventListener("scroll", userPause, { passive: true });
+    trackEl.addEventListener("touchstart", () => (paused = true), { passive: true });
+    trackEl.addEventListener("touchend", userPause, { passive: true });
+    trackEl.addEventListener("pointerdown", () => (paused = true));
+    trackEl.addEventListener("pointerup", userPause);
+
+    // mouse wheel scroll becomes horizontal "wheel"
+    trackEl.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.shiftKey) return;
+        const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        trackEl.scrollLeft += delta;
+        e.preventDefault();
+        userPause();
+      },
+      { passive: false }
+    );
+
+    start();
+    return { start, stop };
+  }
+
+  /* ---------- data (demo) ---------- */
+  const landlords = [
+    {
+      id: "northside",
+      name: "Northside Properties",
+      addr: "123 Main St • Williamsburg • Brooklyn, NY",
+      borough: "Brooklyn",
+      lat: 40.7081,
+      lng: -73.9571,
+      score: 4,
+      date: "1/5/2026",
+      text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
     },
-    { passive: false }
-  );
+    {
+      id: "parkave",
+      name: "Park Ave Management",
+      addr: "22 Park Ave • Manhattan • New York, NY",
+      borough: "Manhattan",
+      lat: 40.7402,
+      lng: -73.9857,
+      score: 3,
+      date: "12/18/2025",
+      text: "Great location, but communication was slow. Security deposit itemization took weeks.",
+    },
+    {
+      id: "elmhurst",
+      name: "Elmhurst Holdings",
+      addr: "86-12 Broadway • Elmhurst • Queens, NY",
+      borough: "Queens",
+      lat: 40.7427,
+      lng: -73.8822,
+      score: 5,
+      date: "11/30/2025",
+      text: "Responsive management. Clear lease terms and quick repairs.",
+    },
+    {
+      id: "bronxgroup",
+      name: "Bronx Group LLC",
+      addr: "401 Grand Concourse • Bronx, NY",
+      borough: "Bronx",
+      lat: 40.8270,
+      lng: -73.9229,
+      score: 2,
+      date: "10/02/2025",
+      text: "Maintenance took too long. Common areas were not consistently cleaned.",
+    },
+    {
+      id: "statenmanage",
+      name: "Staten Management",
+      addr: "12 Bay St • Staten Island, NY",
+      borough: "Staten Island",
+      lat: 40.6437,
+      lng: -74.0736,
+      score: 4,
+      date: "9/14/2025",
+      text: "Solid communication. Repairs completed within reasonable time.",
+    },
+  ];
 
-  start();
-  return { start, stop };
-}
-/* =========================================================
-   Demo dataset (in-memory)
-   ========================================================= */
-const landlords = [
-  {
-    id: "northside",
-    name: "Northside Properties",
-    addr: "123 Main St • Williamsburg • Brooklyn, NY",
-    borough: "Brooklyn",
-    lat: 40.7081,
-    lng: -73.9571,
-    score: 4,
-    date: "1/5/2026",
-    text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
-  },
-  {
-    id: "parkave",
-    name: "Park Ave Management",
-    addr: "22 Park Ave • Manhattan • New York, NY",
-    borough: "Manhattan",
-    lat: 40.7402,
-    lng: -73.9857,
-    score: 3,
-    date: "12/18/2025",
-    text: "Great location, but communication was slow. Security deposit itemization took weeks.",
-  },
-  {
-    id: "elmhurst",
-    name: "Elmhurst Holdings",
-    addr: "86-12 Broadway • Elmhurst • Queens, NY",
-    borough: "Queens",
-    lat: 40.7427,
-    lng: -73.8822,
-    score: 5,
-    date: "11/30/2025",
-    text: "Responsive management. Clear lease terms and quick repairs.",
-  },
-];
-
-/* =========================================================
-   MAP (Leaflet)
-   ========================================================= */
-let __homeMap = null;
-let __homeLayer = null;
-
-let __searchMap = null;
-let __searchLayer = null;
-
-function leafletOK() {
-  return typeof window.L !== "undefined" && typeof window.L.map === "function";
-}
-
-function initMap(elId, which) {
-  if (!leafletOK()) return null;
-
-  const el = document.getElementById(elId);
-  if (!el) return null;
-
-  // If this element was used before, Leaflet can throw "Map container is already initialized"
-  // Safer to reset it.
-  el.innerHTML = "";
-
-  const m = window.L.map(elId, { scrollWheelZoom: false }).setView([40.73, -73.97], 11);
-
-  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap",
-  }).addTo(m);
-
-  const layer = window.L.layerGroup().addTo(m);
-
-  if (which === "home") {
-    __homeMap = m;
-    __homeLayer = layer;
-  } else {
-    __searchMap = m;
-    __searchLayer = layer;
+  /* ---------- Leaflet helpers ---------- */
+  function leafletAvailable() {
+    return typeof window.L !== "undefined" && typeof window.L.map === "function";
   }
 
-  // 🔥 Critical: force Leaflet to compute correct size after DOM paint
-  requestAnimationFrame(() => m.invalidateSize());
-  setTimeout(() => m.invalidateSize(), 250);
+  function initLeafletMap(containerId, center, zoom) {
+    if (!leafletAvailable()) return null;
 
-  return m;
-}
+    const map = window.L.map(containerId, { scrollWheelZoom: false }).setView(center, zoom);
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(map);
 
-function setMarkers(which, list) {
-  if (!leafletOK()) return;
-
-  const map = which === "home" ? __homeMap : __searchMap;
-  const layer = which === "home" ? __homeLayer : __searchLayer;
-
-  if (!map || !layer) return;
-
-  layer.clearLayers();
-  const pts = [];
-
-  list.forEach((x) => {
-    if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
-
-    const mk = window.L.marker([x.lat, x.lng]).addTo(layer);
-    mk.bindPopup(`
-      <div style="min-width:220px;">
-        <div style="font-weight:1000;">${esc(x.name)}</div>
-        <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
-        <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.addr)}</div>
-        <div style="margin-top:8px;">${starsRow(x.score)}</div>
-        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-          <a class="btn btn--primary" style="text-decoration:none;" href="#/landlord/${esc(x.id)}">View</a>
-          <a class="btn btn--outline" style="text-decoration:none;" href="#/review/${esc(x.id)}">Review</a>
-        </div>
-      </div>
-    `);
-
-    pts.push([x.lat, x.lng]);
-  });
-
-  if (pts.length) {
-    map.fitBounds(window.L.latLngBounds(pts).pad(0.18));
-  } else {
-    map.setView([40.73, -73.97], 11);
+    const group = window.L.layerGroup().addTo(map);
+    return { map, group };
   }
 
-  requestAnimationFrame(() => map.invalidateSize());
-  setTimeout(() => map.invalidateSize(), 250);
-}
+  function setMarkers(mapObj, list) {
+    if (!mapObj) return;
+    const { map, group } = mapObj;
+    group.clearLayers();
 
-/* =========================================================
-   HOME
-   ========================================================= */
-function renderHome() {
-  const app = $("#app");
-  if (!app) return;
+    const points = [];
 
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="pad hero">
-            <div>
-              <div class="kicker">CASA</div>
-              <h1>Know your landlord<br/>before you sign.</h1>
-              <p class="lead">Search landlords, read tenant reviews, and add your building in minutes.</p>
-            </div>
+    list.forEach((x) => {
+      if (typeof x.lat !== "number" || typeof x.lng !== "number") return;
 
-            <div class="heroSearch">
-              <div class="heroSearch__bar">
-                <input id="homeQ" placeholder="Search landlord name, management company, or address..." />
-              </div>
-              <button class="btn btn--primary" id="homeGo">Search</button>
-              <a class="btn btn--outline" href="#/add">Add a landlord</a>
-            </div>
-
-            <div class="trustLine">No account required to review. Verified landlords can respond.</div>
-
-            <!-- Tiles (NO Tap/Info labels) -->
-            <div class="cards3" style="margin-top:14px;">
-              <div class="xCard" role="button" tabindex="0">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">⌕</span> Search
-                  </div>
-                </div>
-                <div class="xCard__body">Search by name, entity or address</div>
-              </div>
-
-              <div class="xCard" role="button" tabindex="0">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">★</span> Review
-                  </div>
-                </div>
-                <div class="xCard__body">leave a rating based on select categories</div>
-              </div>
-
-              <div class="xCard xCard--locked" aria-disabled="true">
-                <div class="xCard__top">
-                  <div class="xCard__title">
-                    <span class="xCard__icon">⌂</span> Rent
-                  </div>
-                </div>
-              </div>
-            </div>
+      const marker = window.L.marker([x.lat, x.lng]).addTo(group);
+      marker.bindPopup(`
+        <div style="min-width:220px;">
+          <div style="font-weight:1000;">${esc(x.name)}</div>
+          <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.addr)}</div>
+          <div style="opacity:.75; font-weight:850; font-size:12.5px; margin-top:2px;">${esc(x.borough || "")}</div>
+          <div style="margin-top:8px;">${starsRow(x.score)}</div>
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <a class="btn btn--primary" style="text-decoration:none;" href="#/landlord/${esc(x.id)}">View</a>
           </div>
         </div>
+      `);
 
-        <!-- 50/50 Highlights + Map -->
-        <div class="grid2">
-          <div class="card">
-            <div class="hd">
-              <div>
-                <div class="kicker">Featured Reviews</div>
-                <h2>Recent highlights</h2>
-                <div class="muted">Browse ratings and landlord profiles.</div>
-              </div>
-              <a class="btn btn--outline" href="#/search">Browse all</a>
-            </div>
-            <div class="bd">
-      <div class="carousel" id="featuredCarousel" aria-label="Recent highlights carousel">
-  <div class="carousel__track" id="featuredGrid"></div>
-</div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="hd">
-              <div>
-                <div class="kicker">Map</div>
-                <h2>Browse by location</h2>
-                <div class="muted">Pins reflect existing ratings.</div>
-              </div>
-              <a class="btn btn--outline" href="#/search">Open search</a>
-            </div>
-            <div class="bd">
-              <div class="mapWrap">
-                <div id="homeMap"></div>
-              </div>
-              <div id="homeMapFallback" class="box" style="margin-top:12px; display:none;">
-                <div style="font-weight:1000;">Map not loaded</div>
-                <div class="tiny" style="margin-top:6px;">Leaflet must be included in index.html.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <footer class="wrap footer">
-          <div class="tiny">© ${new Date().getFullYear()} casa</div>
-          <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-            <a href="#/trust">Trust & Safety</a>
-            <a href="#/how">How it works</a>
-            <a href="#/search">Search</a>
-          </div>
-        </footer>
-      </div>
-    </section>
-  `;
-
-  // Featured cards
-  const grid = $("#featuredGrid");
-const grid = document.getElementById("featuredGrid");
-if (grid) {
-  grid.innerHTML = landlords.slice(0, 10).map((r) => `
-    <div class="smallCard">
-      <div class="smallCard__top">
-        <div>
-          <div class="smallCard__name">${esc(r.name)}</div>
-          <div class="smallCard__addr">${esc(r.addr)}</div>
-        </div>
-        <div class="smallCard__time">${esc(r.date)}</div>
-      </div>
-      ${starsRow(r.score)}
-      <div class="smallCard__text">${esc(r.text)}</div>
-      <div class="smallCard__foot">
-        <span class="tiny">${esc(r.borough || "")}</span>
-        <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View</a>
-      </div>
-    </div>
-  `).join("");
-
-  // ✅ IMPORTANT: this line must be OUTSIDE the template string
-  setupAutoCarousel(grid, { intervalMs: 3000, stepPx: 380 });
-}
-  // Home search
-  const homeQ = $("#homeQ");
-  $("#homeGo")?.addEventListener("click", () => {
-    const q = (homeQ?.value || "").trim();
-    location.hash = "#/search?q=" + encodeURIComponent(q);
-  });
-  homeQ?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#homeGo")?.click();
-  });
-
-  // Tiles toggle (only clickable ones)
-  document.querySelectorAll(".xCard:not(.xCard--locked)").forEach((c) => {
-    c.addEventListener("click", () => c.classList.toggle("open"));
-    c.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") c.classList.toggle("open");
-    });
-  });
-
-  // Home map
-  if (!leafletOK()) {
-    $("#homeMap") && ($("#homeMap").style.display = "none");
-    $("#homeMapFallback") && ($("#homeMapFallback").style.display = "block");
-  } else {
-    initMap("homeMap", "home");
-    setMarkers("home", landlords);
-  }
-}
-
-/* =========================================================
-   SEARCH
-   ========================================================= */
-function renderSearch() {
-  const app = $("#app");
-  if (!app) return;
-
-  const raw = location.hash || "#/search";
-  const queryString = raw.includes("?") ? raw.split("?")[1] : "";
-  const params = new URLSearchParams(queryString);
-  const initial = params.get("q") || "";
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Search</div>
-              <h2>Find a landlord</h2>
-              <div class="muted">Search by name, company, or address. Filter by borough. Browse on the map.</div>
-            </div>
-            <a class="btn btn--outline" href="#/add">Add landlord</a>
-          </div>
-
-          <div class="bd">
-            <div class="searchHero">
-              <div class="heroSearch__bar">
-                <input id="q" placeholder="Type a landlord name or address..." value="${esc(initial)}" />
-              </div>
-              <button class="btn btn--primary" id="doSearch">Search</button>
-            </div>
-
-            <div class="filtersRow">
-              <div class="field">
-                <label>Borough</label>
-                <select id="borough">
-                  <option value="">All boroughs</option>
-                  <option>Manhattan</option>
-                  <option>Brooklyn</option>
-                  <option>Queens</option>
-                  <option>Bronx</option>
-                  <option>Staten Island</option>
-                </select>
-              </div>
-
-              <div class="field">
-                <label>Min rating</label>
-                <select id="minr">
-                  <option value="">Any</option>
-                  <option value="5">5 stars</option>
-                  <option value="4">4+ stars</option>
-                  <option value="3">3+ stars</option>
-                  <option value="2">2+ stars</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="mapWrap" style="margin-top:12px;">
-              <div id="searchMap"></div>
-            </div>
-
-            <div id="searchMapFallback" class="box" style="margin-top:12px; display:none;">
-              <div style="font-weight:1000;">Map not loaded</div>
-              <div class="tiny" style="margin-top:6px;">Leaflet must be included in index.html.</div>
-            </div>
-
-            <div id="results"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-
-  function run() {
-    const query = ($("#q").value || "").trim().toLowerCase();
-    const borough = ($("#borough").value || "").trim();
-    const minr = Number($("#minr").value || 0);
-
-    let list = landlords.slice();
-
-    if (query) {
-      list = list.filter((x) =>
-        x.name.toLowerCase().includes(query) ||
-        x.addr.toLowerCase().includes(query)
-      );
-    }
-    if (borough) list = list.filter((x) => (x.borough || "") === borough);
-    if (minr) list = list.filter((x) => (Number(x.score) || 0) >= minr);
-
-    $("#results").innerHTML = list.length
-      ? list.map((x) => `
-        <div class="rowCard">
-          <div style="flex:1;">
-            <div class="rowTitle">${esc(x.name)}</div>
-            <div class="rowSub">${esc(x.addr)}</div>
-            <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
-            ${starsRow(x.score)}
-          </div>
-          <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
-            <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
-            <a class="btn btn--outline" href="#/review/${esc(x.id)}">Write review</a>
-          </div>
-        </div>
-      `).join("")
-      : `
-        <div class="box" style="margin-top:12px;">
-          <div style="font-weight:1000;">No results</div>
-          <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
-        </div>
-      `;
-
-    if (leafletOK()) setMarkers("search", list);
-  }
-
-  // Search map
-  if (!leafletOK()) {
-    $("#searchMap") && ($("#searchMap").style.display = "none");
-    $("#searchMapFallback") && ($("#searchMapFallback").style.display = "block");
-  } else {
-    initMap("searchMap", "search");
-    setMarkers("search", landlords);
-  }
-
-  $("#doSearch")?.addEventListener("click", run);
-  $("#q")?.addEventListener("keydown", (e) => (e.key === "Enter" ? run() : null));
-  ["borough", "minr"].forEach((id) => document.getElementById(id)?.addEventListener("change", run));
-
-  run();
-}
-
-/* =========================================================
-   ADD LANDLORD (demo)
-   ========================================================= */
-function renderAdd() {
-  const app = $("#app");
-  if (!app) return;
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Add landlord</div>
-              <h2>Add a missing profile</h2>
-              <div class="muted">No account required. Keep it factual and specific.</div>
-            </div>
-            <a class="btn btn--ghost" href="#/search">Search</a>
-          </div>
-
-          <div class="bd">
-            <div class="split2">
-              <div class="field">
-                <label>Landlord / Company name</label>
-                <input id="name" placeholder="e.g., Northside Properties" />
-              </div>
-              <div class="field">
-                <label>Address</label>
-                <input id="addr" placeholder="e.g., 123 Main St, Brooklyn, NY" />
-              </div>
-            </div>
-
-            <div class="split2" style="margin-top:12px;">
-              <div class="field">
-                <label>Borough</label>
-                <select id="boro">
-                  <option value="">Select borough</option>
-                  <option>Manhattan</option>
-                  <option>Brooklyn</option>
-                  <option>Queens</option>
-                  <option>Bronx</option>
-                  <option>Staten Island</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Coordinates (optional)</label>
-                <input id="coords" placeholder="lat,lng (e.g., 40.7081,-73.9571)" />
-              </div>
-            </div>
-
-            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
-              <a class="btn btn--ghost" href="#/">Cancel</a>
-              <button class="btn btn--primary" id="submit">Add landlord</button>
-            </div>
-
-            <div class="tiny" style="margin-top:10px;">
-              Demo mode: this adds to memory only (won’t persist after refresh).
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-
-  $("#submit")?.addEventListener("click", () => {
-    const name = ($("#name").value || "").trim();
-    const addr = ($("#addr").value || "").trim();
-    const borough = ($("#boro").value || "").trim();
-    const coords = ($("#coords").value || "").trim();
-
-    if (!name || !addr) return toast("Add name + address.");
-
-    let lat, lng;
-    if (coords.includes(",")) {
-      const [a, b] = coords.split(",").map((x) => Number(x.trim()));
-      if (!Number.isNaN(a) && !Number.isNaN(b)) { lat = a; lng = b; }
-    }
-
-    const id =
-      name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 48)
-      || "landlord-" + Date.now();
-
-    landlords.unshift({
-      id,
-      name,
-      addr,
-      borough: borough || "",
-      lat: typeof lat === "number" ? lat : undefined,
-      lng: typeof lng === "number" ? lng : undefined,
-      score: 0,
-      date: new Date().toLocaleDateString(),
-      text: "New listing (no reviews yet).",
+      points.push([x.lat, x.lng]);
     });
 
-    toast("Added (demo): " + name);
-    location.hash = "#/search?q=" + encodeURIComponent(name);
-  });
-}
+    if (points.length) {
+      const bounds = window.L.latLngBounds(points);
+      map.fitBounds(bounds.pad(0.18));
+    }
+  }
 
-/* =========================================================
-   LANDLORD PROFILE + REVIEW
-   ========================================================= */
-function renderLandlord(id) {
-  const app = $("#app");
-  if (!app) return;
+  /* =========================================================
+     PAGES
+     ========================================================= */
 
-  const l = landlords.find((x) => x.id === id);
-  if (!l) {
+  function renderHome() {
+    const app = $("#app");
+    if (!app) return;
+
     app.innerHTML = `
-      <section class="section"><div class="wrap">
-        <div class="card pad">
-          <h2>Not found</h2>
-          <div class="muted">That landlord profile doesn’t exist.</div>
-          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-            <a class="btn btn--primary" href="#/search">Search</a>
-            <a class="btn btn--ghost" href="#/">Home</a>
+      <section class="section">
+        <div class="wrap">
+
+          <div class="card">
+            <div class="pad hero">
+              <div>
+                <div class="kicker">CASA</div>
+                <h1>Know your landlord<br/>before you sign.</h1>
+                <p class="lead">Search landlords, read tenant reviews, and add your building in minutes.</p>
+              </div>
+
+              <div class="heroSearch">
+                <div class="heroSearch__bar">
+                  <input id="homeSearch" placeholder="Search landlord name, management company, or address..." />
+                </div>
+                <button class="btn btn--primary" id="goSearch">Search</button>
+                <button class="btn btn--outline" id="goAdd">Add a landlord</button>
+              </div>
+
+              <div class="trustLine">No account required to review. Verified landlords can respond.</div>
+
+              <div class="cards3" style="margin-top:14px;">
+                <div class="xCard" data-acc="search">
+                  <div class="xCard__top">
+                    <div class="xCard__title"><span class="xCard__icon">⌕</span> Search</div>
+                  </div>
+                  <div class="xCard__body">Search by name, entity or address</div>
+                </div>
+
+                <div class="xCard" data-acc="review">
+                  <div class="xCard__top">
+                    <div class="xCard__title"><span class="xCard__icon">★</span> Review</div>
+                  </div>
+                  <div class="xCard__body">leave a rating based on select categories</div>
+                </div>
+
+                <div class="xCard xCard--static" aria-disabled="true">
+                  <div class="xCard__top">
+                    <div class="xCard__title"><span class="xCard__icon">⌂</span> Rent</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gridHalf" style="margin-top:14px;">
+            <div class="card">
+              <div class="hd">
+                <div>
+                  <div class="kicker">Featured Reviews</div>
+                  <h2>Recent highlights</h2>
+                  <div class="muted">Browse ratings and landlord profiles.</div>
+                </div>
+                <a class="btn btn--outline" href="#/search">Browse all</a>
+              </div>
+
+              <div class="bd">
+                <div class="carousel" aria-label="Recent highlights carousel">
+                  <div class="carousel__track" id="featuredGrid"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="hd">
+                <div>
+                  <div class="kicker">Map</div>
+                  <h2>Browse by location</h2>
+                  <div class="muted">Pins reflect existing ratings.</div>
+                </div>
+                <a class="btn btn--outline" href="#/search">Open search</a>
+              </div>
+
+              <div class="bd">
+                <div class="mapWrap" id="homeMapWrap">
+                  <div id="homeMap"></div>
+                </div>
+                <div class="tiny" style="margin-top:10px;">
+                  ${leafletAvailable() ? "" : "Map requires Leaflet. Add it in index.html to enable pins."}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="wrap footer">
+            <div class="tiny">© ${new Date().getFullYear()} casa</div>
+            <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+              <a href="#/trust">Trust & Safety</a>
+              <a href="#/how">How it works</a>
+              <a href="#/search">Search</a>
+            </div>
+          </footer>
+
+        </div>
+      </section>
+    `;
+
+    // tiles
+    document.querySelectorAll(".xCard[data-acc]").forEach((c) => {
+      c.addEventListener("click", () => c.classList.toggle("open"));
+    });
+
+    // home buttons
+    const goSearch = $("#goSearch");
+    const goAdd = $("#goAdd");
+    const input = $("#homeSearch");
+    if (goSearch && input) {
+      goSearch.onclick = () =>
+        (location.hash = "#/search?q=" + encodeURIComponent(input.value.trim()));
+    }
+    if (goAdd) goAdd.onclick = () => (location.hash = "#/add");
+
+    // featured cards
+    const grid = $("#featuredGrid");
+    if (grid) {
+      grid.innerHTML = landlords.map((r) => `
+        <div class="smallCard">
+          <div class="smallCard__top">
+            <div>
+              <div class="smallCard__name">${esc(r.name)}</div>
+              <div class="smallCard__addr">${esc(r.addr)}</div>
+            </div>
+            <div class="smallCard__time">${esc(r.date)}</div>
+          </div>
+          ${starsRow(r.score)}
+          <div class="smallCard__text">${esc(r.text)}</div>
+          <div class="smallCard__foot">
+            <span class="tiny">${esc(r.borough || "")}</span>
+            <a class="btn btn--outline" href="#/landlord/${esc(r.id)}">View</a>
           </div>
         </div>
-      </div></section>`;
-    return;
+      `).join("");
+
+      setupAutoCarousel(grid, { intervalMs: 3000, stepPx: 420 });
+    }
+
+    // home map
+    const wrap = $("#homeMapWrap");
+    if (wrap && leafletAvailable()) {
+      const mapObj = initLeafletMap("homeMap", [40.73, -73.97], 11);
+      setMarkers(mapObj, landlords);
+      // allow map to layout correctly after render
+      setTimeout(() => mapObj.map.invalidateSize(), 60);
+    }
   }
 
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Landlord</div>
-              <h2>${esc(l.name)}</h2>
-              <div class="muted">${esc(l.addr)}</div>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <a class="btn btn--outline" href="#/search">Back</a>
-              <a class="btn btn--primary" href="#/review/${esc(l.id)}">Write review</a>
-            </div>
-          </div>
+  function renderSearch() {
+    const app = $("#app");
+    if (!app) return;
 
-          <div class="bd">
-            <div class="rowCard">
-              <div style="flex:1;">
-                <div class="rowTitle">Overall rating</div>
-                ${starsRow(l.score)}
-                <div class="tiny" style="margin-top:6px;">${esc(l.borough || "")}</div>
+    const hash = location.hash || "#/search";
+    const queryString = hash.includes("?") ? hash.split("?")[1] : "";
+    const params = new URLSearchParams(queryString);
+    const initial = params.get("q") || "";
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Search</div>
+                <h2>Find a landlord</h2>
+                <div class="muted">Search by name, company, address, or borough. Browse on the map.</div>
               </div>
-              <div class="box" style="flex:1;">
-                <div style="font-weight:1000;">Latest highlight</div>
-                <div class="tiny" style="margin-top:6px;">${esc(l.date)}</div>
-                <div style="margin-top:10px; font-weight:850; color:rgba(35,24,16,.78); line-height:1.35;">
-                  ${esc(l.text)}
+              <a class="btn btn--outline" href="#/add">Add landlord</a>
+            </div>
+
+            <div class="bd">
+
+              <div class="heroSearch" style="justify-content:flex-start;">
+                <div class="heroSearch__bar" style="max-width:760px;">
+                  <input id="q" placeholder="Search landlord name, management company, or address..." value="${esc(initial)}" />
                 </div>
+                <button class="btn btn--primary" id="doSearch">Search</button>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
 
-function renderReview(id) {
-  const app = $("#app");
-  if (!app) return;
+              <div class="filtersRow" style="margin-top:12px;">
+                <div class="field">
+                  <label>Borough</label>
+                  <select id="borough">
+                    <option value="">All boroughs</option>
+                    <option>Manhattan</option>
+                    <option>Brooklyn</option>
+                    <option>Queens</option>
+                    <option>Bronx</option>
+                    <option>Staten Island</option>
+                  </select>
+                </div>
 
-  const l = landlords.find((x) => x.id === id);
-  if (!l) return renderLandlord(id);
+                <div class="field">
+                  <label>Min rating</label>
+                  <select id="minr">
+                    <option value="">Any</option>
+                    <option value="5">5 stars</option>
+                    <option value="4">4+ stars</option>
+                    <option value="3">3+ stars</option>
+                    <option value="2">2+ stars</option>
+                  </select>
+                </div>
 
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Write a review</div>
-              <h2>${esc(l.name)}</h2>
-              <div class="muted">${esc(l.addr)}</div>
-            </div>
-            <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Back</a>
-          </div>
-
-          <div class="bd">
-            <div class="split2">
-              <div class="field">
-                <label>Overall rating</label>
-                <select id="rScore">
-                  <option value="5">5 — Excellent</option>
-                  <option value="4">4 — Good</option>
-                  <option value="3">3 — Okay</option>
-                  <option value="2">2 — Bad</option>
-                  <option value="1">1 — Terrible</option>
-                </select>
-              </div>
-              <div class="field">
-                <label>Borough (optional)</label>
-                <select id="rBoro">
-                  <option value="">Use existing</option>
-                  <option>Manhattan</option>
-                  <option>Brooklyn</option>
-                  <option>Queens</option>
-                  <option>Bronx</option>
-                  <option>Staten Island</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="field" style="margin-top:12px;">
-              <label>What happened?</label>
-              <textarea id="rText" placeholder="Stick to facts: repairs, communication, safety, deposit, etc."></textarea>
-            </div>
-
-            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
-              <a class="btn btn--ghost" href="#/landlord/${esc(l.id)}">Cancel</a>
-              <button class="btn btn--primary" id="submitReview">Submit review</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-
-  $("#submitReview")?.addEventListener("click", () => {
-    const score = Number($("#rScore").value || 0);
-    const text = ($("#rText").value || "").trim();
-    const boro = ($("#rBoro").value || "").trim();
-    if (!text) return toast("Write a short description.");
-
-    l.score = Math.max(1, Math.min(5, score || 0));
-    l.text = text;
-    l.date = new Date().toLocaleDateString();
-    if (boro) l.borough = boro;
-
-    toast("Posted (demo).");
-    location.hash = "#/landlord/" + encodeURIComponent(l.id);
-  });
-}
-
-/* =========================================================
-   HOW / TRUST
-   ========================================================= */
-function renderHow() {
-  const app = $("#app");
-  if (!app) return;
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">How it works</div>
-              <h2>Simple, fast, and public</h2>
-              <div class="muted">No reviewer accounts. Landlords verify to respond.</div>
-            </div>
-            <a class="btn btn--ghost" href="#/">Home</a>
-          </div>
-
-          <div class="bd">
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Search</div>
-              <div class="rowSub">Find a landlord by name, company, address, borough, or map.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Review</div>
-              <div class="rowSub">Post instantly (no account). Keep it factual and specific.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Verified responses</div>
-              <div class="rowSub">Landlords verify documents before responding publicly.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Reporting</div>
-              <div class="rowSub">Report spam, harassment, or personal information.</div>
-            </div></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function renderTrust() {
-  const app = $("#app");
-  if (!app) return;
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Trust & Safety</div>
-              <h2>Built for accuracy and accountability</h2>
-              <div class="muted">Clear rules + verified landlord responses.</div>
-            </div>
-            <a class="btn btn--ghost" href="#/">Home</a>
-          </div>
-
-          <div class="bd">
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">No reviewer accounts</div>
-              <div class="rowSub">Tenants can post without accounts. Reviews should be factual and specific.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Verified landlord responses</div>
-              <div class="rowSub">Landlords verify documents before responding publicly.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">No personal info</div>
-              <div class="rowSub">Do not post phone numbers, emails, or private details.</div>
-            </div></div>
-
-            <div class="rowCard"><div style="flex:1;">
-              <div class="rowTitle">Reporting</div>
-              <div class="rowSub">Report spam, harassment, or inaccurate listings for moderation.</div>
-            </div></div>
-          </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-/* =========================================================
-   LANDLORD PORTAL (inline SVG logos; no CSS dependency)
-   ========================================================= */
-function googleIcon() {
-  return `
-    <svg class="oauthSvg" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.18 3.22l6.82-6.82C35.86 2.36 30.28 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.93 6.16C12.36 13.02 17.74 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9.01h12.7c-.55 2.96-2.2 5.47-4.67 7.16l7.16 5.55C43.88 36.52 46.5 30.78 46.5 24z"/>
-      <path fill="#FBBC05" d="M10.49 28.38A14.5 14.5 0 0 1 9.5 24c0-1.52.26-2.99.74-4.38l-7.93-6.16A23.9 23.9 0 0 0 0 24c0 3.85.92 7.49 2.56 10.78l7.93-6.4z"/>
-      <path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.9-5.78l-7.16-5.55c-1.99 1.34-4.54 2.13-8.74 2.13-6.26 0-11.64-3.52-13.51-8.62l-7.93 6.4C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
-  `;
-}
-
-function appleIcon() {
-  return `
-    <svg class="oauthSvg" viewBox="0 0 384 512" aria-hidden="true">
-      <path fill="#111" d="M318.7 268.6c-.3-52.6 43.1-77.8 45.1-79.1-24.6-35.9-62.9-40.8-76.4-41.4-32.6-3.3-63.7 19.2-80.2 19.2-16.5 0-42-18.7-69-18.2-35.5.5-68.2 20.6-86.5 52.4-36.9 64-9.4 158.7 26.5 210.6 17.6 25.4 38.6 54 66.2 52.9 26.6-1.1 36.7-17.2 68.8-17.2 32.1 0 41.2 17.2 69.1 16.6 28.5-.5 46.6-25.9 64.1-51.4 20.2-29.5 28.6-58 28.9-59.5-.6-.3-55.4-21.3-55.6-84.9zM259.5 78.7c14.6-17.7 24.4-42.2 21.7-66.7-21.1.8-46.6 14.1-61.7 31.8-13.6 15.7-25.5 40.8-22.3 64.8 23.5 1.8 47.7-12 62.3-29.9z"/>
-    </svg>
-  `;
-}
-
-function microsoftIcon() {
-  return `
-    <svg class="oauthSvg" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#F25022" d="M1 1h10v10H1z"/>
-      <path fill="#7FBA00" d="M13 1h10v10H13z"/>
-      <path fill="#00A4EF" d="M1 13h10v10H1z"/>
-      <path fill="#FFB900" d="M13 13h10v10H13z"/>
-    </svg>
-  `;
-}
-
-function renderPortal() {
-  const app = $("#app");
-  if (!app) return;
-
-  app.innerHTML = `
-    <section class="section">
-      <div class="wrap">
-        <div class="card">
-          <div class="hd">
-            <div>
-              <div class="kicker">Landlord Portal</div>
-              <h2>Sign in</h2>
-              <div class="muted">Landlords verify documents before responding publicly.</div>
-            </div>
-            <a class="btn btn--ghost" href="#/">Home</a>
-          </div>
-
-          <div class="bd">
-            <div class="split2">
-              <div class="card" style="box-shadow:none;">
-                <div class="pad">
-                  <div class="kicker">Sign in</div>
-                  <div class="field" style="margin-top:10px;">
-                    <label>Email</label>
-                    <input id="le" placeholder="you@company.com"/>
-                  </div>
-                  <div class="field" style="margin-top:10px;">
-                    <label>Password</label>
-                    <input id="lp" type="password" placeholder="Password"/>
-                  </div>
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">Sign in</button>
-
-                  <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
-
-                  <button class="btn btn--outline btn--block oauthBtn" id="g">
-                    ${googleIcon()} <span>Continue with Google</span>
-                  </button>
-                  <div style="height:8px;"></div>
-                  <button class="btn btn--outline btn--block oauthBtn" id="a">
-                    ${appleIcon()} <span>Continue with Apple</span>
-                  </button>
-                  <div style="height:8px;"></div>
-                  <button class="btn btn--outline btn--block oauthBtn" id="m">
-                    ${microsoftIcon()} <span>Continue with Microsoft</span>
-                  </button>
+                <div class="field">
+                  <label>Sort</label>
+                  <select id="sort">
+                    <option value="relevance">Relevance</option>
+                    <option value="rating">Rating</option>
+                    <option value="newest">Newest</option>
+                  </select>
                 </div>
               </div>
 
-              <div class="card" style="box-shadow:none;">
-                <div class="pad">
-                  <div class="kicker">Create account</div>
-                  <div class="field" style="margin-top:10px;">
-                    <label>Email</label>
-                    <input id="se" placeholder="you@company.com"/>
-                  </div>
-                  <div class="field" style="margin-top:10px;">
-                    <label>Password</label>
-                    <input id="sp" type="password" placeholder="Create a password"/>
-                  </div>
-                  <div class="field" style="margin-top:10px;">
-                    <label>Verification document (demo)</label>
-                    <input id="doc" type="file"/>
-                    <div class="tiny" style="margin-top:6px;">Lease header, LLC registration, management agreement, etc.</div>
-                  </div>
-                  <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-                  <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
+              <div class="mapWrap" id="mapWrap" style="margin-top:14px;">
+                <div id="map"></div>
+              </div>
+
+              <div id="results"></div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+
+    // map init (if leaflet)
+    const mapWrap = $("#mapWrap");
+    let mapObj = null;
+    if (mapWrap && leafletAvailable()) {
+      mapObj = initLeafletMap("map", [40.73, -73.97], 11);
+      setTimeout(() => mapObj.map.invalidateSize(), 60);
+    } else if (mapWrap) {
+      mapWrap.style.display = "none";
+    }
+
+    function parseDate(d) {
+      const parts = String(d || "").split("/");
+      if (parts.length !== 3) return new Date(0);
+      const mm = Number(parts[0]) - 1;
+      const dd = Number(parts[1]);
+      const yy = Number(parts[2]);
+      return new Date(yy, mm, dd);
+    }
+
+    function run() {
+      const query = ($("#q").value || "").trim().toLowerCase();
+      const borough = ($("#borough").value || "").trim();
+      const minr = Number($("#minr").value || 0);
+      const sort = ($("#sort").value || "relevance");
+
+      let list = landlords.slice();
+
+      if (query) {
+        list = list.filter(
+          (x) =>
+            x.name.toLowerCase().includes(query) ||
+            x.addr.toLowerCase().includes(query)
+        );
+      }
+      if (borough) list = list.filter((x) => (x.borough || "") === borough);
+      if (minr) list = list.filter((x) => (Number(x.score) || 0) >= minr);
+
+      if (sort === "rating") list.sort((a, b) => (b.score || 0) - (a.score || 0));
+      if (sort === "newest") list.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+
+      const results = $("#results");
+      if (results) {
+        results.innerHTML = list.length
+          ? list.map((x) => `
+              <div class="rowCard">
+                <div style="flex:1;">
+                  <div class="rowTitle">${esc(x.name)}</div>
+                  <div class="rowSub">${esc(x.addr)}</div>
+                  <div class="tiny" style="margin-top:6px;">${esc(x.borough || "")}</div>
+                  ${starsRow(x.score)}
                 </div>
+                <div style="display:flex; flex-direction:column; gap:10px; justify-content:center;">
+                  <a class="btn btn--primary" href="#/landlord/${esc(x.id)}">View</a>
+                </div>
+              </div>
+            `).join("")
+          : `
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:1000;">No results</div>
+              <div class="tiny" style="margin-top:6px;">Try a different search or change filters.</div>
+            </div>
+          `;
+      }
+
+      if (mapObj) setMarkers(mapObj, list);
+    }
+
+    $("#doSearch")?.addEventListener("click", run);
+    $("#q")?.addEventListener("keydown", (e) => e.key === "Enter" && run());
+    ["borough", "minr", "sort"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("change", run);
+    });
+
+    run();
+  }
+
+  function renderAdd() {
+    const app = $("#app");
+    if (!app) return;
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Add landlord</div>
+                <h2>Add a missing profile</h2>
+                <div class="muted">No account required. Keep it factual and specific.</div>
+              </div>
+              <a class="btn btn--ghost" href="#/search">Search</a>
+            </div>
+
+            <div class="bd">
+              <div class="split2">
+                <div class="field">
+                  <label>Landlord / Company name</label>
+                  <input id="name" placeholder="e.g., Northside Properties" />
+                </div>
+                <div class="field">
+                  <label>Address</label>
+                  <input id="addr" placeholder="e.g., 123 Main St, Brooklyn, NY" />
+                </div>
+              </div>
+
+              <div class="split2" style="margin-top:12px;">
+                <div class="field">
+                  <label>Borough</label>
+                  <select id="boro">
+                    <option value="">Select borough</option>
+                    <option>Manhattan</option>
+                    <option>Brooklyn</option>
+                    <option>Queens</option>
+                    <option>Bronx</option>
+                    <option>Staten Island</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Coordinates (optional for map)</label>
+                  <input id="coords" placeholder="lat,lng (e.g., 40.7081,-73.9571)" />
+                </div>
+              </div>
+
+              <div class="field" style="margin-top:12px;">
+                <label>Notes (optional)</label>
+                <textarea id="notes" placeholder="Any helpful context (management company, building name, etc.)"></textarea>
+              </div>
+
+              <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+                <a class="btn btn--ghost" href="#/">Cancel</a>
+                <button class="btn btn--primary" id="submit">Add landlord</button>
+              </div>
+
+              <div class="tiny" style="margin-top:10px;">
+                Demo mode: adds to in-memory list (won’t persist after refresh).
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  `;
+      </section>
+    `;
 
-  $("#login")?.addEventListener("click", () => {
-    const e = ($("#le").value || "").trim();
-    const p = ($("#lp").value || "").trim();
-    if (!e || !p) return toast("Enter email + password.");
-    toast("Signed in (demo).");
-  });
+    $("#submit")?.addEventListener("click", () => {
+      const name = ($("#name").value || "").trim();
+      const addr = ($("#addr").value || "").trim();
+      const borough = ($("#boro").value || "").trim();
+      const coords = ($("#coords").value || "").trim();
+      const notes = ($("#notes").value || "").trim();
 
-  $("#signup")?.addEventListener("click", () => {
-    const e = ($("#se").value || "").trim();
-    const p = ($("#sp").value || "").trim();
-    const f = $("#doc")?.files?.[0];
-    if (!e || !p) return toast("Enter email + password.");
-    if (!f) return toast("Upload a verification document.");
-    toast("Submitted for verification (demo).");
-  });
+      if (!name || !addr) return toast("Add name + address.");
 
-  ["g", "a", "m"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("click", () => toast("OAuth (demo only)."));
-  });
-}
+      let lat, lng;
+      if (coords.includes(",")) {
+        const [a, b] = coords.split(",").map((x) => Number(x.trim()));
+        if (!Number.isNaN(a) && !Number.isNaN(b)) { lat = a; lng = b; }
+      }
 
-/* =========================================================
-   ROUTER
-   ========================================================= */
-function route() {
-  const raw = location.hash || "#/";
-  const [pathPart] = raw.replace(/^#/, "").split("?");
-  const parts = pathPart.split("/").filter(Boolean);
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || ("landlord-" + Date.now());
 
-  if (parts.length === 0) return renderHome();
+      landlords.unshift({
+        id,
+        name,
+        addr,
+        borough: borough || "",
+        lat: typeof lat === "number" ? lat : undefined,
+        lng: typeof lng === "number" ? lng : undefined,
+        score: 0,
+        date: new Date().toLocaleDateString(),
+        text: notes || "New listing (no reviews yet).",
+      });
 
-  const page = parts[0];
+      toast("Added: " + name);
+      location.hash = "#/search?q=" + encodeURIComponent(name);
+    });
+  }
 
-  if (page === "search") return renderSearch();
-  if (page === "add") return renderAdd();
-  if (page === "how") return renderHow();
-  if (page === "trust") return renderTrust();
-  if (page === "portal") return renderPortal();
-  if (page === "landlord" && parts[1]) return renderLandlord(parts[1]);
-  if (page === "review" && parts[1]) return renderReview(parts[1]);
+  function renderHow() {
+    const app = $("#app");
+    if (!app) return;
 
-  renderHome();
-}
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">How it works</div>
+                <h2>Simple, fast, and public</h2>
+                <div class="muted">No reviewer accounts. Landlords verify to respond.</div>
+              </div>
+              <a class="btn btn--ghost" href="#/">Home</a>
+            </div>
 
-function boot() {
+            <div class="bd">
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Search</div>
+                <div class="rowSub">Find a landlord by name, company, address, or borough.</div>
+              </div></div>
+
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Review</div>
+                <div class="rowSub">Post instantly (no account required).</div>
+              </div></div>
+
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Verified responses</div>
+                <div class="rowSub">Landlords verify documents before responding publicly.</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderTrust() {
+    const app = $("#app");
+    if (!app) return;
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Trust & Safety</div>
+                <h2>Built for accuracy and accountability</h2>
+                <div class="muted">Clear rules + verified landlord responses.</div>
+              </div>
+              <a class="btn btn--ghost" href="#/">Home</a>
+            </div>
+
+            <div class="bd">
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">No reviewer accounts</div>
+                <div class="rowSub">Tenants can post without accounts.</div>
+              </div></div>
+
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">No personal info</div>
+                <div class="rowSub">Do not post phone numbers, emails, or private details.</div>
+              </div></div>
+
+              <div class="rowCard"><div style="flex:1;">
+                <div class="rowTitle">Reporting</div>
+                <div class="rowSub">Spam, harassment, and inaccurate listings can be reported.</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function iconGoogle() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.4H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.6z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.4 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.3 35.7 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.5 39.3 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.4H42V20H24v8h11.3c-.8 2.1-2.2 3.9-4 5.1l.0 0 6.3 5.2C36.9 40.8 44 36 44 24c0-1.2-.1-2.4-.4-3.6z"/>
+      </svg>
+    `;
+  }
+  function iconApple() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true">
+        <path fill="currentColor" d="M318.7 268.6c-.2-38.4 17.1-67.4 53.1-89.3-20.1-28.9-50.5-44.8-90.7-47.9-38.3-3-80 22.3-95.3 22.3-16.2 0-53-21.2-82.2-20.6C44.5 134.2 0 181.5 0 277.7 0 305.7 5.1 334 15.4 362.7c13.7 37.8 63.1 130.3 114.7 128.8 27.1-.6 46.2-19.2 81.5-19.2 34.2 0 51.7 19.2 82.2 18.6 56.2-.9 101-85 114-122.9-67.2-31.7-89-84-89.1-99.4zM250.5 80.3c29.5-35.1 26.9-67 26-78.3-26.1 1.5-56.4 17.7-73.6 37.8-19 21.6-30.2 48.4-27.8 77 28.3 2.2 53.8-12.1 75.4-36.5z"/>
+      </svg>
+    `;
+  }
+  function iconMicrosoft() {
+    return `
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#F25022" d="M1 1h10v10H1z"/>
+        <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+        <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+        <path fill="#FFB900" d="M13 13h10v10H13z"/>
+      </svg>
+    `;
+  }
+
+  function renderPortal() {
+    const app = $("#app");
+    if (!app) return;
+
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card">
+            <div class="hd">
+              <div>
+                <div class="kicker">Landlord Portal</div>
+                <h2>Sign in</h2>
+                <div class="muted">Landlords verify documents before responding publicly.</div>
+              </div>
+              <a class="btn btn--ghost" href="#/">Home</a>
+            </div>
+
+            <div class="bd">
+              <div class="split2">
+                <div class="card" style="box-shadow:none;">
+                  <div class="pad">
+                    <div class="kicker">Sign in</div>
+                    <div class="field" style="margin-top:10px;">
+                      <label>Email</label>
+                      <input id="le" placeholder="you@company.com"/>
+                    </div>
+                    <div class="field" style="margin-top:10px;">
+                      <label>Password</label>
+                      <input id="lp" type="password" placeholder="Password"/>
+                    </div>
+                    <button class="btn btn--primary btn--block" style="margin-top:12px;" id="login">Sign in</button>
+
+                    <div class="tiny" style="margin:12px 0 10px; text-align:center;">or continue with</div>
+
+                    <button class="btn btn--outline btn--block socialBtn" id="g">
+                      <span class="socialBtn__ic">${iconGoogle()}</span>
+                      <span>Continue with Google</span>
+                    </button>
+
+                    <div style="height:8px;"></div>
+
+                    <button class="btn btn--outline btn--block socialBtn" id="a">
+                      <span class="socialBtn__ic">${iconApple()}</span>
+                      <span>Continue with Apple</span>
+                    </button>
+
+                    <div style="height:8px;"></div>
+
+                    <button class="btn btn--outline btn--block socialBtn" id="m">
+                      <span class="socialBtn__ic">${iconMicrosoft()}</span>
+                      <span>Continue with Microsoft</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card" style="box-shadow:none;">
+                  <div class="pad">
+                    <div class="kicker">Create account</div>
+                    <div class="field" style="margin-top:10px;">
+                      <label>Email</label>
+                      <input id="se" placeholder="you@company.com"/>
+                    </div>
+                    <div class="field" style="margin-top:10px;">
+                      <label>Password</label>
+                      <input id="sp" type="password" placeholder="Create a password"/>
+                    </div>
+                    <div class="field" style="margin-top:10px;">
+                      <label>Verification document (demo)</label>
+                      <input id="doc" type="file"/>
+                      <div class="tiny" style="margin-top:6px;">Lease header, LLC registration, management agreement, etc.</div>
+                    </div>
+                    <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
+                    <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    `;
+
+    $("#login")?.addEventListener("click", () => {
+      const e = ($("#le").value || "").trim();
+      const p = ($("#lp").value || "").trim();
+      if (!e || !p) return toast("Enter email + password.");
+      toast("Signed in (demo).");
+    });
+
+    $("#signup")?.addEventListener("click", () => {
+      const e = ($("#se").value || "").trim();
+      const p = ($("#sp").value || "").trim();
+      if (!e || !p) return toast("Enter email + password.");
+      toast("Account created (demo).");
+    });
+
+    $("#g")?.addEventListener("click", () => toast("Google sign-in (demo)"));
+    $("#a")?.addEventListener("click", () => toast("Apple sign-in (demo)"));
+    $("#m")?.addEventListener("click", () => toast("Microsoft sign-in (demo)"));
+  }
+
+  function renderNotFound() {
+    const app = $("#app");
+    if (!app) return;
+    app.innerHTML = `
+      <section class="section">
+        <div class="wrap">
+          <div class="card pad">
+            <h2>Page not found</h2>
+            <p class="muted">That route doesn’t exist.</p>
+            <a class="btn btn--primary" href="#/">Go home</a>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  /* ---------- router ---------- */
+  function route() {
+    const h = location.hash || "#/";
+    const path = h.split("?")[0];
+
+    if (path === "#/" || path === "#") return renderHome();
+    if (path === "#/search") return renderSearch();
+    if (path === "#/add") return renderAdd();
+    if (path === "#/how") return renderHow();
+    if (path === "#/trust") return renderTrust();
+    if (path === "#/portal") return renderPortal();
+
+    // placeholder for future landlord detail
+    if (path.startsWith("#/landlord/")) {
+      const id = path.split("/")[2] || "";
+      const x = landlords.find((z) => z.id === id);
+      const app = $("#app");
+      if (!app) return;
+      app.innerHTML = `
+        <section class="section">
+          <div class="wrap">
+            <div class="card">
+              <div class="hd">
+                <div>
+                  <div class="kicker">Landlord</div>
+                  <h2>${esc(x ? x.name : "Unknown")}</h2>
+                  <div class="muted">${esc(x ? x.addr : "")}</div>
+                </div>
+                <a class="btn btn--ghost" href="#/search">Back</a>
+              </div>
+              <div class="bd">
+                ${x ? starsRow(x.score) : ""}
+                <div class="rowSub" style="margin-top:10px;">${esc(x ? x.text : "No data.")}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+      return;
+    }
+
+    renderNotFound();
+  }
+
+  /* ---------- boot ---------- */
   window.addEventListener("hashchange", route);
-  if (!location.hash) location.hash = "#/";
-  route();
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
-} else {
-  boot();
-}
+  document.addEventListener("DOMContentLoaded", () => {
+    // quick sanity check
+    if (!document.getElementById("app")) {
+      console.error("Missing #app in index.html");
+      return;
+    }
+    route();
+  });
+})();
