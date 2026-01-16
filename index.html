@@ -2,20 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>casa</title>
-  <link rel="stylesheet" href="./styles.css" />
-  <!-- Leaflet (map) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-</head>
 
+  <!-- Leaflet (maps) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="app.js"></script>
+</head>
 <body>
   <header class="nav" role="banner">
     <div class="wrap nav__inner">
-      <!-- BRAND (keeps your original wavy mark) -->
-      <a class="brand" href="#/" aria-label="casa home">
+      <a class="brand" href="#/" aria-label="casa home" id="brandHome">
         <div class="brand__mark" aria-hidden="true">
-          <!-- YOUR ORIGINAL LOGO MARK -->
+          <!-- YOUR ORIGINAL LOGO (do not change) -->
           <svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
             <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
@@ -29,62 +31,40 @@
         </div>
       </a>
 
-      <!-- DESKTOP NAV -->
       <nav class="nav__center" aria-label="Primary">
         <a class="nav__link" href="#/search">Search</a>
         <a class="nav__link" href="#/add">Add Landlord</a>
         <a class="nav__link" href="#/how">How It Works</a>
-        <a class="nav__link" href="#/trust">Trust & Safety</a>
+        <a class="nav__link" href="#/trust">Trust &amp; Safety</a>
       </nav>
 
       <div class="nav__right">
-        <a class="btn btn--ghost btn--pill" href="#/portal">Landlord Portal</a>
-
-        <!-- MOBILE MENU BUTTON (hidden on desktop via CSS) -->
-        <button class="btn btn--ghost btn--pill nav__menuBtn" id="menuBtn" type="button" aria-label="Open menu">
-          Menu
-        </button>
+        <a class="btn btn--ghost" href="#/portal">Landlord Portal</a>
+        <!-- MOBILE ONLY -->
+        <button class="btn btn--ghost nav__menuBtn" id="menuBtn" type="button">Menu</button>
       </div>
     </div>
   </header>
 
-  <!-- MOBILE MENU OVERLAY -->
-  <div class="overlay" id="menuOverlay" aria-hidden="true">
-    <div class="overlay__scrim" id="menuScrim"></div>
-    <div class="overlay__panel" role="dialog" aria-modal="true" aria-label="Menu">
-      <div class="overlay__head">
-        <div class="overlay__title">Menu</div>
-        <button class="iconBtn" id="menuClose" aria-label="Close menu">×</button>
-      </div>
-
-      <div class="overlay__body">
-        <a class="menuItem" href="#/search">Search</a>
-        <a class="menuItem" href="#/add">Add Landlord</a>
-        <a class="menuItem" href="#/how">How It Works</a>
-        <a class="menuItem" href="#/trust">Trust & Safety</a>
-        <a class="btn btn--primary btn--block" href="#/portal">Landlord Portal</a>
-      </div>
-    </div>
-  </div>
-
   <main class="wrap" id="app" role="main"></main>
 
-  <!-- GLOBAL MODAL ROOT -->
-  <div class="modal" id="modalRoot" aria-hidden="true"></div>
-
-  <footer class="footer">
-    <div class="wrap footer__inner">
-      <div class="tiny">© <span id="year"></span> casa</div>
-      <div class="footer__links">
-        <a href="#/trust">Trust & Safety</a>
-        <a href="#/how">How it works</a>
-        <a href="#/search">Search</a>
-      </div>
+  <!-- Mobile menu drawer -->
+  <div class="drawerOverlay" id="drawerOverlay" aria-hidden="true"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-label="Menu">
+    <div class="drawer__head">
+      <div class="drawer__title">Menu</div>
+      <button class="iconBtn" id="drawerClose" aria-label="Close menu">×</button>
     </div>
-  </footer>
+    <div class="drawer__body">
+      <a class="drawer__item" href="#/search" data-drawer-link>Search</a>
+      <a class="drawer__item" href="#/add" data-drawer-link>Add Landlord</a>
+      <a class="drawer__item" href="#/how" data-drawer-link>How It Works</a>
+      <a class="drawer__item" href="#/trust" data-drawer-link>Trust &amp; Safety</a>
+      <a class="drawer__item drawer__item--primary" href="#/portal" data-drawer-link>Landlord Portal</a>
+    </div>
+  </aside>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="./app.js"></script>
+  <!-- Modal root -->
+  <div class="modalOverlay" id="modalOverlay" aria-hidden="true"></div>
 </body>
 </html>
