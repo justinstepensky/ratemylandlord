@@ -15,10 +15,20 @@
 
   --red-bg: rgba(239, 68, 68, .10);
   --red-br: rgba(239, 68, 68, .26);
+
+  /* unified control tokens */
+  --ctl-bg: rgba(255,255,255,.88);
+  --ctl-bg-focus: rgba(255,255,255,.95);
+  --ctl-br: rgba(20,16,12,.12);
+  --ctl-br-focus: rgba(20,16,12,.18);
+  --ctl-shadow: 0 10px 26px rgba(20,16,12,.06);
+  --ctl-shadow-focus: 0 0 0 4px rgba(20,16,12,.08), 0 18px 44px rgba(20,16,12,.08);
+  --ctl-placeholder: rgba(21,17,14,.42);
 }
 
 *{box-sizing:border-box}
 html,body{height:100%}
+
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
@@ -46,13 +56,13 @@ body{
   border:1px solid rgba(20,16,12,.08);
 }
 
-/* Logo font (club-ish). Requires Google font link in <head> */
+/* logo */
 .brand__name{
-  font-family: "Bodoni Moda", ui-serif, Georgia, "Times New Roman", serif;
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
   font-style: italic;
-  font-weight: 600;
+  font-weight: 650;
   font-size:18px;
-  letter-spacing:-0.02em;
+  letter-spacing: -0.02em;
   text-transform:lowercase;
 }
 
@@ -63,7 +73,6 @@ body{
   padding:10px 10px;border-radius:999px;
 }
 .nav__link:hover{background: rgba(20,16,12,.06)}
-
 .nav__right{display:flex;gap:10px;align-items:center}
 
 /* -----------------------------
@@ -114,7 +123,6 @@ body{
   font-size:11px;
   color: rgba(21,17,14,.45);
 }
-
 .h1{
   font-size:52px;
   line-height:1.02;
@@ -127,7 +135,92 @@ body{
 }
 
 /* -----------------------------
-   INPUTS
+   FORM CONTROLS (UNIFIED)
+   Every textbox, select, textarea uses the same premium style
+------------------------------ */
+.field{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+
+label{
+  font-weight:850;
+  font-size:13px;
+  color:rgba(21,17,14,.78);
+  letter-spacing:.01em;
+}
+
+/* Base control class (we apply to .input + .textarea + safety net below) */
+.control,
+.input,
+.textarea{
+  width:100%;
+  border-radius:18px;
+  border:1px solid var(--ctl-br);
+  background: var(--ctl-bg);
+  color: rgba(21,17,14,.92);
+  font-weight:650;
+  outline:none;
+  box-shadow: var(--ctl-shadow);
+  transition: box-shadow .15s ease, border-color .15s ease, background .15s ease, transform .05s ease;
+}
+
+.input,
+.control{
+  height:46px;
+  padding:0 14px;
+}
+
+.textarea{
+  padding:14px 14px;
+  min-height:120px;
+  resize: vertical;
+  line-height:1.45;
+}
+
+/* Placeholder */
+.input::placeholder,
+.textarea::placeholder,
+.control::placeholder{
+  color: var(--ctl-placeholder);
+  font-weight:650;
+}
+
+/* Focus */
+.input:focus,
+.textarea:focus,
+.control:focus{
+  background: var(--ctl-bg-focus);
+  border-color: var(--ctl-br-focus);
+  box-shadow: var(--ctl-shadow-focus);
+}
+
+/* Select styling to match */
+select.input,
+select.control{
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(21,17,14,.55) 50%),
+    linear-gradient(135deg, rgba(21,17,14,.55) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px);
+  background-size:6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+  padding-right:38px;
+}
+
+/* Safety net: if you ever forgot to apply .input/.textarea somewhere */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="number"],
+textarea,
+select{
+  font-family: inherit;
+}
+
+/* -----------------------------
+   HERO SEARCH
 ------------------------------ */
 .heroSearch{
   display:flex;
@@ -135,17 +228,6 @@ body{
   align-items:center;
   margin-top:14px;
 }
-.input{
-  flex:1;
-  height:44px;
-  border-radius:999px;
-  border:1px solid rgba(20,16,12,.14);
-  padding:0 16px;
-  background: rgba(255,255,255,.78);
-  outline:none;
-  font-weight:600;
-}
-.input:focus{box-shadow: 0 0 0 4px rgba(20,16,12,.08)}
 
 /* -----------------------------
    TILES
@@ -173,29 +255,33 @@ body{
   border:1px solid rgba(20,16,12,.10);
 }
 .tile__label{font-weight:800}
-.tilePanel{margin-top:10px;padding:14px;border-radius:18px;background: rgba(255,255,255,.55);border:1px solid rgba(20,16,12,.08)}
+.tilePanel{
+  margin-top:10px;
+  padding:12px 14px;
+  border-radius:18px;
+  background: rgba(255,255,255,.62);
+  border:1px solid rgba(20,16,12,.08);
+  box-shadow: 0 10px 26px rgba(20,16,12,.06);
+  font-weight:650;
+  color: rgba(21,17,14,.62);
+  line-height:1.45;
+}
 
 /* -----------------------------
    HOME: equal-size Highlights + Map
 ------------------------------ */
 .splitRow{
   display:grid;
-  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap:16px;
   margin-top:16px;
   align-items:stretch;
 }
-.sectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.sectionTitle{margin:0;font-size:34px;line-height:1.05}
-.sectionDesc{margin:6px 0 0;color:rgba(21,17,14,.6);font-weight:600}
-.miniBtn{padding:9px 12px;font-size:13px}
-
-/* Make both splitRow cards equal-height panes */
 .splitRow > .card{
+  min-width:0;
   display:flex;
   flex-direction:column;
-  min-height: 360px;
-  min-width:0;
+  min-height:360px;
 }
 .splitRow > .card > .pad{
   flex:1;
@@ -203,6 +289,12 @@ body{
   flex-direction:column;
   min-height:0;
 }
+
+/* section header */
+.sectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sectionTitle{margin:0;font-size:34px;line-height:1.05}
+.sectionDesc{margin:6px 0 0;color:rgba(21,17,14,.6);font-weight:600}
+.miniBtn{padding:9px 12px;font-size:13px}
 
 /* -----------------------------
    CAROUSEL
@@ -214,7 +306,6 @@ body{
   border:1px solid rgba(20,16,12,.08);
   overflow:hidden;
   position:relative;
-
   flex:1;
   display:flex;
   flex-direction:column;
@@ -267,7 +358,21 @@ body{
 .lcRow{margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stars{letter-spacing:1px}
 .ratingNum{font-weight:900}
-.smallNote{margin-top:8px;color:rgba(21,17,14,.52);font-weight:600;font-size:12px}
+
+/* bubble notes everywhere */
+.smallNote{
+  margin-top:10px;
+  border-radius:16px;
+  border:1px solid rgba(20,16,12,.08);
+  background: rgba(255,255,255,.62);
+  padding:10px 12px;
+  color: rgba(21,17,14,.62);
+  font-weight:650;
+  font-size:12px;
+  line-height:1.45;
+  box-shadow: 0 10px 26px rgba(20,16,12,.06);
+}
+
 .lcRight{display:flex;gap:10px;align-items:center}
 .pill{
   border:1px solid rgba(20,16,12,.12);
@@ -299,16 +404,15 @@ body{
   overflow:hidden;
   border:1px solid rgba(20,16,12,.10);
   background: rgba(255,255,255,.65);
-
   flex:1;
   display:flex;
   min-height:0;
 }
 .map{
   width:100%;
-  height:100%;
-  min-height:240px;  /* Leaflet needs a real height */
   flex:1;
+  height:100%;
+  min-height:240px;
   position:relative;
   z-index:0;
 }
@@ -324,7 +428,6 @@ body{
 
 .twoCol{display:grid;grid-template-columns: 1.2fr .8fr;gap:16px;margin-top:16px}
 .list{display:flex;flex-direction:column;gap:12px}
-
 .hr{height:1px;background:rgba(20,16,12,.10);margin:16px 0}
 
 /* profile */
@@ -343,19 +446,6 @@ body{
 
 /* portal */
 .portalGrid{display:grid;grid-template-columns: 1fr 1fr;gap:14px;margin-top:14px}
-.field{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
-.tinyNote{
-  margin-top:8px;
-  padding:10px 12px;
-  border-radius:14px;
-  border:1px solid rgba(20,16,12,.10);
-  background: rgba(255,255,255,.62);
-  color: rgba(21,17,14,.62);
-  font-weight:800;
-  font-size:12px;
-  line-height:1.45;
-}
 .oauth{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 .oauthBtn{
   display:flex;align-items:center;justify-content:center;gap:10px;
@@ -376,6 +466,15 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 .fileRow .fileName{font-weight:800;font-size:13px;color:rgba(21,17,14,.78);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fileRow input[type="file"]{display:none}
 .filePick{padding:8px 10px;border-radius:999px;border:1px solid rgba(20,16,12,.14);background: rgba(255,255,255,.76);font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap}
+
+/* helper text (unified) */
+.tiny{
+  font-size:12px;
+  line-height:1.45;
+  color: rgba(21,17,14,.58);
+  font-weight:700;
+  letter-spacing:.01em;
+}
 
 /* modal */
 .modalOverlay{
@@ -403,32 +502,6 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 }
 .modalTitle{font-weight:950}
 .modalBody{padding:14px 16px}
-
-.textarea{
-  width:100%;
-  border-radius:18px;
-  border:1px solid rgba(20,16,12,.12);
-  padding:14px 14px;
-  background: rgba(255,255,255,.88);
-  outline:none;
-  min-height:120px;
-  font-weight:650;
-  color: rgba(21,17,14,.92);
-  box-shadow: 0 10px 26px rgba(20,16,12,.06);
-  transition: box-shadow .15s ease, border-color .15s ease, background .15s ease;
-}
-
-.textarea::placeholder{
-  color: rgba(21,17,14,.42);
-  font-weight:650;
-}
-
-.textarea:focus{
-  background: rgba(255,255,255,.95);
-  border-color: rgba(20,16,12,.18);
-  box-shadow: 0 0 0 4px rgba(20,16,12,.08), 0 18px 44px rgba(20,16,12,.08);
-}
-
 .modalFoot{
   display:flex;justify-content:flex-end;gap:10px;
   padding:14px 16px;border-top:1px solid rgba(20,16,12,.10);
@@ -478,14 +551,13 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 .footer a:hover{text-decoration:underline}
 
 /* -----------------------------
-   STAR PICKER (gold, horizontal, half-stars)
+   STAR PICKER (simple 1–5, gold fill)
 ------------------------------ */
 .starPicker{
   display:flex;
   align-items:center;
   gap:10px;
   flex-wrap:nowrap;
-  justify-content:flex-start;
 }
 
 .starBtn{
@@ -499,73 +571,12 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   display:grid;
   place-items:center;
   padding:0;
-  overflow:hidden;
-  transition: transform .06s ease, background .12s ease;
-}
-.starBtn:hover{
-  background: rgba(255,255,255,.92);
-  transform: translateY(-1px);
-}
-.starBtn:active{ transform: translateY(0px); }
-
-.starBase,
-.starFill{
-  position:absolute;
-  font-size:18px;
-  line-height:1;
-  user-select:none;
-}
-.starBase{ color: rgba(20,16,12,.22); } /* gray */
-.starFill{
-  color:#b88900;              /* gold */
-  width: var(--fill, 0%);     /* 0/50/100 */
-  overflow:hidden;
-  white-space:nowrap;
-  left:50%;
-  transform: translateX(-50%);
-}
-/* ===== Star Picker: WHOLE stars only (gold fill) ===== */
-.starPicker{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex-wrap:nowrap;
-  justify-content:flex-start;
-}
-
-.starBtn{
-  width:44px;
-  height:44px;
-  border-radius:999px;
-  border:1px solid rgba(20,16,12,.14);
-  background: rgba(255,255,255,.78);
-  cursor:pointer;
-  position:relative;
-  display:grid;
-  place-items:center;
-  padding:0;
-  overflow:hidden;
 }
 
 .starBtn:hover{ background: rgba(255,255,255,.92); }
 
-.starBase,
-.starFill{
-  position:absolute;
-  font-size:18px;
-  line-height:1;
-  user-select:none;
-}
-
-.starBase{ color: rgba(20,16,12,.22); }  /* gray */
-.starFill{
-  color:#b88900;            /* gold */
-  width: var(--fill, 0%);
-  overflow:hidden;
-  white-space:nowrap;
-  left:50%;
-  transform: translateX(-50%);
-}
+.starBase{ color: rgba(20,16,12,.22); font-size:18px; line-height:1; user-select:none; }
+.starFill{ color:#b88900; font-size:18px; line-height:1; user-select:none; }
 
 .starValue{
   margin-left:8px;
@@ -574,29 +585,13 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   color: rgba(21,17,14,.72);
 }
 
-.starValue{
-  margin-left:8px;
-  font-weight:900;
-  font-size:13px;
-  color: rgba(21,17,14,.72);
-}
-
-/* -----------------------------
-   RESPONSIVE
------------------------------- */
+/* responsive */
 @media (max-width: 980px){
   .h1{font-size:44px}
   .splitRow{grid-template-columns:1fr}
   .twoCol{grid-template-columns:1fr}
   .nav__center{display:none}
   .splitRow > .card{min-height:unset}
-}
-
-@media (max-width: 980px){
-  .nav__menuBtn{display:inline-flex}
-}
-@media (min-width: 981px){
-  .nav__menuBtn{display:none}
 }
 
 @media (max-width: 520px){
