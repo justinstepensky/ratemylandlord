@@ -1222,81 +1222,60 @@ function renderLandlord(id) {
 }
 
 /* -----------------------------
-   Star picker (HALF-star)
-   - Horizontal row
-   - Gold fill indicates selection
-   - Hover preview + click set
-   - Stores 0.5 increments in #mStars
+   Star picker (WHOLE stars ONLY)
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
-  const v = Number(defaultValue) || 5;
+  const v = Math.max(1, Math.min(5, Number(defaultValue) || 5));
 
   return `
     <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
-      ${[1,2,3,4,5].map(i => {
-        return `
-          <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
-            <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
-            <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
-
-            <!-- base star (gray) -->
-            <span class="starBase">★</span>
-
-            <!-- fill star (gold, clipped to half/full) -->
-            <span class="starFill">★</span>
-          </button>
-        `;
-      }).join("")}
-
-      <span class="starValue" id="starValue">${v.toFixed(1)}</span>
+      ${[1,2,3,4,5].map(i => `
+        <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
+          <span class="starBase">★</span>
+          <span class="starFill">★</span>
+        </button>
+      `).join("")}
+      <span class="starValue" id="starValue">${v}/5</span>
       <input type="hidden" id="mStars" value="${v}">
     </div>
   `;
 }
 
 function applyStarPickerVisual(value) {
-  const v = Number(value) || 0;
+  const v = Math.max(1, Math.min(5, Number(value) || 1));
   const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
 
   btns.forEach(btn => {
     const s = Number(btn.dataset.star);
-    const fillEl = btn.querySelector(".starFill");
-    if (!fillEl) return;
-
-    // 0% = empty, 50% = half, 100% = full
-    let pct = "0%";
-    if (v >= s) pct = "100%";
-    else if (v === s - 0.5) pct = "50%";
-
-    fillEl.style.setProperty("--fill", pct);
+    // set percent fill (0 or 100)
+    btn.style.setProperty("--fill", v >= s ? "100%" : "0%");
   });
 
   const out = $("#starValue");
-  if (out) out.textContent = v.toFixed(1);
+  if (out) out.textContent = `${v}/5`;
 
   const hidden = $("#mStars");
   if (hidden) hidden.value = String(v);
 }
 
 function bindStarPicker(defaultValue = 5) {
-  let current = Math.max(0.5, Math.min(5, Number(defaultValue) || 5));
+  let current = Math.max(1, Math.min(5, Number(defaultValue) || 5));
   applyStarPickerVisual(current);
 
   // hover preview
-  document.querySelectorAll("#starPicker .hit").forEach(hit => {
-    hit.addEventListener("mouseenter", () => {
-      applyStarPickerVisual(hit.dataset.value);
+  document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
+    btn.addEventListener("mouseenter", () => {
+      applyStarPickerVisual(btn.dataset.star);
     });
   });
 
-  $("#starPicker").addEventListener("mouseleave", () => {
-    applyStarPickerVisual(current);
-  });
+  // restore
+  $("#starPicker").addEventListener("mouseleave", () => applyStarPickerVisual(current));
 
   // click set
-  document.querySelectorAll("#starPicker .hit").forEach(hit => {
-    hit.addEventListener("click", () => {
-      current = Math.max(0.5, Math.min(5, Number(hit.dataset.value) || current));
+  document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      current = Number(btn.dataset.star);
       applyStarPickerVisual(current);
     });
   });
@@ -1341,8 +1320,7 @@ function openReviewModal(landlordId) {
 
   $("#mSubmit").addEventListener("click", () => {
     // picker stores 0.5 increments; DB stores integer 1..5
-    const raw = Number($("#mStars").value); // e.g. 4.5
-    const starsInt = Math.max(1, Math.min(5, Math.round(raw)));
+   const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
     const text = $("#mText").value.trim();
 
     if (!text || text.length < 20) {
