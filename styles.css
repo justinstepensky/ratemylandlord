@@ -567,16 +567,31 @@ select{
   border:1px solid rgba(20,16,12,.14);
   background: rgba(255,255,255,.78);
   cursor:pointer;
-  position:relative;
   display:grid;
   place-items:center;
   padding:0;
+  transition: transform .06s ease, background .12s ease;
 }
 
-.starBtn:hover{ background: rgba(255,255,255,.92); }
+.starBtn:hover{
+  background: rgba(255,255,255,.92);
+  transform: translateY(-1px);
+}
 
-.starBase{ color: rgba(20,16,12,.22); font-size:18px; line-height:1; user-select:none; }
-.starFill{ color:#b88900; font-size:18px; line-height:1; user-select:none; }
+.starBtn:active{ transform: translateY(0px); }
+
+/* single star element */
+.starChar{
+  font-size:18px;
+  line-height:1;
+  user-select:none;
+  color: rgba(20,16,12,.22); /* empty star */
+}
+
+/* filled stars */
+.starBtn.isOn .starChar{
+  color:#b88900; /* gold */
+}
 
 .starValue{
   margin-left:8px;
