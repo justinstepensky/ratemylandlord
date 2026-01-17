@@ -672,9 +672,6 @@ function renderSearch() {
 
   const qEl = $("#searchQ");
   const bEl = $("#searchB");
-qEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#doSearch").click();
-});
 
    // Press Enter in the search box = click Search
   qEl.addEventListener("keydown", (e) => {
@@ -1301,13 +1298,12 @@ function openReviewModal(landlordId) {
       <div class="field">
         <label>Rating</label>
         ${starPickerHTML(5)}
-        <div class="tiny" style="margin-top:6px;">Click a star to rate.</div>
       </div>
 
       <div class="field">
         <label>What happened?</label>
         <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
-        <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
+        <div class="tiny">Please write at least 20 characters. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
 
@@ -1338,10 +1334,9 @@ function openReviewModal(landlordId) {
       text,
       createdAt: Date.now()
     });
-    saveDB(DB);
 
+    saveDB(DB);
     closeModal();
     route();
   });
 }
-
