@@ -46,12 +46,13 @@ body{
   border:1px solid rgba(20,16,12,.08);
 }
 
-/* FIX: logo font — match premium sans, not serif */
+/* Logo font (club-ish). Requires Google font link in <head> */
 .brand__name{
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  font-weight:900;
-  font-size:16px;
-  letter-spacing:.08em;
+  font-family: "Bodoni Moda", ui-serif, Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size:18px;
+  letter-spacing:-0.02em;
   text-transform:lowercase;
 }
 
@@ -179,40 +180,32 @@ body{
 ------------------------------ */
 .splitRow{
   display:grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
   gap:16px;
   margin-top:16px;
-  align-items:stretch; /* key */
+  align-items:stretch;
 }
+.sectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sectionTitle{margin:0;font-size:34px;line-height:1.05}
+.sectionDesc{margin:6px 0 0;color:rgba(21,17,14,.6);font-weight:600}
+.miniBtn{padding:9px 12px;font-size:13px}
 
-/* make both cards act like equal-height panes */
-.homePaneCard{
+/* Make both splitRow cards equal-height panes */
+.splitRow > .card{
   display:flex;
   flex-direction:column;
-  min-height: 360px; /* shared height baseline */
+  min-height: 360px;
+  min-width:0;
 }
-.homePaneCard .pad{
-  flex:1;
-  display:flex;
-  flex-direction:column;
-}
-
-/* area below section header fills remaining space */
-.homePaneBody{
+.splitRow > .card > .pad{
   flex:1;
   display:flex;
   flex-direction:column;
   min-height:0;
 }
 
-/* section header */
-.sectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.sectionTitle{margin:0;font-size:34px;line-height:1.05}
-.sectionDesc{margin:6px 0 0;color:rgba(21,17,14,.6);font-weight:600}
-.miniBtn{padding:9px 12px;font-size:13px}
-
 /* -----------------------------
-   CAROUSEL: compact + fills pane
+   CAROUSEL
 ------------------------------ */
 .carousel{
   margin-top:14px;
@@ -222,7 +215,6 @@ body{
   overflow:hidden;
   position:relative;
 
-  /* fills remaining space in its pane */
   flex:1;
   display:flex;
   flex-direction:column;
@@ -237,13 +229,13 @@ body{
 }
 .carouselSlide{
   min-width:100%;
-  padding:12px; /* smaller */
+  padding:12px;
   display:flex;
   min-height:0;
 }
 .dots{
   display:flex;gap:8px;justify-content:center;align-items:center;
-  padding:10px 12px 12px; /* tighter */
+  padding:10px 12px 12px;
 }
 .dot{
   width:8px;height:8px;border-radius:999px;
@@ -308,14 +300,14 @@ body{
   border:1px solid rgba(20,16,12,.10);
   background: rgba(255,255,255,.65);
 
-  /* fills remaining space in its pane */
   flex:1;
   display:flex;
   min-height:0;
 }
 .map{
   width:100%;
-  height:auto;       /* let container drive height */
+  height:100%;
+  min-height:240px;  /* Leaflet needs a real height */
   flex:1;
   position:relative;
   z-index:0;
@@ -462,167 +454,9 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
 .footer a{color:inherit;text-decoration:none}
 .footer a:hover{text-decoration:underline}
 
-/* responsive */
-@media (max-width: 980px){
-  .h1{font-size:44px}
-  .splitRow{grid-template-columns:1fr}
-  .twoCol{grid-template-columns:1fr}
-  .nav__center{display:none}
-  .homePaneCard{min-height:unset}
-}
-
-@media (max-width: 980px){
-  .nav__menuBtn{display:inline-flex}
-}
-@media (min-width: 981px){
-  .nav__menuBtn{display:none}
-}
-
-@media (max-width: 520px){
-  .h1{font-size:38px}
-  .btn{font-size:13px;padding:10px 12px}
-  .miniBtn{font-size:12px}
-  .tileRow{grid-template-columns:1fr}
-}
-/* ===== CASA FIX PACK (keeps original theme) ===== */
-
-/* (A) Logo font: restore your original premium serif (your old theme) */
-.brand__name{
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif !important;
-  font-weight:700 !important;
-  font-size:18px !important;
-  letter-spacing:.2px !important;
-}
-
-/* (B) Home: force Recent Highlights + Map to be the SAME SIZE panes */
-@media (min-width: 981px){
-  .splitRow{
-    grid-template-columns: 1fr 1fr !important;
-    align-items: stretch !important;
-  }
-
-  /* Make both cards equal-height panes */
-  .splitRow > .card{
-    display:flex !important;
-    flex-direction:column !important;
-    min-height: 360px !important;  /* shared height */
-  }
-
-  .splitRow > .card > .pad{
-    flex:1 !important;
-    display:flex !important;
-    flex-direction:column !important;
-    min-height:0 !important;
-  }
-
-  /* The “content block” inside each pane should fill the remaining space */
-  .splitRow > .card .carousel,
-  .splitRow > .card .mapBox{
-    flex:1 !important;
-    min-height:0 !important;
-  }
-
-  /* Map should stretch to fill its container */
-  .splitRow > .card .map{
-    height: 100% !important;
-    min-height: 240px !important;
-  }
-
-  /* Keep carousel tidy so it doesn’t feel like a giant banner */
-  .carouselSlide{ padding:12px !important; }
-  .dots{ padding:10px 12px 12px !important; }
-}
-/* ===== CASA HOME LAYOUT FIX (force equal halves) ===== */
-@media (min-width: 981px){
-
-  /* Force the row to truly be 50/50 and allow shrinking */
-  .splitRow{
-    display:grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-    gap:16px !important;
-    align-items:stretch !important;
-  }
-
-  /* Critical: prevents “skinny right column” collapse */
-  .splitRow > .card{
-    min-width:0 !important;
-    width:auto !important;
-    display:flex !important;
-    flex-direction:column !important;
-  }
-
-  .splitRow > .card > .pad{
-    flex:1 !important;
-    min-height:0 !important;
-    display:flex !important;
-    flex-direction:column !important;
-  }
-
-  /* Give both panes the same overall height */
-  .splitRow > .card{
-    min-height: 360px !important;
-  }
-
-  /* Make the content areas fill */
-  .splitRow .carousel,
-  .splitRow .mapBox{
-    flex:1 !important;
-    min-height:0 !important;
-  }
-
-  /* Make map fill its box (Leaflet needs a real height) */
-  .splitRow .mapBox{ display:flex !important; }
-  .splitRow .map{
-    flex:1 !important;
-    height: 100% !important;
-    min-height: 240px !important;
-}
-/* adidas "club"-style logo font */
-.brand__name{
-  font-family: "Bodoni Moda", ui-serif, Georgia, "Times New Roman", serif !important;
-  font-style: italic !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.02em !important;
-}
-/* ===== Interactive star picker (CASA theme) ===== */
-.starInput{
-  display:flex;
-  gap:6px;
-  align-items:center;
-  margin-top:2px;
-}
-
-.starBtn{
-  width:38px;
-  height:38px;
-  border-radius:999px;
-  border:1px solid rgba(20,16,12,.12);
-  background: rgba(255,255,255,.65);
-  cursor:pointer;
-  display:grid;
-  place-items:center;
-  padding:0;
-  transition: transform .06s ease, background .12s ease;
-}
-
-.starBtn:hover{
-  background: rgba(255,255,255,.9);
-  transform: translateY(-1px);
-}
-
-.starBtn:active{ transform: translateY(0px); }
-
-.starGlyph{
-  font-size:18px;
-  line-height:1;
-  color: rgba(20,16,12,.22); /* empty star */
-}
-
-/* filled stars */
-.starBtn.isOn .starGlyph{
-  color: rgba(20,14,10,.98); /* filled = your primary ink */
-}
-/* ===== Star Picker: horizontal + gold fill ===== */
+/* -----------------------------
+   STAR PICKER (gold, horizontal, half-stars)
+------------------------------ */
 .starPicker{
   display:flex;
   align-items:center;
@@ -643,9 +477,13 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   place-items:center;
   padding:0;
   overflow:hidden;
+  transition: transform .06s ease, background .12s ease;
 }
-
-.starBtn:hover{ background: rgba(255,255,255,.92); }
+.starBtn:hover{
+  background: rgba(255,255,255,.92);
+  transform: translateY(-1px);
+}
+.starBtn:active{ transform: translateY(0px); }
 
 .starBase,
 .starFill{
@@ -654,11 +492,10 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   line-height:1;
   user-select:none;
 }
-
-.starBase{ color: rgba(20,16,12,.22); }  /* gray */
+.starBase{ color: rgba(20,16,12,.22); } /* gray */
 .starFill{
-  color:#b88900;            /* gold */
-  width: var(--fill, 0%);   /* 0/50/100 */
+  color:#b88900;              /* gold */
+  width: var(--fill, 0%);     /* 0/50/100 */
   overflow:hidden;
   white-space:nowrap;
   left:50%;
@@ -680,4 +517,29 @@ label{font-weight:800;font-size:13px;color:rgba(21,17,14,.78)}
   font-weight:900;
   font-size:13px;
   color: rgba(21,17,14,.72);
+}
+
+/* -----------------------------
+   RESPONSIVE
+------------------------------ */
+@media (max-width: 980px){
+  .h1{font-size:44px}
+  .splitRow{grid-template-columns:1fr}
+  .twoCol{grid-template-columns:1fr}
+  .nav__center{display:none}
+  .splitRow > .card{min-height:unset}
+}
+
+@media (max-width: 980px){
+  .nav__menuBtn{display:inline-flex}
+}
+@media (min-width: 981px){
+  .nav__menuBtn{display:none}
+}
+
+@media (max-width: 520px){
+  .h1{font-size:38px}
+  .btn{font-size:13px;padding:10px 12px}
+  .miniBtn{font-size:12px}
+  .tileRow{grid-template-columns:1fr}
 }
