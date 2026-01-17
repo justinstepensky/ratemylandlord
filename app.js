@@ -14,16 +14,21 @@
    Storage / Demo seed
 ------------------------------ */
 const LS_KEY = "casa_demo_v1";
+let memoryDB = null;
 
 function loadDB() {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
+  if (memoryDB) return memoryDB;
   return seedDB();
 }
 function saveDB(db) {
-  localStorage.setItem(LS_KEY, JSON.stringify(db));
+  memoryDB = db;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(db));
+  } catch {}
 }
 
 function seedDB() {
