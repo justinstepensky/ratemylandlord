@@ -1230,22 +1230,25 @@ function renderLandlord(id) {
 }
 
 /* -----------------------------
-   Star picker (WHOLE stars ONLY)
+   Star picker (WHOLE stars only)
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
   const v = Math.max(1, Math.min(5, Number(defaultValue) || 5));
-
   return `
     <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
       ${[1,2,3,4,5].map(i => `
-        <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
-          <span class="starBase">★</span>
-          <span class="starFill">★</span>
+        <button type="button"
+          class="starBtn"
+          data-star="${i}"
+          aria-label="${i} star${i===1?"":"s"}"
+          aria-pressed="false">
+          <span class="starChar" aria-hidden="true">★</span>
         </button>
       `).join("")}
       <span class="starValue" id="starValue">${v}/5</span>
       <input type="hidden" id="mStars" value="${v}">
     </div>
+    <div class="tiny" style="margin-top:6px;">Click a star to rate.</div>
   `;
 }
 
@@ -1255,8 +1258,9 @@ function applyStarPickerVisual(value) {
 
   btns.forEach(btn => {
     const s = Number(btn.dataset.star);
-    // set percent fill (0 or 100)
-    btn.style.setProperty("--fill", v >= s ? "100%" : "0%");
+    const on = s <= v;
+    btn.classList.toggle("isOn", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
   });
 
   const out = $("#starValue");
@@ -1272,12 +1276,8 @@ function bindStarPicker(defaultValue = 5) {
 
   // hover preview
   document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
-    btn.addEventListener("mouseenter", () => {
-      applyStarPickerVisual(btn.dataset.star);
-    });
+    btn.addEventListener("mouseenter", () => applyStarPickerVisual(btn.dataset.star));
   });
-
-  // restore
   $("#starPicker").addEventListener("mouseleave", () => applyStarPickerVisual(current));
 
   // click set
@@ -1289,7 +1289,7 @@ function bindStarPicker(defaultValue = 5) {
   });
 }
 
-/* Review modal (Interactive stars + halves UI, stores 1..5 int) */
+/* Review modal (Interactive stars, stores 1..5 int) */
 function openReviewModal(landlordId) {
   openModal(`
     <div class="modalHead">
@@ -1301,14 +1301,12 @@ function openReviewModal(landlordId) {
       <div class="field">
         <label>Rating</label>
         ${starPickerHTML(5)}
-        <div class="tiny" style="margin-top:8px;">
-        </div>
       </div>
 
       <div class="field">
         <label>What happened?</label>
         <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
-       <div class="tinyNote">Minimum length required...</div>
+        <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
       </div>
     </div>
 
@@ -1318,22 +1316,34 @@ function openReviewModal(landlordId) {
     </div>
   `);
 
-  // close
   $("#mClose").addEventListener("click", closeModal);
   $("#mCancel").addEventListener("click", closeModal);
 
-  // init star picker
   bindStarPicker(5);
 
   $("#mSubmit").addEventListener("click", () => {
-    // picker stores 0.5 increments; DB stores integer 1..5
-   const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
+    const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
     const text = $("#mText").value.trim();
 
     if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
       return;
     }
+
+    DB.reviews.push({
+      id: "r" + Math.random().toString(16).slice(2),
+      landlordId,
+      stars: starsInt,
+      text,
+      createdAt: Date.now()
+    });
+    saveDB(DB);
+
+    closeModal();
+    route();
+  });
+}
+
 
     DB.reviews.push({
       id: "r" + Math.random().toString(16).slice(2),
