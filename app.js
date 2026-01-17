@@ -1300,7 +1300,7 @@ function openReviewModal(landlordId) {
       <div class="field">
         <label>What happened?</label>
         <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
-        <div class="tiny">Minimum length required. Don’t include phone numbers/emails/private info.</div>
+       <div class="tinyNote">Minimum length required...</div>
       </div>
     </div>
 
