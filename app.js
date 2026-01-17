@@ -672,6 +672,9 @@ function renderSearch() {
 
   const qEl = $("#searchQ");
   const bEl = $("#searchB");
+qEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("#doSearch").click();
+});
 
    // Press Enter in the search box = click Search
   qEl.addEventListener("keydown", (e) => {
@@ -719,49 +722,55 @@ function run() {
   const query = qEl.value.trim();
   const borough = bEl.value;
 
-  // If empty query: show all (optionally filtered by borough)
-  if (!query) {
-    const listAll = DB.landlords.filter(l => matches(l, "", borough));
-    renderListAndMap(listAll);
+  // 1) normal results using your existing "matches()" search
+  const normalList = DB.landlords.filter(l => matches(l, query, borough));
+
+  // 2) exact-name matches (normalized)
+  const nq = normalizeName(query);
+  const exactMatches = !nq ? [] : DB.landlords.filter(l => {
+    const nameOk = normalizeName(l.name) === nq;
+    const boroughOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
+    return nameOk && boroughOk;
+  });
+
+  // 3) If EXACTLY 1 exact match, go to that landlord page
+  if (exactMatches.length === 1) {
+    location.hash = `#/landlord/${encodeURIComponent(exactMatches[0].id)}`;
     return;
   }
 
-  // 1) EXACT MATCH BY NAME (case-insensitive, normalized) -> go to landlord page
-  const qNorm = normalizeName(query);
-  const exact = DB.landlords.find(l => normalizeName(l.name) === qNorm);
+  // 4) If 2+ exact matches, show them so user can choose
+  const listToShow = exactMatches.length >= 2 ? exactMatches : normalList;
 
-  if (exact && matches(exact, query, borough)) {
-    location.hash = `#/landlord/${exact.id}`;
-    return;
+  $("#results").innerHTML = listToShow.length
+    ? listToShow.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
+    : `<div class="muted">No results.</div>`;
+
+  // map + markers
+  const mapEl = $("#searchMap");
+  mapEl.innerHTML = "";
+  const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
+
+  const markers = new Map();
+  for (const l of listToShow) {
+    if (typeof l.lat === "number" && typeof l.lng === "number") {
+      const st = ratingStats(l.id);
+      const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
+      const m = L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+      markers.set(l.id, m);
+    }
   }
 
-  // 2) SIMILAR MATCHES (ranked)
-  const scored = DB.landlords
-    .filter(l => matches(l, "", borough)) // borough filter still applies
-    .map(l => ({ l, s: scoreMatch(l, query) }))
-    .filter(x => x.s > 0)
-    .sort((a,b) => b.s - a.s)
-    .map(x => x.l);
-
-  // 3) If no similar matches, fallback to showing ALL available (borough-filtered)
-  const list = scored.length ? scored : DB.landlords.filter(l => matches(l, "", borough));
-
-  renderListAndMap(list);
-
-  // Show a helpful note if we didn't have an exact match
-  if (!scored.length) {
-    $("#results").insertAdjacentHTML("afterbegin", `
-      <div class="muted" style="margin-bottom:10px;">
-        No close matches found for <b>${esc(query)}</b>. Showing all landlords.
-      </div>
-    `);
-  } else {
-    $("#results").insertAdjacentHTML("afterbegin", `
-      <div class="muted" style="margin-bottom:10px;">
-        No exact match for <b>${esc(query)}</b>. Showing similar results.
-      </div>
-    `);
-  }
+  // center on map buttons (keep your existing behavior)
+  document.querySelectorAll("[data-center]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.center;
+      const l = DB.landlords.find(x => x.id === id);
+      if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
+      map.setView([l.lat, l.lng], 14, { animate: true });
+      markers.get(id)?.openPopup();
+    });
+  });
 }
 
 function renderListAndMap(list){
@@ -796,12 +805,11 @@ function renderListAndMap(list){
   });
 }
 
-  $("#doSearch").addEventListener("click", () => {
-    const query = qEl.value.trim();
-    location.hash = `#/search?q=${encodeURIComponent(query)}`;
-    // keep borough selection without putting in URL (simple)
-    run();
-  });
+$("#doSearch").addEventListener("click", () => {
+  const query = qEl.value.trim();
+  location.hash = `#/search?q=${encodeURIComponent(query)}`;
+  run();
+});
 
   run();
 }
