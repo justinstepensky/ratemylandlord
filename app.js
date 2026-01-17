@@ -1322,7 +1322,21 @@ function openReviewModal(landlordId) {
     const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
     const text = $("#mText").value.trim();
 
-    if (!text || text.length < 20) {
+      if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
       return;
     }
+
+    DB.reviews.push({
+      id: "r" + Math.random().toString(16).slice(2),
+      landlordId,
+      stars: starsInt,
+      text,
+      createdAt: Date.now()
+    });
+
+    saveDB(DB);
+    closeModal();
+    route();
+  });
+}
