@@ -275,7 +275,7 @@ function openModal(innerHTML) {
     <div class="modal" role="dialog" aria-modal="true">
       ${innerHTML}
     </div>
-  `;
+  `);
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
