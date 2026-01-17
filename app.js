@@ -1,3 +1,4 @@
+alert("app.js loaded");
 /* CASA — single-file SPA app.js
    - hash routing
    - premium cards
