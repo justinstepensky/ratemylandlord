@@ -1301,6 +1301,7 @@ function openReviewModal(landlordId) {
       <div class="field">
         <label>Rating</label>
         ${starPickerHTML(5)}
+        <div class="tiny" style="margin-top:6px;">Click a star to rate.</div>
       </div>
 
       <div class="field">
@@ -1329,21 +1330,6 @@ function openReviewModal(landlordId) {
       alert("Please write at least 20 characters.");
       return;
     }
-
-    DB.reviews.push({
-      id: "r" + Math.random().toString(16).slice(2),
-      landlordId,
-      stars: starsInt,
-      text,
-      createdAt: Date.now()
-    });
-    saveDB(DB);
-
-    closeModal();
-    route();
-  });
-}
-
 
     DB.reviews.push({
       id: "r" + Math.random().toString(16).slice(2),
