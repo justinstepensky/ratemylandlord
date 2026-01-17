@@ -1294,7 +1294,6 @@ function openReviewModal(landlordId) {
         <label>Rating</label>
         ${starPickerHTML(5)}
         <div class="tiny" style="margin-top:8px;">
-          Click a star (half-steps supported). Stored as 1–5.
         </div>
       </div>
 
