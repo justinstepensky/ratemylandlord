@@ -1229,45 +1229,46 @@ function renderLandlord(id) {
    - Stores 0.5 increments in #mStars
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
-  const v = Math.max(0.5, Math.min(5, Number(defaultValue) || 5));
+  const v = Number(defaultValue) || 5;
 
   return `
     <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
-      ${[1,2,3,4,5].map(i => `
-        <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
-          <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
-          <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
+      ${[1,2,3,4,5].map(i => {
+        return `
+          <button type="button" class="starBtn" data-star="${i}" aria-label="${i} stars">
+            <span class="hit hitL" data-value="${i - 0.5}" aria-hidden="true"></span>
+            <span class="hit hitR" data-value="${i}" aria-hidden="true"></span>
 
-          <span class="starBase">★</span>
-          <span class="starFill">★</span>
-        </button>
-      `).join("")}
+            <!-- base star (gray) -->
+            <span class="starBase">★</span>
+
+            <!-- fill star (gold, clipped to half/full) -->
+            <span class="starFill">★</span>
+          </button>
+        `;
+      }).join("")}
 
       <span class="starValue" id="starValue">${v.toFixed(1)}</span>
       <input type="hidden" id="mStars" value="${v}">
     </div>
-    <div class="tiny" style="margin-top:6px;">Half-stars supported.</div>
   `;
 }
 
 function applyStarPickerVisual(value) {
-  const v = Math.max(0.5, Math.min(5, Number(value) || 0));
+  const v = Number(value) || 0;
   const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
 
   btns.forEach(btn => {
-    const s = Number(btn.dataset.star); // 1..5
-    const fill = btn.querySelector(".starFill");
+    const s = Number(btn.dataset.star);
+    const fillEl = btn.querySelector(".starFill");
+    if (!fillEl) return;
 
-    // set fill percent: 0, 50, 100
-    let pct = 0;
-    if (v >= s) pct = 100;
-    else if (v >= s - 0.5) pct = 50;
+    // 0% = empty, 50% = half, 100% = full
+    let pct = "0%";
+    if (v >= s) pct = "100%";
+    else if (v === s - 0.5) pct = "50%";
 
-    btn.style.setProperty("--fill", `${pct}%`);
-    btn.classList.toggle("isOn", pct > 0);
-
-    // fill width controlled by CSS using --fill
-    if (fill) fill.style.width = `${pct}%`;
+    fillEl.style.setProperty("--fill", pct);
   });
 
   const out = $("#starValue");
