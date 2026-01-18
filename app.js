@@ -1,4 +1,3 @@
-alert("app.js loaded");
 /* CASA — single-file SPA app.js
    - hash routing
    - premium cards
@@ -7,9 +6,63 @@ alert("app.js loaded");
    - Recent highlights carousel w/ dots only (max 5)
    - mobile drawer works
    - review modal fixed (z-index + layout)
-   - FIX: rating is now clickable stars w/ HALF-star support
-   - FIX: badges paths corrected + fail-safe if missing
+   - rating is clickable stars
+   - HARDENED: prevents blank app if any piece fails
 */
+
+/* -----------------------------
+   Global hardening + Debug
+------------------------------ */
+(function installSafetyNet() {
+  const showOverlayError = (title, err) => {
+    try {
+      console.error(title, err);
+      const el = document.getElementById("app");
+      if (!el) return;
+
+      // Minimal, non-invasive debug UI (only appears on fatal errors)
+      el.innerHTML = `
+        <section class="pageCard card">
+          <div class="pad">
+            <div class="kicker">CASA</div>
+            <div class="pageTitle" style="margin-top:6px;">Something went wrong</div>
+            <div class="pageSub" style="margin-top:8px;">
+              The app hit a runtime error and stopped rendering.
+            </div>
+            <div class="hr"></div>
+            <div class="smallNote" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+${String(title || "Error")}
+${String(err && (err.stack || err.message) ? (err.stack || err.message) : err)}
+            </div>
+            <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+              <a class="btn btn--primary" href="#/">Go Home</a>
+              <button class="btn" id="reloadBtn">Reload</button>
+              <button class="btn" id="resetBtn">Reset demo data</button>
+            </div>
+            <div class="tiny" style="margin-top:10px;">
+              Tip: open DevTools → Console to see the full error log.
+            </div>
+          </div>
+        </section>
+      `;
+      document.getElementById("reloadBtn")?.addEventListener("click", () => location.reload());
+      document.getElementById("resetBtn")?.addEventListener("click", () => {
+        try {
+          localStorage.removeItem("casa_demo_v1");
+          location.reload();
+        } catch {}
+      });
+    } catch {}
+  };
+
+  window.addEventListener("error", (e) => {
+    showOverlayError("Uncaught error", e?.error || e?.message || e);
+  });
+
+  window.addEventListener("unhandledrejection", (e) => {
+    showOverlayError("Unhandled promise rejection", e?.reason || e);
+  });
+})();
 
 /* -----------------------------
    Storage / Demo seed
@@ -24,7 +77,9 @@ function loadDB() {
   return seedDB();
 }
 function saveDB(db) {
-  localStorage.setItem(LS_KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(db));
+  } catch {}
 }
 
 function seedDB() {
@@ -89,7 +144,9 @@ let DB = loadDB();
 const $ = (sel, root = document) => root.querySelector(sel);
 
 function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
 }
 
 function fmtDate(ts) {
@@ -97,17 +154,10 @@ function fmtDate(ts) {
   return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
-function slugify(s) {
-  return String(s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 function round1(n) {
   return Math.round(n * 10) / 10;
 }
+
 function norm(s) {
   return String(s || "").trim().toLowerCase();
 }
@@ -135,22 +185,21 @@ function findSimilarLandlords(query, borough = "") {
     return landlordHaystack(l).includes(q);
   });
 
-  // if none similar, show all available landlords
   if (q && list.length === 0) {
     list = DB.landlords.filter(l => !b || norm(l.borough) === b);
   }
-
   return list;
 }
 
 /* Recency-weighted average:
-   weight halves every 180 days (simple credibility)
+   weight halves every 180 days
 */
 function weightedAverageStars(reviews) {
   if (!reviews.length) return null;
   const now = Date.now();
   const halfLifeDays = 180;
   let num = 0, den = 0;
+
   for (const r of reviews) {
     const ageDays = Math.max(0, (now - r.createdAt) / (1000*60*60*24));
     const w = Math.pow(0.5, ageDays / halfLifeDays);
@@ -162,7 +211,9 @@ function weightedAverageStars(reviews) {
 }
 
 function landlordReviews(landlordId) {
-  return DB.reviews.filter(r => r.landlordId === landlordId).sort((a,b)=>b.createdAt-a.createdAt);
+  return DB.reviews
+    .filter(r => r.landlordId === landlordId)
+    .sort((a,b)=>b.createdAt-a.createdAt);
 }
 
 function ratingStats(landlordId) {
@@ -171,24 +222,15 @@ function ratingStats(landlordId) {
   if (count === 0) return { count: 0, avg: null, avgRounded: null, dist: [0,0,0,0,0] };
   const avg = weightedAverageStars(rs);
   const avgRounded = round1(avg);
-  const dist = [0,0,0,0,0]; // 1..5
+  const dist = [0,0,0,0,0];
   for (const r of rs) dist[r.stars - 1] += 1;
   return { count, avg, avgRounded, dist };
 }
 
-function starsVisual(avgRounded) {
-  if (avgRounded == null) return "★★★★★";
-  const full = Math.floor(avgRounded);
-  const half = (avgRounded - full) >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return "★".repeat(full) + (half ? "★" : "") + "☆".repeat(empty);
-}
-
 function cardTier(avgRounded, reviewCount) {
-  // If 0 reviews: no special coloring
   if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
 
-  const r = avgRounded; // IMPORTANT: classification uses the rounded rating
+  const r = avgRounded;
   if (r >= 1.0 && r <= 2.99) return { tier: "red", label: "Low Rating", pillClass: "pill--red" };
   if (r > 2.99 && r <= 3.99) return { tier: "yellow", label: "Mixed Reviews", pillClass: "pill--yellow" };
   if (r >= 4.0 && r <= 5.0) return { tier: "green", label: "Highly Rated", pillClass: "pill--green" };
@@ -203,17 +245,12 @@ function casaCredential(landlordId) {
   const total = rs.length;
   const in12 = last12mo.length;
 
-  // CASA Rated = 10+ total AND 3+ last 12 months
   if (total === 0) return "Unrated";
   if (!(total >= 10 && in12 >= 3)) return "Not yet CASA Rated — needs more reviews";
   return "CASA Rated";
 }
 
-/* FIX: badge paths per your theme spec:
-   assets/badge-verified.png
-   assets/badge-top.png
-   + if missing, remove instead of broken icon
-*/
+/* badges */
 function badgesHTML(l) {
   const parts = [];
   if (l.verified) {
@@ -239,6 +276,8 @@ function initDrawer() {
   const overlay = $("#drawerOverlay");
   const closeBtn = $("#drawerClose");
 
+  if (!btn || !drawer || !overlay || !closeBtn) return;
+
   function open() {
     drawer.classList.add("isOpen");
     overlay.classList.add("isOpen");
@@ -252,16 +291,15 @@ function initDrawer() {
     overlay.setAttribute("aria-hidden", "true");
   }
 
-  btn?.addEventListener("click", open);
-  closeBtn?.addEventListener("click", close);
-  overlay?.addEventListener("click", close);
+  btn.addEventListener("click", open);
+  closeBtn.addEventListener("click", close);
+  overlay.addEventListener("click", close);
 
-  drawer?.addEventListener("click", (e) => {
+  drawer.addEventListener("click", (e) => {
     const a = e.target.closest("[data-drawer-link]");
     if (a) close();
   });
 
-  // If someone resizes to desktop, close drawer automatically
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 981) close();
   });
@@ -272,21 +310,27 @@ function initDrawer() {
 ------------------------------ */
 function openModal(innerHTML) {
   const overlay = $("#modalOverlay");
+  if (!overlay) return;
+
   overlay.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
       ${innerHTML}
     </div>
-  `);
+  `;
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 
-  overlay.addEventListener("click", (e) => {
+  // One-time click handler
+  const handler = (e) => {
     if (e.target === overlay) closeModal();
-  });
+  };
+  overlay.addEventListener("click", handler, { once: true });
 }
+
 function closeModal() {
   const overlay = $("#modalOverlay");
+  if (!overlay) return;
   overlay.classList.remove("isOpen");
   overlay.setAttribute("aria-hidden", "true");
   overlay.innerHTML = "";
@@ -294,37 +338,71 @@ function closeModal() {
 }
 
 /* -----------------------------
-   Maps
+   Leaflet safe init
 ------------------------------ */
+function leafletReady() {
+  return typeof window.L !== "undefined" && typeof window.L.map === "function";
+}
+
 function initLeafletMap(el, center, zoom = 12) {
-  const map = L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-  return map;
+  if (!el) return null;
+  if (!leafletReady()) {
+    console.warn("Leaflet not ready; skipping map init.");
+    return null;
+  }
+
+  // Avoid "Map container is already initialized" errors
+  try {
+    if (el._leaflet_id) {
+      el._leaflet_id = null;
+    }
+  } catch {}
+
+  let map = null;
+  try {
+    map = L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    // Fix 0-height/hidden containers (prevents blank tiles)
+    setTimeout(() => {
+      try { map.invalidateSize(); } catch {}
+    }, 60);
+
+    return map;
+  } catch (e) {
+    console.error("Map init failed:", e);
+    return null;
+  }
 }
 
 /* -----------------------------
    Router
 ------------------------------ */
 function route() {
-  const hash = location.hash || "#/";
-   const path = hash.replace("#", "").split("?")[0];
-  const cleanPath = path.split("?")[0];
-  const parts = cleanPath.split("/").filter(Boolean);
-  const base = parts[0] || "";
-  const param = parts[1] || "";
+  try {
+    const hash = location.hash || "#/";
+    const path = hash.replace("#", "");
+    const cleanPath = path.split("?")[0];
+    const parts = cleanPath.split("/").filter(Boolean);
+    const base = parts[0] || "";
+    const param = parts[1] || "";
 
-  if (!base) return renderHome();
-  if (base === "search") return renderSearch();
-  if (base === "add") return renderAdd();
-  if (base === "how") return renderHow();
-  if (base === "trust") return renderTrust();
-  if (base === "portal") return renderPortal();
-  if (base === "landlord" && param) return renderLandlord(param);
+    if (!base) return renderHome();
+    if (base === "search") return renderSearch();
+    if (base === "add") return renderAdd();
+    if (base === "how") return renderHow();
+    if (base === "trust") return renderTrust();
+    if (base === "portal") return renderPortal();
+    if (base === "landlord" && param) return renderLandlord(param);
 
-  renderHome();
+    renderHome();
+  } catch (e) {
+    console.error("Route error:", e);
+    renderHome();
+  }
 }
 
 window.addEventListener("hashchange", route);
@@ -342,12 +420,17 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   const count = st.count;
 
   const tier = cardTier(avg ?? 0, count);
-  const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+  const tintClass =
+    tier.tier === "green" ? "lc--green" :
+    tier.tier === "yellow" ? "lc--yellow" :
+    tier.tier === "red" ? "lc--red" : "";
 
   const avgText = (avg == null) ? "—" : avg.toFixed(1);
-  const starVis = (avg == null) ? "☆☆☆☆☆" : (avg >= 4 ? "★★★★☆" : avg >= 3 ? "★★★☆☆" : avg >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+  const starVis =
+    (avg == null) ? "☆☆☆☆☆" :
+    (avg >= 4 ? "★★★★☆" : avg >= 3 ? "★★★☆☆" : avg >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
-  const addr = `${esc(l.address.line1)} • ${esc(l.address.city)} • ${esc(l.address.state)} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
+  const addr = `${esc(l.address?.line1 || "")} • ${esc(l.address?.city || "")} • ${esc(l.address?.state || "")} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
 
   return `
     <div class="lc ${tintClass}">
@@ -377,15 +460,13 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
   `;
 }
 
-/* Recent highlights:
-   - up to 5 most recent reviews (across all landlords)
-   - dots count matches slides
-   - auto-advance
-*/
+/* -----------------------------
+   Highlights carousel
+------------------------------ */
 let carouselTimer = null;
 
 function highlightsData() {
-  const items = DB.reviews
+  return DB.reviews
     .slice()
     .sort((a,b)=>b.createdAt-a.createdAt)
     .slice(0, 5)
@@ -394,11 +475,11 @@ function highlightsData() {
       return { r, l };
     })
     .filter(x => x.l);
-  return items;
 }
 
 function renderHighlightsCarousel() {
   const items = highlightsData();
+
   if (items.length === 0) {
     return `
       <div class="carousel">
@@ -412,10 +493,15 @@ function renderHighlightsCarousel() {
   const slides = items.map(({r,l}) => {
     const st = ratingStats(l.id);
     const tier = cardTier(st.avgRounded ?? 0, st.count);
-    const tintClass = tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+    const tintClass =
+      tier.tier === "green" ? "lc--green" :
+      tier.tier === "yellow" ? "lc--yellow" :
+      tier.tier === "red" ? "lc--red" : "";
 
     const avgText = (st.avgRounded == null) ? "—" : st.avgRounded.toFixed(1);
-    const starVis = (st.avgRounded == null) ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+    const starVis =
+      (st.avgRounded == null) ? "☆☆☆☆☆" :
+      (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
     return `
       <div class="carouselSlide">
@@ -445,7 +531,9 @@ function renderHighlightsCarousel() {
     `;
   }).join("");
 
-  const dots = items.map((_, i) => `<span class="dot ${i===0?"isActive":""}" data-dot="${i}" aria-label="Go to slide ${i+1}"></span>`).join("");
+  const dots = items.map((_, i) =>
+    `<span class="dot ${i===0?"isActive":""}" data-dot="${i}" aria-label="Go to slide ${i+1}"></span>`
+  ).join("");
 
   return `
     <div class="carousel" id="highCarousel">
@@ -462,6 +550,13 @@ function setupCarousel() {
   const items = highlightsData();
   const track = $("#highTrack");
   const dots = Array.from(document.querySelectorAll("#highDots .dot"));
+
+  if (!track || dots.length === 0 || items.length <= 1) {
+    if (carouselTimer) clearInterval(carouselTimer);
+    carouselTimer = null;
+    return;
+  }
+
   let idx = 0;
 
   function go(n) {
@@ -470,20 +565,18 @@ function setupCarousel() {
     dots.forEach((d, i) => d.classList.toggle("isActive", i === idx));
   }
 
-  dots.forEach((d) => {
-    d.addEventListener("click", () => go(Number(d.dataset.dot)));
-  });
+  dots.forEach((d) => d.addEventListener("click", () => go(Number(d.dataset.dot))));
 
-  // auto-advance
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(() => go(idx + 1), 4500);
 }
 
 /* -----------------------------
-   Pages
+   Pages base shell
 ------------------------------ */
 function renderShell(content) {
   const app = $("#app");
+  if (!app) return;
   app.innerHTML = `
     ${content}
     <div class="footer">
@@ -496,6 +589,10 @@ function renderShell(content) {
     </div>
   `;
 }
+
+/* -----------------------------
+   HOME
+------------------------------ */
 function renderHome() {
   const content = `
     <section class="pageCard card">
@@ -583,39 +680,43 @@ function renderHome() {
   document.querySelectorAll("[data-home-tile]").forEach(el => {
     el.addEventListener("click", () => {
       const k = el.dataset.homeTile;
+      if (!tilePanel) return;
       tilePanel.style.display = "block";
       if (k === "search") tilePanel.textContent = "Search by name, entity or address";
       if (k === "review") tilePanel.textContent = "Leave a rating based on select categories";
     });
   });
 
-  $("#homeSearch").addEventListener("click", () => {
-  const q = $("#homeQ").value.trim();
+  // search
+  $("#homeSearch")?.addEventListener("click", () => {
+    const q = $("#homeQ")?.value?.trim?.() || "";
 
-  const exact = findExactLandlord(q);
-  if (exact) {
-    location.hash = `#/landlord/${exact.id}`;
-    return;
-  }
+    const exact = findExactLandlord(q);
+    if (exact) {
+      location.hash = `#/landlord/${exact.id}`;
+      return;
+    }
+    location.hash = `#/search?q=${encodeURIComponent(q)}`;
+  });
 
-  location.hash = `#/search?q=${encodeURIComponent(q)}`;
-});
-
-$("#homeQ").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#homeSearch").click();
-});
+  $("#homeQ")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#homeSearch")?.click();
+  });
 
   // Map
   setTimeout(() => {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
     const map = initLeafletMap(mapEl, [40.73, -73.95], 11);
+    if (!map) return;
 
     for (const l of DB.landlords) {
       if (typeof l.lat === "number" && typeof l.lng === "number") {
         const st = ratingStats(l.id);
         const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
-        L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+        try {
+          L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+        } catch {}
       }
     }
   }, 0);
@@ -623,6 +724,9 @@ $("#homeQ").addEventListener("keydown", (e) => {
   setupCarousel();
 }
 
+/* -----------------------------
+   Query params
+------------------------------ */
 function getQueryParam(name) {
   const hash = location.hash || "";
   const qIndex = hash.indexOf("?");
@@ -631,6 +735,9 @@ function getQueryParam(name) {
   return params.get(name) || "";
 }
 
+/* -----------------------------
+   SEARCH
+------------------------------ */
 function renderSearch() {
   const q = getQueryParam("q");
 
@@ -659,7 +766,6 @@ function renderSearch() {
           <button class="btn btn--primary" id="doSearch">Search</button>
         </div>
 
-        <!-- MAP ON TOP (like before) -->
         <div class="mapBox" style="margin-top:14px;">
           <div class="map" id="searchMap" style="height:320px;"></div>
         </div>
@@ -673,145 +779,100 @@ function renderSearch() {
 
   const qEl = $("#searchQ");
   const bEl = $("#searchB");
+  const resultsEl = $("#results");
 
-   // Press Enter in the search box = click Search
+  // safe guard
+  if (!qEl || !bEl || !resultsEl) return;
+
   qEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#doSearch").click();
+    if (e.key === "Enter") $("#doSearch")?.click();
   });
 
   function matches(l, query, borough) {
     const t = (query || "").toLowerCase();
-    const hay = `${l.name} ${l.entity || ""} ${l.address.line1} ${l.address.city} ${l.address.state}`.toLowerCase();
+    const hay = `${l.name} ${l.entity || ""} ${l.address?.line1 || ""} ${l.address?.city || ""} ${l.address?.state || ""}`.toLowerCase();
     const qOk = !t || hay.includes(t);
     const bOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
     return qOk && bOk;
   }
 
-function normalizeName(s){
-  return String(s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s\-_.]+/g, " ")
-    .replace(/[^\w\s]/g, "");
-}
-
-function scoreMatch(landlord, q){
-  // simple similarity: counts how many query tokens appear in landlord haystack
-  const query = normalizeName(q);
-  if (!query) return 0;
-
-  const tokens = query.split(" ").filter(Boolean);
-  const hay = normalizeName(
-    `${landlord.name} ${landlord.entity || ""} ${landlord.address.line1} ${landlord.address.city} ${landlord.address.state}`
-  );
-
-  let score = 0;
-  for (const t of tokens){
-    if (hay.includes(t)) score += 1;
+  function normalizeName(s) {
+    return String(s || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[\s\-_.]+/g, " ")
+      .replace(/[^\w\s]/g, "");
   }
 
-  // tiny bonus if name starts with query
-  if (normalizeName(landlord.name).startsWith(query)) score += 2;
+  function run() {
+    const query = qEl.value.trim();
+    const borough = bEl.value;
 
-  return score;
-}
+    const normalList = DB.landlords.filter(l => matches(l, query, borough));
 
-function run() {
-  const query = qEl.value.trim();
-  const borough = bEl.value;
-
-  // 1) normal results using your existing "matches()" search
-  const normalList = DB.landlords.filter(l => matches(l, query, borough));
-
-  // 2) exact-name matches (normalized)
-  const nq = normalizeName(query);
-  const exactMatches = !nq ? [] : DB.landlords.filter(l => {
-    const nameOk = normalizeName(l.name) === nq;
-    const boroughOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
-    return nameOk && boroughOk;
-  });
-
-  // 3) If EXACTLY 1 exact match, go to that landlord page
-  if (exactMatches.length === 1) {
-    location.hash = `#/landlord/${encodeURIComponent(exactMatches[0].id)}`;
-    return;
-  }
-
-  // 4) If 2+ exact matches, show them so user can choose
-  const listToShow = exactMatches.length >= 2 ? exactMatches : normalList;
-
-  $("#results").innerHTML = listToShow.length
-    ? listToShow.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
-    : `<div class="muted">No results.</div>`;
-
-  // map + markers
-  const mapEl = $("#searchMap");
-  mapEl.innerHTML = "";
-  const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
-
-  const markers = new Map();
-  for (const l of listToShow) {
-    if (typeof l.lat === "number" && typeof l.lng === "number") {
-      const st = ratingStats(l.id);
-      const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
-      const m = L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
-      markers.set(l.id, m);
-    }
-  }
-
-  // center on map buttons (keep your existing behavior)
-  document.querySelectorAll("[data-center]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.center;
-      const l = DB.landlords.find(x => x.id === id);
-      if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
-      map.setView([l.lat, l.lng], 14, { animate: true });
-      markers.get(id)?.openPopup();
+    const nq = normalizeName(query);
+    const exactMatches = !nq ? [] : DB.landlords.filter(l => {
+      const nameOk = normalizeName(l.name) === nq;
+      const boroughOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
+      return nameOk && boroughOk;
     });
-  });
-}
 
-function renderListAndMap(list){
-  $("#results").innerHTML = list.length
-    ? list.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
-    : `<div class="muted">No results.</div>`;
-
-  // map + markers
-  const mapEl = $("#searchMap");
-  mapEl.innerHTML = "";
-  const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
-
-  const markers = new Map();
-  for (const l of list) {
-    if (typeof l.lat === "number" && typeof l.lng === "number") {
-      const st = ratingStats(l.id);
-      const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
-      const m = L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
-      markers.set(l.id, m);
+    if (exactMatches.length === 1) {
+      location.hash = `#/landlord/${encodeURIComponent(exactMatches[0].id)}`;
+      return;
     }
+
+    const listToShow = exactMatches.length >= 2 ? exactMatches : normalList;
+
+    resultsEl.innerHTML = listToShow.length
+      ? listToShow.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
+      : `<div class="muted">No results.</div>`;
+
+    // Map
+    const mapEl = $("#searchMap");
+    if (mapEl) mapEl.innerHTML = "";
+
+    const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
+    if (!map) return;
+
+    const markers = new Map();
+    for (const l of listToShow) {
+      if (typeof l.lat === "number" && typeof l.lng === "number") {
+        const st = ratingStats(l.id);
+        const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
+        try {
+          const m = L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+          markers.set(l.id, m);
+        } catch {}
+      }
+    }
+
+    document.querySelectorAll("[data-center]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.center;
+        const l = DB.landlords.find(x => x.id === id);
+        if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
+        try {
+          map.setView([l.lat, l.lng], 14, { animate: true });
+          markers.get(id)?.openPopup();
+        } catch {}
+      });
+    });
   }
 
-  // center on map buttons
-  document.querySelectorAll("[data-center]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.center;
-      const l = DB.landlords.find(x => x.id === id);
-      if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
-      map.setView([l.lat, l.lng], 14, { animate: true });
-      markers.get(id)?.openPopup();
-    });
+  $("#doSearch")?.addEventListener("click", () => {
+    const query = qEl.value.trim();
+    // Keep hash in sync for shareability
+    location.hash = `#/search?q=${encodeURIComponent(query)}`;
+    run();
   });
-}
-
-$("#doSearch").addEventListener("click", () => {
-  const query = qEl.value.trim();
-  location.hash = `#/search?q=${encodeURIComponent(query)}`;
-  run();
-});
 
   run();
 }
 
+/* -----------------------------
+   ADD
+------------------------------ */
 function renderAdd() {
   const content = `
     <section class="pageCard card">
@@ -883,22 +944,25 @@ function renderAdd() {
 
   setTimeout(() => {
     const map = initLeafletMap($("#addMap"), [40.73, -73.95], 10);
-    let marker = null;
+    if (!map) return;
 
+    let marker = null;
     map.on("click", (e) => {
       picked = { lat: e.latlng.lat, lng: e.latlng.lng };
-      if (marker) marker.remove();
-      marker = L.marker([picked.lat, picked.lng]).addTo(map);
+      try {
+        if (marker) marker.remove();
+        marker = L.marker([picked.lat, picked.lng]).addTo(map);
+      } catch {}
     });
   }, 0);
 
-  $("#addBtn").addEventListener("click", () => {
-    const name = $("#ln").value.trim();
-    const entity = $("#le").value.trim();
-    const line1 = $("#a1").value.trim();
-    const unit = $("#unit").value.trim();
-    const city = $("#city").value.trim();
-    const state = $("#state").value.trim();
+  $("#addBtn")?.addEventListener("click", () => {
+    const name = $("#ln")?.value?.trim?.() || "";
+    const entity = $("#le")?.value?.trim?.() || "";
+    const line1 = $("#a1")?.value?.trim?.() || "";
+    const unit = $("#unit")?.value?.trim?.() || "";
+    const city = $("#city")?.value?.trim?.() || "";
+    const state = $("#state")?.value?.trim?.() || "";
 
     if (!name || !line1 || !city || !state) {
       alert("Please fill required fields: Name, Address, City, State.");
@@ -911,7 +975,7 @@ function renderAdd() {
       name,
       entity,
       address: { line1, unit, city, state },
-      borough: "", // no borough field on add page
+      borough: "",
       lat: picked?.lat ?? 40.73,
       lng: picked?.lng ?? -73.95,
       verified: false,
@@ -926,6 +990,9 @@ function renderAdd() {
   });
 }
 
+/* -----------------------------
+   HOW + TRUST + PORTAL
+------------------------------ */
 function renderHow() {
   const content = `
     <section class="pageCard card">
@@ -1089,22 +1156,24 @@ function renderPortal() {
   `;
   renderShell(content);
 
-  // file name
   const doc = $("#doc");
   const fileName = $("#fileName");
-  doc.addEventListener("change", () => {
+  doc?.addEventListener("change", () => {
+    if (!fileName) return;
     fileName.textContent = doc.files?.[0]?.name || "No file chosen";
   });
 
-  // demo auth
   const demo = (label) => alert(`${label} (demo)`);
   ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2"].forEach(id=>{
     $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
   });
-  $("#psignin").addEventListener("click", ()=>demo("Sign in"));
-  $("#signup").addEventListener("click", ()=>demo("Create account"));
+  $("#psignin")?.addEventListener("click", ()=>demo("Sign in"));
+  $("#signup")?.addEventListener("click", ()=>demo("Create account"));
 }
 
+/* -----------------------------
+   LANDLORD PROFILE
+------------------------------ */
 function renderLandlord(id) {
   const l = DB.landlords.find(x => x.id === id);
   if (!l) return renderHome();
@@ -1117,6 +1186,7 @@ function renderLandlord(id) {
   const badgeRow = badgesHTML(l);
 
   const distTotal = st.dist.reduce((a,b)=>a+b,0);
+
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -1137,7 +1207,7 @@ function renderLandlord(id) {
             </div>
 
             <div class="addrLine">
-              ${esc(l.address.line1)}${l.address.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address.city)}, ${esc(l.address.state)}
+              ${esc(l.address?.line1 || "")}${l.address?.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address?.city || "")}, ${esc(l.address?.state || "")}
             </div>
           </div>
 
@@ -1203,32 +1273,32 @@ function renderLandlord(id) {
   `;
   renderShell(content);
 
-  // Map
   setTimeout(() => {
     const map = initLeafletMap($("#profileMap"), [l.lat ?? 40.73, l.lng ?? -73.95], 12);
+    if (!map) return;
+
     let marker = null;
     if (typeof l.lat === "number" && typeof l.lng === "number") {
-      marker = L.marker([l.lat, l.lng]).addTo(map);
+      try { marker = L.marker([l.lat, l.lng]).addTo(map); } catch {}
     }
-    $("#centerProfile").addEventListener("click", () => {
-      map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
-      marker?.openPopup?.();
+
+    $("#centerProfile")?.addEventListener("click", () => {
+      try {
+        map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
+        marker?.openPopup?.();
+      } catch {}
     });
   }, 0);
 
-  // Report
   document.querySelectorAll("[data-report]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      alert("Report submitted (demo).");
-    });
+    btn.addEventListener("click", () => alert("Report submitted (demo)."));
   });
 
-  // Review modal (fixed so map never blocks it)
-  $("#rateBtn").addEventListener("click", () => openReviewModal(l.id));
+  $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
 }
 
 /* -----------------------------
-   Star picker (WHOLE stars only)
+   Star picker
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
   const v = Math.max(1, Math.min(5, Number(defaultValue) || 5));
@@ -1272,13 +1342,11 @@ function bindStarPicker(defaultValue = 5) {
   let current = Math.max(1, Math.min(5, Number(defaultValue) || 5));
   applyStarPickerVisual(current);
 
-  // hover preview
   document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
     btn.addEventListener("mouseenter", () => applyStarPickerVisual(btn.dataset.star));
   });
-  $("#starPicker").addEventListener("mouseleave", () => applyStarPickerVisual(current));
+  $("#starPicker")?.addEventListener("mouseleave", () => applyStarPickerVisual(current));
 
-  // click set
   document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
     btn.addEventListener("click", () => {
       current = Number(btn.dataset.star);
@@ -1287,7 +1355,7 @@ function bindStarPicker(defaultValue = 5) {
   });
 }
 
-/* Review modal (Interactive stars, stores 1..5 int) */
+/* Review modal */
 function openReviewModal(landlordId) {
   openModal(`
     <div class="modalHead">
@@ -1314,14 +1382,14 @@ function openReviewModal(landlordId) {
     </div>
   `);
 
-  $("#mClose").addEventListener("click", closeModal);
-  $("#mCancel").addEventListener("click", closeModal);
+  $("#mClose")?.addEventListener("click", closeModal);
+  $("#mCancel")?.addEventListener("click", closeModal);
 
   bindStarPicker(5);
 
-  $("#mSubmit").addEventListener("click", () => {
-    const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
-    const text = $("#mText").value.trim();
+  $("#mSubmit")?.addEventListener("click", () => {
+    const starsInt = Math.max(1, Math.min(5, Number($("#mStars")?.value) || 5));
+    const text = $("#mText")?.value?.trim?.() || "";
 
     if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
@@ -1341,22 +1409,3 @@ function openReviewModal(landlordId) {
     route();
   });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
