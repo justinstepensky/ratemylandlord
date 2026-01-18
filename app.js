@@ -851,6 +851,79 @@ function openBadgeEmbedModal(landlordId) {
 function leafletReady() {
   return typeof window.L !== "undefined" && typeof window.L.map === "function";
 }
+/* -----------------------------
+   Map Regions (NYC/MIA/LA/CHI)
+------------------------------ */
+const REGION_KEY = "casa_region_v1";
+
+const REGIONS = {
+  NYC: { label: "New York", center: [40.73, -73.95], zoom: 11, states: ["NY"] },
+  MIA: { label: "Miami", center: [25.7617, -80.1918], zoom: 11, states: ["FL"] },
+  LA:  { label: "Los Angeles",  center: [34.0522, -118.2437], zoom: 10, states: ["CA"] },
+  CHI: { label: "Chicago", center: [41.8781, -87.6298], zoom: 11, states: ["IL"] },
+};
+
+function getRegionKey() {
+  const raw = (localStorage.getItem(REGION_KEY) || "").toUpperCase();
+  return REGIONS[raw] ? raw : "NYC";
+}
+
+function setRegionKey(key) {
+  const k = String(key || "").toUpperCase();
+  const safe = REGIONS[k] ? k : "NYC";
+  try { localStorage.setItem(REGION_KEY, safe); } catch {}
+}
+
+function regionFromState(state) {
+  const s = String(state || "").trim().toUpperCase();
+  if (!s) return null;
+  for (const [k, cfg] of Object.entries(REGIONS)) {
+    if ((cfg.states || []).includes(s)) return k;
+  }
+  return null;
+}
+
+function filterPropertiesByRegion(props, regionKey) {
+  const cfg = REGIONS[regionKey] || REGIONS.NYC;
+  const allowed = new Set((cfg.states || []).map((x) => String(x).toUpperCase()));
+  return props.filter((p) => {
+    const st = String((p.address && p.address.state) || "").toUpperCase();
+    return allowed.has(st);
+  });
+}
+
+function regionSelectorHTML(activeKey) {
+  const keys = Object.keys(REGIONS);
+  return `
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      ${keys
+        .map((k) => {
+          const isOn = k === activeKey;
+          return `
+            <button
+              type="button"
+              class="btn miniBtn ${isOn ? "btn--primary" : ""}"
+              data-region-btn="${esc(k)}"
+              aria-pressed="${isOn ? "true" : "false"}"
+            >${esc(REGIONS[k].label)}</button>
+          `.trim();
+        })
+        .join("")}
+    </div>
+  `.trim();
+}
+
+function wireRegionSelector(rootEl, onChange) {
+  if (!rootEl) return;
+  rootEl.querySelectorAll("[data-region-btn]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const k = btn.getAttribute("data-region-btn");
+      if (!k) return;
+      setRegionKey(k);
+      onChange && onChange(k);
+    });
+  });
+}
 
 function initLeafletMap(el, center, zoom = 12) {
   if (!el) return null;
@@ -859,17 +932,29 @@ function initLeafletMap(el, center, zoom = 12) {
     return null;
   }
 
+  // Cleanly remove any previous map instance attached to this element
   try {
-    if (el._leaflet_id) el._leaflet_id = null;
+    if (el._casaMap && typeof el._casaMap.remove === "function") {
+      el._casaMap.remove();
+    }
   } catch {}
 
-  let map = null;
   try {
-    map = window.L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap",
-    }).addTo(map);
+    const map = window.L
+      .map(el, { zoomControl: true, scrollWheelZoom: false })
+      .setView(center, zoom);
+
+    // keep reference so we can safely remove on re-render
+    try {
+      el._casaMap = map;
+    } catch {}
+
+    window.L
+      .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      })
+      .addTo(map);
 
     setTimeout(() => {
       try {
@@ -1300,6 +1385,9 @@ function renderHome() {
           </div>
 
           <div class="homePaneBody">
+                      <div id="homeRegion" style="margin-top:12px;">
+              ${regionSelectorHTML(getRegionKey())}
+            </div>
             <div class="mapBox" style="margin-top:14px;">
               <div class="map" id="homeMap"></div>
             </div>
@@ -1346,10 +1434,15 @@ function renderHome() {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
 
-    const map = initLeafletMap(mapEl, [40.73, -73.95], 11);
+    const regionKey = getRegionKey();
+    const cfg = REGIONS[regionKey] || REGIONS.NYC;
+
+    const map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
     if (!map) return;
 
-    for (const p of DB.properties) {
+    const propsInRegion = filterPropertiesByRegion(DB.properties, regionKey);
+
+    for (const p of propsInRegion) {
       if (typeof p.lat === "number" && typeof p.lng === "number") {
         const a = p.address || {};
         const st = ratingStats("property", p.id);
@@ -1366,7 +1459,9 @@ function renderHome() {
       }
     }
   }, 0);
-
+   
+  // Region selector rerender (simple + reliable)
+wireRegionSelector(document.getElementById("homeRegion"), () => renderHome());
   setupCarousel();
 }
 
@@ -1378,21 +1473,34 @@ function ensureRuntimeStyles() {
   const style = document.createElement("style");
   style.id = "casaRuntimeStyles";
   style.textContent = `
-    /* Force 50/50 banner split on desktop; stack on mobile */
+     /* Force 50/50 banner split on desktop; stack on mobile */
     .splitRow--banner{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      align-items: stretch;
+      display:grid !important;
+      grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+      gap: 16px !important;
+      align-items: stretch !important;
+      width: 100% !important;
     }
+    .splitRow--banner > *{
+      min-width: 0 !important;
+      width: 100% !important;
+      max-width: none !important;
+    }
+    
+    .splitRow--banner .homePaneCard{
+      min-height: 420px;
+    }
+
     @media (max-width: 980px){
       .splitRow--banner{
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
       }
     }
+
     /* Make carousel slides not overflow */
     #highTrack{ display:flex; transition: transform .35s ease; }
     .carouselSlide{ min-width: 100%; }
+
     /* Map sizing guard */
     #homeMap, #searchMap, #propMap, #addMap{
       width:100%;
@@ -1427,7 +1535,10 @@ function renderSearch() {
           <input class="input" id="searchQ" placeholder="Search landlord name, management company, or address..." value="${esc(q)}"/>
           <button class="btn btn--primary" id="doSearch" type="button">Search</button>
         </div>
-
+        
+               <div id="searchRegion" style="margin-top:12px;">
+          ${regionSelectorHTML(getRegionKey())}
+        </div>
         <div class="mapBox" style="margin-top:14px;">
           <div class="map" id="searchMap" style="height:320px;"></div>
         </div>
@@ -1456,6 +1567,8 @@ function renderSearch() {
   renderShell(content);
   ensureRuntimeStyles();
 
+     // Region selector wiring for Search page (wired only through refresh to avoid stacking)
+  // (do nothing here)
   const qEl = $("#searchQ");
   const lResEl = $("#landlordResults");
   const pResEl = $("#propertyResults");
@@ -1483,7 +1596,21 @@ function renderSearch() {
       .replace(/[\s\-_.]+/g, " ")
       .replace(/[^\w\s]/g, "");
   }
+  
+   function refreshSearchRegionUI() {
+    const wrap = document.getElementById("searchRegion");
+    if (!wrap) return;
 
+    // Re-render selector buttons with correct active state
+    wrap.innerHTML = regionSelectorHTML(getRegionKey());
+
+    // Re-wire click handlers for the newly-rendered buttons
+      wireRegionSelector(wrap, () => {
+      // update active button styling + rerun results/map
+      refreshSearchRegionUI();
+      runSearchAndRender();
+    });
+  }
   function runSearchAndRender() {
     const query = qEl ? qEl.value.trim() : "";
 
@@ -1498,15 +1625,28 @@ function renderSearch() {
       : DB.properties.filter((p) => normalizeName((p.address && p.address.line1) || "") === nq);
     if (exactProps.length === 1) return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
 
+         // Auto-switch region if user typed a recognized state code (NY/FL/CA/IL)
+    const typed = String(query || "").toUpperCase();
+    const stateHit = typed.match(/\b(NY|FL|CA|IL)\b/);
+      if (stateHit) {
+      const rk = regionFromState(stateHit[1]);
+      if (rk) {
+        setRegionKey(rk);
+        refreshSearchRegionUI();
+      }
+    }
+
+    const regionKey = getRegionKey();
     const landlords = DB.landlords.filter((l) => matchesLandlord(l, query));
-    const props = DB.properties.filter((p) => matchesProperty(p, query));
+    const props = filterPropertiesByRegion(DB.properties, regionKey).filter((p) => matchesProperty(p, query));
 
     if (lResEl) lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
     if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
 
     const mapEl = $("#searchMap");
     if (mapEl) mapEl.innerHTML = "";
-    const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
+    const cfg = REGIONS[regionKey] || REGIONS.NYC;
+    const map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
     if (!map) return;
 
     for (const p of props) {
@@ -1527,10 +1667,10 @@ function renderSearch() {
   doBtn?.addEventListener("click", () => {
     const query = qEl ? qEl.value.trim() : "";
     location.hash = `#/search?q=${encodeURIComponent(query)}`;
-    runSearchAndRender();
   });
 
-  runSearchAndRender();
+refreshSearchRegionUI();
+runSearchAndRender();
 }
 
 /* -----------------------------
@@ -1614,7 +1754,9 @@ function renderAdd() {
   let picked = null;
 
   setTimeout(() => {
-    const map = initLeafletMap($("#addMap"), [40.73, -73.95], 10);
+const rk = getRegionKey();
+const cfg = REGIONS[rk] || REGIONS.NYC;
+const map = initLeafletMap($("#addMap"), cfg.center, cfg.zoom);
     if (!map) return;
 
     let marker = null;
@@ -1635,6 +1777,8 @@ function renderAdd() {
     const unit = $("#unit")?.value ? $("#unit").value.trim() : "";
     const city = $("#city")?.value ? $("#city").value.trim() : "";
     const state = $("#state")?.value ? $("#state").value.trim() : "";
+     const rk = regionFromState(state);
+if (rk) setRegionKey(rk);
 
     if (!name || !line1 || !city || !state) {
       alert("Please fill required fields: Name, Address, City, State.");
@@ -2399,6 +2543,8 @@ function renderProperty(id) {
   }
 
   const a = p.address || {};
+   const rk = regionFromState(a.state);
+if (rk) setRegionKey(rk);
   const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
   setPageTitle(title);
 
@@ -2486,11 +2632,17 @@ function renderProperty(id) {
 
   // Map
   setTimeout(() => {
-    const map = initLeafletMap($("#propMap"), [p.lat || 40.73, p.lng || -73.95], 14);
+    const regionKey = getRegionKey();
+    const cfg = REGIONS[regionKey] || REGIONS.NYC;
+    const center = [
+      typeof p.lat === "number" ? p.lat : cfg.center[0],
+      typeof p.lng === "number" ? p.lng : cfg.center[1],
+    ];
+    const map = initLeafletMap($("#propMap"), center, 14);
     if (!map) return;
 
     try {
-      window.L.marker([p.lat || 40.73, p.lng || -73.95]).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
+      window.L.marker(center).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
     } catch {}
   }, 0);
 
