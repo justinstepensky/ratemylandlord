@@ -1581,40 +1581,67 @@ function renderHome() {
     if (e.key === "Enter") homeSearch?.click();
   });
 
-  // Map pins (properties)
+  // Map pins (properties) — async-safe (never crash after render)
   setTimeout(() => {
-    const mapEl = $("#homeMap");
-    if (!mapEl) return;
+    try {
+      const mapEl = $("#homeMap");
+      if (!mapEl) return;
 
-    const regionKey = getRegionKey();
-    const cfg = REGIONS[regionKey] || REGIONS.NYC;
+      const regionKey = getRegionKey();
+      const cfg = REGIONS[regionKey] || REGIONS.NYC;
 
-    const map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
-    if (!map) return;
-
-    const propsInRegion = filterPropertiesByRegion(DB.properties, regionKey);
-
-    for (const p of propsInRegion) {
-      if (typeof p.lat === "number" && typeof p.lng === "number") {
-        const a = p.address || {};
-        const st = ratingStats("property", p.id);
-        const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
-        const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
-
-        try {
-          window.L.marker([p.lat, p.lng])
-            .addTo(map)
-            .bindPopup(
-              `<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`
-            );
-        } catch {}
+      let map = null;
+      try {
+        map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
+      } catch (e) {
+        console.error("home initLeafletMap failed:", e);
+        map = null;
       }
+      if (!map) return;
+
+      const propsInRegion = filterPropertiesByRegion(DB.properties, regionKey);
+
+      for (const p of propsInRegion) {
+        if (typeof p.lat === "number" && typeof p.lng === "number") {
+          const a = p.address || {};
+          const st = ratingStats("property", p.id);
+          const label =
+            st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
+          const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+
+          try {
+            if (window.L && window.L.marker) {
+              window.L.marker([p.lat, p.lng])
+                .addTo(map)
+                .bindPopup(
+                  `<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`
+                );
+            }
+          } catch (e) {
+            console.error("home marker failed:", e);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("home map setTimeout crashed:", err);
     }
   }, 0);
-   
-  // Region selector rerender (simple + reliable)
-wireRegionSelector(document.getElementById("homeRegion"), () => renderHome());
-  setupCarousel();
+
+  // Region selector rerender (simple + reliable) — safe
+  try {
+    const hr = document.getElementById("homeRegion");
+    if (hr) wireRegionSelector(hr, () => renderHome());
+  } catch (e) {
+    console.error("home wireRegionSelector failed:", e);
+  }
+
+  // Carousel wiring — async-safe
+  try {
+    setupCarousel();
+  } catch (e) {
+    console.error("setupCarousel failed:", e);
+  }
+
 }
 
 /* -----------------------------
