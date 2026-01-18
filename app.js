@@ -292,6 +292,94 @@ function badgesHTML(l) {
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
+function casaBrandFontInlineCSS() {
+  // Matches .brand__name in styles.css
+  return [
+    "font-family: ui-serif, Georgia, 'Times New Roman', Times, serif",
+    "font-style: italic",
+    "font-weight: 650",
+    "letter-spacing: -0.02em",
+    "text-transform: lowercase"
+  ].join("; ");
+}
+
+function casaLogoSVGInline(size = 18) {
+  // Exact same logo as your header (do not change the paths)
+  return `
+  <svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none"
+       xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+       style="display:block; color: rgba(21,17,14,.82);">
+    <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
+    <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
+    <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
+    <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
+    <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
+  </svg>`;
+}
+
+function casaEmbedSnippetForLandlord(l) {
+  const st = ratingStats(l.id);
+  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+  const count = st.count || 0;
+
+  // IMPORTANT: use absolute URL so the embed works anywhere.
+  // If you ever change repo name, update this one line.
+  const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
+  const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
+
+  // Self-contained: inline SVG + inline styles (no missing badge images).
+  // Uses same casa font styling as your header.
+  return `
+<a href="${profileURL}" target="_blank" rel="noopener noreferrer"
+   style="
+     display:inline-flex;
+     align-items:center;
+     gap:10px;
+     padding:10px 14px;
+     border-radius:999px;
+     border:1px solid rgba(20,16,12,.14);
+     background: rgba(255,255,255,.65);
+     text-decoration:none;
+     color: rgba(21,17,14,.9);
+     box-shadow: 0 10px 26px rgba(20,16,12,.06);
+     line-height:1;
+   ">
+  <span style="
+     width:28px; height:28px;
+     border-radius:999px;
+     background: rgba(20,16,12,.05);
+     border:1px solid rgba(20,16,12,.08);
+     display:grid; place-items:center;
+   ">
+    ${casaLogoSVGInline(18).replace(/\n/g, "")}
+  </span>
+
+  <span style="
+    ${casaBrandFontInlineCSS()};
+    font-size:14px;
+  ">
+    Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
+  </span>
+
+  <span style="
+     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+     font-weight: 900;
+     font-size:13px;
+     color: rgba(21,17,14,.72);
+   ">
+    • ${avgText}/5
+   </span>
+
+   <span style="
+     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+     font-weight: 700;
+     font-size:12px;
+     color: rgba(21,17,14,.55);
+   ">
+    (${count} review${count===1?"":"s"})
+   </span>
+</a>`.trim();
+}
 
 /* NEW: report helper */
 function reportFor(landlordId) {
@@ -372,6 +460,69 @@ function closeModal() {
   overlay.setAttribute("aria-hidden", "true");
   overlay.innerHTML = "";
   document.body.style.overflow = "";
+}
+function openBadgeEmbedModal(landlordId) {
+  const l = DB.landlords.find(x => x.id === landlordId);
+  if (!l) return;
+
+  const snippet = casaEmbedSnippetForLandlord(l);
+
+  openModal(`
+    <div class="modalHead">
+      <div class="modalTitle">CASA badge embed</div>
+      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="tiny" style="margin-bottom:10px;">
+        Copy/paste this into a website or listing description. It links to your CASA profile.
+      </div>
+
+      <div class="field">
+        <label>Embed code</label>
+        <textarea class="textarea" id="embedBox" spellcheck="false">${esc(snippet)}</textarea>
+        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn btn--primary" id="copyEmbed">Copy</button>
+          <button class="btn" id="previewEmbed">Preview</button>
+        </div>
+      </div>
+
+      <div class="field" id="embedPreviewWrap" style="display:none;">
+        <label>Preview</label>
+        <div class="card" style="box-shadow:none;">
+          <div class="pad" id="embedPreview"></div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  $("#mClose")?.addEventListener("click", closeModal);
+
+  $("#copyEmbed")?.addEventListener("click", async () => {
+    const txt = $("#embedBox")?.value || snippet;
+    try {
+      await navigator.clipboard.writeText(txt);
+      alert("Copied!");
+    } catch {
+      // fallback
+      const ta = $("#embedBox");
+      if (ta) {
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        alert("Copied!");
+      }
+    }
+  });
+
+  $("#previewEmbed")?.addEventListener("click", () => {
+    const wrap = $("#embedPreviewWrap");
+    const prev = $("#embedPreview");
+    if (!wrap || !prev) return;
+    wrap.style.display = "block";
+    // Render the HTML snippet safely in our own page context
+    prev.innerHTML = $("#embedBox")?.value || snippet;
+  });
 }
 
 /* -----------------------------
@@ -1344,11 +1495,11 @@ function renderLandlord(id) {
             </div>
           </div>
 
-          <div style="display:flex;gap:10px;align-items:center">
-            <a class="btn" href="#/search">Back</a>
-            <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
-          </div>
-        </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <a class="btn" href="#/search">Back</a>
+  <button class="btn" id="embedBtn">Get CASA badge embed</button>
+  <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
+</div>
 
         <div class="hr"></div>
 
@@ -1430,6 +1581,8 @@ function renderLandlord(id) {
   });
 
   $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
+   $("#embedBtn")?.addEventListener("click", () => openBadgeEmbedModal(l.id));
+
 
   /* NEW: CASA embed badge modal */
   $("#embedBtn")?.addEventListener("click", () => openEmbedModal(l));
