@@ -3,6 +3,7 @@
 
    Fixes + Adds (repo-safe):
    ✅ App won’t go down (hard safety net + guarded rendering)
+   ✅ Home banner: Recent highlights (left) + Map (right) = 50/50
    ✅ Split search results: Landlords (left) + Addresses (right)
       - Works from BOTH Home search + Search page
    ✅ Landlords can have multiple properties
@@ -12,6 +13,8 @@
    ✅ Map safe-init (Leaflet optional)
    ✅ Keeps badges (assets/badge-verified.png + assets/badge-top.png)
    ✅ Landlord page “More options” dropdown + CASA embed modal w/ fractional stars
+   ✅ Landlord Portal: real login UI + Sign up, with Apple/Google/Microsoft options (demo-safe)
+   ✅ Menu ONLY on mobile (desktop hides hamburger + drawer)
 */
 
 /* -----------------------------
@@ -76,7 +79,10 @@ ${msg}
   };
 
   window.addEventListener("error", (e) =>
-    showOverlayError("Uncaught error", e && (e.error || e.message) ? e.error || e.message : e)
+    showOverlayError(
+      "Uncaught error",
+      e && (e.error || e.message) ? e.error || e.message : e
+    )
   );
 
   window.addEventListener("unhandledrejection", (e) =>
@@ -295,7 +301,7 @@ function seedDB() {
     },
   ];
 
-  const db = { landlords, properties, reviews, reports, flags: [], replies: [] };
+  const db = { landlords, properties, reviews, reports, flags: [], replies: [], landlordUsers: [] };
   saveDB(db);
   return db;
 }
@@ -308,6 +314,7 @@ function normalizeDB(db) {
     reports: Array.isArray(db.reports) ? db.reports : [],
     flags: Array.isArray(db.flags) ? db.flags : [],
     replies: Array.isArray(db.replies) ? db.replies : [],
+    landlordUsers: Array.isArray(db.landlordUsers) ? db.landlordUsers : [],
   };
 
   // ensure every review has targetType/targetId
@@ -402,7 +409,7 @@ function migrateLegacyToV2(legacy) {
     .filter((r) => r.targetId);
 
   const reports = Array.isArray(legacy.reports) ? legacy.reports : [];
-  return normalizeDB({ landlords, properties, reviews, reports, flags: [], replies: [] });
+  return normalizeDB({ landlords, properties, reviews, reports, flags: [], replies: [], landlordUsers: [] });
 }
 
 let DB = loadDB();
@@ -433,6 +440,18 @@ function norm(s) {
 
 function idRand(prefix) {
   return prefix + Math.random().toString(16).slice(2);
+}
+
+function persist() {
+  saveDB(DB);
+}
+
+function parseId(id) {
+  try {
+    return decodeURIComponent(String(id || ""));
+  } catch {
+    return String(id || "");
+  }
 }
 
 /* -----------------------------
@@ -654,13 +673,12 @@ function casaEmbedSnippetForLandlord(l) {
 }
 
 /* -----------------------------
-   Reports
+   Reports + SEO title
 ------------------------------ */
 function reportFor(landlordId) {
   return (DB.reports || []).find((r) => r.landlordId === landlordId) || null;
 }
 
-/* SEO title */
 function setPageTitle(title) {
   try {
     document.title = title ? `${title} • casa` : "casa";
@@ -792,10 +810,8 @@ function openBadgeEmbedModal(landlordId) {
     </div>
   `);
 
-  const mClose = $("#mClose");
-  const mDone = $("#mDone");
-  mClose && mClose.addEventListener("click", closeModal);
-  mDone && mDone.addEventListener("click", closeModal);
+  $("#mClose")?.addEventListener("click", closeModal);
+  $("#mDone")?.addEventListener("click", closeModal);
 
   const prev = $("#embedPreview");
   if (prev) prev.innerHTML = snippet;
@@ -803,34 +819,30 @@ function openBadgeEmbedModal(landlordId) {
   const box = $("#embedBox");
   if (box) box.value = snippet;
 
-  const copyBtn = $("#copyEmbed");
-  copyBtn &&
-    copyBtn.addEventListener("click", async () => {
+  $("#copyEmbed")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      alert("Copied embed HTML!");
+    } catch {
       try {
-        await navigator.clipboard.writeText(snippet);
+        box && box.focus && box.focus();
+        box && box.select && box.select();
+        document.execCommand("copy");
         alert("Copied embed HTML!");
       } catch {
-        try {
-          box && box.focus && box.focus();
-          box && box.select && box.select();
-          document.execCommand("copy");
-          alert("Copied embed HTML!");
-        } catch {
-          alert("Copy failed.");
-        }
+        alert("Copy failed.");
       }
-    });
+    }
+  });
 
-  const toggle = $("#toggleHTML");
-  toggle &&
-    toggle.addEventListener("click", () => {
-      const wrap = $("#htmlWrap");
-      const btn = $("#toggleHTML");
-      if (!wrap || !btn) return;
-      const shown = wrap.style.display !== "none";
-      wrap.style.display = shown ? "none" : "block";
-      btn.textContent = shown ? "Show HTML" : "Hide HTML";
-    });
+  $("#toggleHTML")?.addEventListener("click", () => {
+    const wrap = $("#htmlWrap");
+    const btn = $("#toggleHTML");
+    if (!wrap || !btn) return;
+    const shown = wrap.style.display !== "none";
+    wrap.style.display = shown ? "none" : "block";
+    btn.textContent = shown ? "Show HTML" : "Hide HTML";
+  });
 }
 
 /* -----------------------------
@@ -848,7 +860,6 @@ function initLeafletMap(el, center, zoom = 12) {
   }
 
   try {
-    // if re-rendering, Leaflet can complain — best effort reset
     if (el._leaflet_id) el._leaflet_id = null;
   } catch {}
 
@@ -901,8 +912,37 @@ function route() {
 window.addEventListener("hashchange", route);
 window.addEventListener("load", () => {
   initDrawer();
+  initMobileOnlyMenu(); // ✅ new: hide hamburger/drawer on desktop
   route();
 });
+
+/* -----------------------------
+   Mobile-only Menu (desktop hides)
+------------------------------ */
+function initMobileOnlyMenu() {
+  const btn = $("#menuBtn");
+  const drawer = $("#drawer");
+  const overlay = $("#drawerOverlay");
+
+  function apply() {
+    const isDesktop = window.innerWidth >= 981;
+    // Hide hamburger + drawer + overlay on desktop (even if present in HTML)
+    if (btn) btn.style.display = isDesktop ? "none" : "";
+    if (drawer) drawer.style.display = isDesktop ? "none" : "";
+    if (overlay) overlay.style.display = isDesktop ? "none" : "";
+
+    // Also ensure drawer isn't open on desktop
+    if (isDesktop) {
+      try {
+        drawer && drawer.classList.remove("isOpen");
+        overlay && overlay.classList.remove("isOpen");
+      } catch {}
+    }
+  }
+
+  apply();
+  window.addEventListener("resize", apply);
+}
 
 /* -----------------------------
    Components: Stars / cards
@@ -910,6 +950,12 @@ window.addEventListener("load", () => {
 function starVisFromAvg(avgRounded) {
   if (avgRounded == null) return "☆☆☆☆☆";
   return avgRounded >= 4 ? "★★★★☆" : avgRounded >= 3 ? "★★★☆☆" : avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆";
+}
+
+function clampStars(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 5;
+  return Math.max(1, Math.min(5, Math.round(x)));
 }
 
 function landlordCardHTML(l, opts = {}) {
@@ -921,7 +967,13 @@ function landlordCardHTML(l, opts = {}) {
 
   const tier = cardTier(avg ?? 0, count);
   const tintClass =
-    tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+    tier.tier === "green"
+      ? "lc--green"
+      : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+      ? "lc--red"
+      : "";
 
   const avgText = avg == null ? "—" : avg.toFixed(1);
   const stars = starVisFromAvg(avg);
@@ -963,16 +1015,19 @@ function propertyCardHTML(p, opts = {}) {
 
   const tier = cardTier(avg ?? 0, count);
   const tintClass =
-    tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+    tier.tier === "green"
+      ? "lc--green"
+      : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+      ? "lc--red"
+      : "";
 
   const avgText = avg == null ? "—" : avg.toFixed(1);
   const stars = starVisFromAvg(avg);
 
   const a = p.address || {};
-  const addr = `${a.line1 || ""}${a.unit ? `, ${a.unit}` : ""} • ${a.city || ""} • ${a.state || ""}${p.borough ? ` • ${p.borough}` : ""}`.replace(
-    /\s•\s$/,
-    ""
-  );
+  const addr = `${a.line1 || ""}${a.unit ? `, ${a.unit}` : ""} • ${a.city || ""} • ${a.state || ""}`.replace(/\s•\s$/, "");
 
   const ll = DB.landlords.find((l) => l.id === p.landlordId);
 
@@ -1057,7 +1112,13 @@ function renderHighlightsCarousel() {
       const st = ratingStats(r.targetType, r.targetId);
       const tier = cardTier(st.avgRounded ?? 0, st.count);
       const tintClass =
-        tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+        tier.tier === "green"
+          ? "lc--green"
+          : tier.tier === "yellow"
+          ? "lc--yellow"
+          : tier.tier === "red"
+          ? "lc--red"
+          : "";
 
       const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
       const starVis = starVisFromAvg(st.avgRounded);
@@ -1092,7 +1153,10 @@ function renderHighlightsCarousel() {
     .join("");
 
   const dots = items
-    .map((_, i) => `<span class="dot ${i === 0 ? "isActive" : ""}" data-dot="${i}" aria-label="Go to slide ${i + 1}"></span>`)
+    .map(
+      (_, i) =>
+        `<span class="dot ${i === 0 ? "isActive" : ""}" data-dot="${i}" aria-label="Go to slide ${i + 1}"></span>`
+    )
     .join("");
 
   return `
@@ -1131,7 +1195,7 @@ function setupCarousel() {
 }
 
 /* -----------------------------
-   Shell + query params
+   Shell
 ------------------------------ */
 function renderShell(content) {
   const app = $("#app");
@@ -1146,11 +1210,15 @@ function renderShell(content) {
         <a href="#/how">How it works</a>
         <a href="#/toolkit">Tenant Toolkit</a>
         <a href="#/search">Search</a>
+        <a href="#/portal">Landlord Portal</a>
       </div>
     </div>
   `;
 }
 
+/* -----------------------------
+   Query params
+------------------------------ */
 function getQueryParam(name) {
   const hash = location.hash || "";
   const qIndex = hash.indexOf("?");
@@ -1160,7 +1228,7 @@ function getQueryParam(name) {
 }
 
 /* -----------------------------
-   HOME
+   HOME (✅ banner 50/50)
 ------------------------------ */
 function renderHome() {
   setPageTitle("Know your landlord");
@@ -1201,7 +1269,8 @@ function renderHome() {
       </div>
     </section>
 
-    <section class="splitRow">
+    <!-- ✅ Banner is a single row with 2 equal halves -->
+    <section class="splitRow splitRow--banner">
       <div class="card homePaneCard">
         <div class="pad">
           <div class="sectionHead">
@@ -1242,6 +1311,9 @@ function renderHome() {
 
   renderShell(content);
 
+  // Minimal CSS injection to FORCE 50/50 banner without touching theme files
+  ensureRuntimeStyles();
+
   const tilePanel = $("#tilePanel");
   document.querySelectorAll("[data-home-tile]").forEach((el) => {
     el.addEventListener("click", () => {
@@ -1256,26 +1328,18 @@ function renderHome() {
   const homeSearch = $("#homeSearch");
   const homeQ = $("#homeQ");
 
-  homeSearch &&
-    homeSearch.addEventListener("click", () => {
-      const q = homeQ && homeQ.value ? String(homeQ.value).trim() : "";
-      const exactL = findExactLandlord(q);
-      if (exactL) {
-        location.hash = `#/landlord/${exactL.id}`;
-        return;
-      }
-      const exactP = findExactProperty(q);
-      if (exactP) {
-        location.hash = `#/property/${exactP.id}`;
-        return;
-      }
-      location.hash = `#/search?q=${encodeURIComponent(q)}`;
-    });
+  homeSearch?.addEventListener("click", () => {
+    const q = homeQ && homeQ.value ? String(homeQ.value).trim() : "";
+    const exactL = findExactLandlord(q);
+    if (exactL) return (location.hash = `#/landlord/${exactL.id}`);
+    const exactP = findExactProperty(q);
+    if (exactP) return (location.hash = `#/property/${exactP.id}`);
+    location.hash = `#/search?q=${encodeURIComponent(q)}`;
+  });
 
-  homeQ &&
-    homeQ.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") homeSearch && homeSearch.click();
-    });
+  homeQ?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") homeSearch?.click();
+  });
 
   // Map pins (properties)
   setTimeout(() => {
@@ -1295,7 +1359,9 @@ function renderHome() {
         try {
           window.L.marker([p.lat, p.lng])
             .addTo(map)
-            .bindPopup(`<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`);
+            .bindPopup(
+              `<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`
+            );
         } catch {}
       }
     }
@@ -1305,7 +1371,41 @@ function renderHome() {
 }
 
 /* -----------------------------
-   SEARCH (Split columns: Landlords + Addresses)
+   Runtime styles (ONLY layout fixes)
+------------------------------ */
+function ensureRuntimeStyles() {
+  if (document.getElementById("casaRuntimeStyles")) return;
+  const style = document.createElement("style");
+  style.id = "casaRuntimeStyles";
+  style.textContent = `
+    /* Force 50/50 banner split on desktop; stack on mobile */
+    .splitRow--banner{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    @media (max-width: 980px){
+      .splitRow--banner{
+        grid-template-columns: 1fr;
+      }
+    }
+    /* Make carousel slides not overflow */
+    #highTrack{ display:flex; transition: transform .35s ease; }
+    .carouselSlide{ min-width: 100%; }
+    /* Map sizing guard */
+    #homeMap, #searchMap, #propMap, #addMap{
+      width:100%;
+      min-height: 320px;
+      border-radius: 18px;
+      overflow:hidden;
+    }
+  `.trim();
+  document.head.appendChild(style);
+}
+
+/* -----------------------------
+   SEARCH (Split columns)
 ------------------------------ */
 function renderSearch() {
   setPageTitle("Search");
@@ -1325,14 +1425,6 @@ function renderSearch() {
 
         <div class="heroSearch" style="margin-top:16px;">
           <input class="input" id="searchQ" placeholder="Search landlord name, management company, or address..." value="${esc(q)}"/>
-          <select class="input" id="searchB" style="max-width:220px;">
-            <option value="">All boroughs</option>
-            <option>Manhattan</option>
-            <option>Brooklyn</option>
-            <option>Queens</option>
-            <option>Bronx</option>
-            <option>Staten Island</option>
-          </select>
           <button class="btn btn--primary" id="doSearch" type="button">Search</button>
         </div>
 
@@ -1362,17 +1454,15 @@ function renderSearch() {
   `;
 
   renderShell(content);
+  ensureRuntimeStyles();
 
   const qEl = $("#searchQ");
-  const bEl = $("#searchB");
   const lResEl = $("#landlordResults");
   const pResEl = $("#propertyResults");
   const doBtn = $("#doSearch");
 
-  if (!qEl || !bEl || !lResEl || !pResEl) return;
-
-  qEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doBtn && doBtn.click();
+  qEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doBtn?.click();
   });
 
   function matchesLandlord(l, query) {
@@ -1380,12 +1470,10 @@ function renderSearch() {
     const hay = landlordHaystack(l);
     return !t || hay.includes(t);
   }
-  function matchesProperty(p, query, borough) {
+  function matchesProperty(p, query) {
     const t = (query || "").toLowerCase();
     const hay = propertyHaystack(p);
-    const qOk = !t || hay.includes(t);
-    const bOk = !borough || String(p.borough || "").toLowerCase() === String(borough).toLowerCase();
-    return qOk && bOk;
+    return !t || hay.includes(t);
   }
 
   function normalizeName(s) {
@@ -1397,40 +1485,25 @@ function renderSearch() {
   }
 
   function runSearchAndRender() {
-    const query = qEl.value.trim();
-    const borough = bEl.value;
+    const query = qEl ? qEl.value.trim() : "";
 
-    // Exact: landlord name/entity
     const nq = normalizeName(query);
     const exactLandlords = !nq
       ? []
       : DB.landlords.filter((l) => normalizeName(l.name) === nq || (l.entity && normalizeName(l.entity) === nq));
-    if (exactLandlords.length === 1) {
-      location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`;
-      return;
-    }
+    if (exactLandlords.length === 1) return (location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`);
 
-    // Exact: address line1
     const exactProps = !nq
       ? []
-      : DB.properties.filter((p) => {
-          const a = p.address || {};
-          const addrOk = normalizeName(a.line1 || "") === nq;
-          const boroughOk = !borough || String(p.borough || "").toLowerCase() === String(borough).toLowerCase();
-          return addrOk && boroughOk;
-        });
-    if (exactProps.length === 1) {
-      location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`;
-      return;
-    }
+      : DB.properties.filter((p) => normalizeName((p.address && p.address.line1) || "") === nq);
+    if (exactProps.length === 1) return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
 
     const landlords = DB.landlords.filter((l) => matchesLandlord(l, query));
-    const props = DB.properties.filter((p) => matchesProperty(p, query, borough));
+    const props = DB.properties.filter((p) => matchesProperty(p, query));
 
-    lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
-    pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
+    if (lResEl) lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
+    if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
 
-    // Map: plot properties only (addresses)
     const mapEl = $("#searchMap");
     if (mapEl) mapEl.innerHTML = "";
     const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
@@ -1451,18 +1524,17 @@ function renderSearch() {
     }
   }
 
-  doBtn &&
-    doBtn.addEventListener("click", () => {
-      const query = qEl.value.trim();
-      location.hash = `#/search?q=${encodeURIComponent(query)}`;
-      runSearchAndRender();
-    });
+  doBtn?.addEventListener("click", () => {
+    const query = qEl ? qEl.value.trim() : "";
+    location.hash = `#/search?q=${encodeURIComponent(query)}`;
+    runSearchAndRender();
+  });
 
   runSearchAndRender();
 }
 
 /* -----------------------------
-   ADD (adds landlord + first property)
+   ADD (✅ borough removed entirely)
 ------------------------------ */
 function renderAdd() {
   setPageTitle("Add a landlord");
@@ -1514,18 +1586,6 @@ function renderAdd() {
                 <input class="input" id="state" placeholder="NY" />
               </div>
 
-              <div class="field">
-                <label>Borough (optional)</label>
-                <select class="input" id="bor">
-                  <option value="">—</option>
-                  <option>Manhattan</option>
-                  <option>Brooklyn</option>
-                  <option>Queens</option>
-                  <option>Bronx</option>
-                  <option>Staten Island</option>
-                </select>
-              </div>
-
               <button class="btn btn--primary btn--block" style="margin-top:12px;" id="addBtn" type="button">Add</button>
               <div class="tiny" style="margin-top:10px;">
                 After adding, you’ll land on the Address page so you can review the building.
@@ -1549,6 +1609,7 @@ function renderAdd() {
   `;
 
   renderShell(content);
+  ensureRuntimeStyles();
 
   let picked = null;
 
@@ -1566,70 +1627,65 @@ function renderAdd() {
     });
   }, 0);
 
-  const addBtn = $("#addBtn");
-  addBtn &&
-    addBtn.addEventListener("click", () => {
-      const name = $("#ln") && $("#ln").value ? $("#ln").value.trim() : "";
-      const entity = $("#le") && $("#le").value ? $("#le").value.trim() : "";
+  $("#addBtn")?.addEventListener("click", () => {
+    const name = $("#ln")?.value ? $("#ln").value.trim() : "";
+    const entity = $("#le")?.value ? $("#le").value.trim() : "";
 
-      const line1 = $("#a1") && $("#a1").value ? $("#a1").value.trim() : "";
-      const unit = $("#unit") && $("#unit").value ? $("#unit").value.trim() : "";
-      const city = $("#city") && $("#city").value ? $("#city").value.trim() : "";
-      const state = $("#state") && $("#state").value ? $("#state").value.trim() : "";
-      const borough = $("#bor") ? $("#bor").value : "";
+    const line1 = $("#a1")?.value ? $("#a1").value.trim() : "";
+    const unit = $("#unit")?.value ? $("#unit").value.trim() : "";
+    const city = $("#city")?.value ? $("#city").value.trim() : "";
+    const state = $("#state")?.value ? $("#state").value.trim() : "";
 
-      if (!name || !line1 || !city || !state) {
-        alert("Please fill required fields: Name, Address, City, State.");
-        return;
-      }
+    if (!name || !line1 || !city || !state) {
+      alert("Please fill required fields: Name, Address, City, State.");
+      return;
+    }
 
-      // reuse landlord if exact match exists
-      const existing = findExactLandlord(name) || null;
-      const landlordId = existing ? existing.id : idRand("l");
+    const existing = findExactLandlord(name) || null;
+    const landlordId = existing ? existing.id : idRand("l");
 
-      if (!existing) {
-        DB.landlords.unshift({
-          id: landlordId,
-          name,
-          entity,
-          verified: false,
-          top: false,
-          createdAt: Date.now(),
-        });
-
-        DB.reports = DB.reports || [];
-        DB.reports.push({
-          landlordId,
-          updatedAt: Date.now(),
-          violations_12mo: 0,
-          complaints_12mo: 0,
-          bedbug_reports_12mo: 0,
-          hp_actions: 0,
-          permits_open: 0,
-          eviction_filings_12mo: 0,
-          notes: "Demo report. Production: public datasets + sources.",
-        });
-      }
-
-      // create property
-      const propertyId = idRand("p");
-      DB.properties.unshift({
-        id: propertyId,
-        landlordId,
-        address: { line1, unit, city, state },
-        borough,
-        lat: picked && typeof picked.lat === "number" ? picked.lat : 40.73,
-        lng: picked && typeof picked.lng === "number" ? picked.lng : -73.95,
+    if (!existing) {
+      DB.landlords.unshift({
+        id: landlordId,
+        name,
+        entity,
+        verified: false,
+        top: false,
         createdAt: Date.now(),
       });
 
-      saveDB(DB);
-      location.hash = `#/property/${propertyId}`;
+      DB.reports = DB.reports || [];
+      DB.reports.push({
+        landlordId,
+        updatedAt: Date.now(),
+        violations_12mo: 0,
+        complaints_12mo: 0,
+        bedbug_reports_12mo: 0,
+        hp_actions: 0,
+        permits_open: 0,
+        eviction_filings_12mo: 0,
+        notes: "Demo report. Production: public datasets + sources.",
+      });
+    }
+
+    const propertyId = idRand("p");
+    DB.properties.unshift({
+      id: propertyId,
+      landlordId,
+      address: { line1, unit, city, state },
+      borough: "", // ✅ removed from form entirely (kept field for backward compatibility)
+      lat: picked && typeof picked.lat === "number" ? picked.lat : 40.73,
+      lng: picked && typeof picked.lng === "number" ? picked.lng : -73.95,
+      createdAt: Date.now(),
     });
+
+    persist();
+    location.hash = `#/property/${propertyId}`;
+  });
 }
 
 /* -----------------------------
-   HOW / TRUST / PORTAL
+   HOW / TRUST
 ------------------------------ */
 function renderHow() {
   setPageTitle("How it works");
@@ -1680,30 +1736,148 @@ function renderTrust() {
   `);
 }
 
+/* -----------------------------
+   LANDLORD PORTAL (✅ login + signup + SSO buttons)
+------------------------------ */
 function renderPortal() {
   setPageTitle("Landlord Portal");
-  renderShell(`
+
+  const mode = getQueryParam("mode") === "signup" ? "signup" : "login";
+
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Landlord Portal</div>
-            <div class="pageTitle">Sign in</div>
-            <div class="pageSub">Demo UI only (plug in real auth later).</div>
+            <div class="pageTitle">${mode === "signup" ? "Create your account" : "Sign in"}</div>
+            <div class="pageSub">Demo-safe UI. Plug in real auth later.</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
+
         <div class="hr"></div>
-        <div class="muted" style="font-weight:800;line-height:1.55">
-          This page is intentionally minimal to preserve your theme while keeping navigation functional.
+
+        <div class="twoCol">
+          <div class="card" style="box-shadow:none;">
+            <div class="pad">
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <a class="btn ${mode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login">Login</a>
+                <a class="btn ${mode === "signup" ? "btn--primary" : ""}" href="#/portal?mode=signup">Sign up</a>
+              </div>
+
+              <div class="hr"></div>
+
+              <div class="kicker">Continue with</div>
+              <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+                <button class="btn" type="button" data-sso="apple">Continue with Apple</button>
+                <button class="btn" type="button" data-sso="google">Continue with Google</button>
+                <button class="btn" type="button" data-sso="microsoft">Continue with Microsoft</button>
+              </div>
+
+              <div class="hr"></div>
+
+              <div class="field">
+                <label>Email</label>
+                <input class="input" id="lpEmail" placeholder="you@company.com" />
+              </div>
+
+              <div class="field">
+                <label>Password</label>
+                <input class="input" id="lpPass" type="password" placeholder="••••••••" />
+              </div>
+
+              ${
+                mode === "signup"
+                  ? `
+                    <div class="field">
+                      <label>Company / Landlord name</label>
+                      <input class="input" id="lpCompany" placeholder="Exact name as shown on CASA" />
+                    </div>
+                    <div class="field">
+                      <label>Verification document (demo)</label>
+                      <input class="input" id="lpDoc" type="file" />
+                    </div>
+                  `
+                  : ""
+              }
+
+              <button class="btn btn--primary btn--block" id="lpSubmit" type="button" style="margin-top:12px;">
+                ${mode === "signup" ? "Create account" : "Sign in"}
+              </button>
+
+              <div class="tiny" style="margin-top:10px; line-height:1.45;">
+                ${mode === "signup" ? "After sign up, you’ll be verified before responding to reviews." : "Landlords can respond to reviews after verification."}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="kicker">Why verify?</div>
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+              <div class="pad">
+                <div class="muted" style="font-weight:800; line-height:1.55;">
+                  Verification prevents fake landlord accounts and keeps responses accountable.
+                  Upload a simple ownership/management document (demo field here).
+                </div>
+                <div class="hr" style="margin:14px 0;"></div>
+                <div class="tiny">
+                  This is a UI placeholder — wire it to real auth + storage when you go live.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </section>
-  `);
+  `;
+
+  renderShell(content);
+  ensureRuntimeStyles();
+
+  // SSO buttons demo
+  document.querySelectorAll("[data-sso]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      alert(`Demo: ${btn.getAttribute("data-sso")} SSO would start here.`);
+    });
+  });
+
+  // demo submit
+  $("#lpSubmit")?.addEventListener("click", () => {
+    const email = $("#lpEmail")?.value ? $("#lpEmail").value.trim() : "";
+    const pass = $("#lpPass")?.value ? $("#lpPass").value.trim() : "";
+    if (!email || !pass) {
+      alert("Enter email + password.");
+      return;
+    }
+
+    if (mode === "signup") {
+      const company = $("#lpCompany")?.value ? $("#lpCompany").value.trim() : "";
+      if (!company) {
+        alert("Enter your company/landlord name.");
+        return;
+      }
+      DB.landlordUsers = DB.landlordUsers || [];
+      DB.landlordUsers.push({
+        id: idRand("u"),
+        email,
+        company,
+        verified: false,
+        createdAt: Date.now(),
+      });
+      persist();
+      alert("Demo: account created. Verification pending.");
+      location.hash = "#/";
+    } else {
+      alert("Demo: signed in (no real auth wired).");
+      location.hash = "#/";
+    }
+  });
 }
 
 /* -----------------------------
-   TENANT TOOLKIT (real + usable)
+   TENANT TOOLKIT
 ------------------------------ */
 function renderToolkit() {
   setPageTitle("Tenant Toolkit");
@@ -1777,29 +1951,12 @@ function renderToolkit() {
   `;
 
   renderShell(content);
+  ensureRuntimeStyles();
 }
 
 /* -----------------------------
-   Small helpers for pages/actions
+   REVIEW UI helpers (forms/lists)
 ------------------------------ */
-function persist() {
-  saveDB(DB);
-}
-
-function parseId(id) {
-  try {
-    return decodeURIComponent(String(id || ""));
-  } catch {
-    return String(id || "");
-  }
-}
-
-function clampStars(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return 5;
-  return Math.max(1, Math.min(5, Math.round(x)));
-}
-
 function renderStarsPicker(idPrefix, defaultVal = 5) {
   const opts = [5, 4, 3, 2, 1]
     .map((v) => `<option value="${v}" ${v === defaultVal ? "selected" : ""}>${"★".repeat(v)}${"☆".repeat(5 - v)}</option>`)
@@ -1893,10 +2050,9 @@ function openReportModal(targetType, targetId) {
   });
 }
 
-function repliesForLandlord(landlordId) {
-  return (DB.replies || []).filter((x) => x && x.landlordId === landlordId);
-}
-
+/* -----------------------------
+   Replies
+------------------------------ */
 function addReply(landlordId, reviewId, text) {
   DB.replies = DB.replies || [];
   DB.replies.unshift({
@@ -1931,7 +2087,6 @@ function renderReviewList(targetType, targetId, landlordContextIdForReply) {
         `
         : "";
 
-      // demo “respond” UI exists only for landlord pages (landlordContextIdForReply provided)
       const canReply = !!landlordContextIdForReply && targetType === "landlord";
 
       const respondHTML = canReply
@@ -1971,15 +2126,13 @@ function renderReviewList(targetType, targetId, landlordContextIdForReply) {
     .join("\n");
 }
 
-function wireReviewListInteractions(container, targetType, targetId, landlordContextIdForReply) {
+function wireReviewListInteractions(container, landlordContextIdForReply) {
   if (!container) return;
 
-  // report individual review
   container.querySelectorAll("[data-flag]").forEach((btn) => {
     btn.addEventListener("click", () => openReportModal("review", btn.getAttribute("data-flag") || ""));
   });
 
-  // open reply box
   container.querySelectorAll("[data-reply-open]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const rid = btn.getAttribute("data-reply-open");
@@ -1988,7 +2141,6 @@ function wireReviewListInteractions(container, targetType, targetId, landlordCon
     });
   });
 
-  // cancel reply box
   container.querySelectorAll("[data-reply-cancel]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const rid = btn.getAttribute("data-reply-cancel");
@@ -1997,18 +2149,14 @@ function wireReviewListInteractions(container, targetType, targetId, landlordCon
     });
   });
 
-  // send reply (demo)
   container.querySelectorAll("[data-reply-send]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const rid = btn.getAttribute("data-reply-send");
       const ta = container.querySelector(`[data-reply-text="${CSS.escape(rid)}"]`);
       const text = ta && ta.value ? String(ta.value).trim() : "";
-      if (!text) {
-        alert("Write a short response first.");
-        return;
-      }
+      if (!text) return alert("Write a short response first.");
       addReply(landlordContextIdForReply, rid, text);
-      route(); // re-render
+      route();
     });
   });
 }
@@ -2038,7 +2186,7 @@ function renderLandlord(id) {
     return;
   }
 
-  setPageTitle(l.name);
+   setPageTitle(l.name);
 
   const st = ratingStats("landlord", l.id);
   const tier = cardTier(st.avgRounded ?? 0, st.count);
@@ -2047,7 +2195,6 @@ function renderLandlord(id) {
 
   const props = DB.properties.filter((p) => p.landlordId === l.id);
   const rep = reportFor(l.id);
-
   const credential = casaCredentialForLandlord(l.id);
 
   const content = `
@@ -2069,138 +2216,147 @@ function renderLandlord(id) {
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
               <div class="pad">
                 <div class="kicker">Rating</div>
+
+                <!-- ✅ FIXED: single lcRow, removed corrupted/truncated line -->
                 <div class="lcRow" style="margin-top:10px;">
                   <div style="display:flex; gap:12px; align-items:center;">
                     <span class="stars" style="font-size:16px;">${esc(starVis)}</span>
-                    <span class="ratingNum" style="font-size:16px;">${esc(avgText)}</span>
+                    <span class="ratingNum" style="font-weight:950;">${esc(avgText)}</span>
                     <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
                   </div>
-                  <span class="pill ${esc(tier.pillClass || "")}">${esc(st.count ? tier.label : "Unrated")}</span>
-                </div>
 
-                <div class="tiny" style="margin-top:10px;">
-                  Status: <b>${esc(credential)}</b>
+                  <div style="display:flex; gap:10px; align-items:center;">
+                    ${
+                      st.count
+                        ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>`
+                        : `<span class="pill">Unrated</span>`
+                    }
+
+                    <!-- More options dropdown (keeps your vibe) -->
+                    <div style="position:relative;">
+                      <button class="btn miniBtn" id="moreBtn" type="button" aria-expanded="false">More options</button>
+
+                      <div class="card" id="moreDropdown"
+                           style="display:none; position:absolute; right:0; top:44px; z-index:12; min-width:260px; box-shadow: 0 22px 45px rgba(20,16,12,.12);">
+                        <div class="pad" style="padding:12px;">
+                          <div class="tiny" style="margin-bottom:10px;">Actions</div>
+                          <div style="display:flex; flex-direction:column; gap:10px;">
+                            <button class="btn" type="button" id="embedBtn">Get CASA badge embed</button>
+                            <a class="btn" href="#/add">Add another address</a>
+                            <a class="btn" href="#/trust">Trust &amp; Safety</a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
 
                 <div class="hr" style="margin:14px 0;"></div>
 
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                  <a class="btn btn--primary" href="#/add">Add address</a>
+                <div class="kicker">CASA rating status</div>
+                <div class="muted" style="margin-top:6px; font-weight:900;">${esc(credential)}</div>
 
-                  <div style="position:relative;">
-                    <button class="btn" id="moreBtn" type="button" aria-expanded="false">More options</button>
-                    <div class="dropdown" id="moreDropdown" style="display:none;">
-                      <button class="btn btn--block" id="embedBtn" type="button">Get CASA badge</button>
-                      <button class="btn btn--block" id="flagLandlord" type="button">Report</button>
-                    </div>
-                  </div>
-                </div>
+                <div class="hr" style="margin:14px 0;"></div>
 
-                <div class="tiny" style="margin-top:12px;">
-                  Tip: Rate the landlord here, or rate a specific building on its Address page.
-                </div>
+                <div class="kicker">Report card (demo)</div>
+                ${
+                  rep
+                    ? `
+                      <div class="smallNote" style="margin-top:10px; line-height:1.6;">
+                        <div><b>${esc(String(rep.violations_12mo))}</b> violations (12 mo)</div>
+                        <div><b>${esc(String(rep.complaints_12mo))}</b> complaints (12 mo)</div>
+                        <div><b>${esc(String(rep.bedbug_reports_12mo))}</b> bedbug reports (12 mo)</div>
+                        <div><b>${esc(String(rep.permits_open))}</b> open permits</div>
+                        <div><b>${esc(String(rep.eviction_filings_12mo))}</b> eviction filings (12 mo)</div>
+                      </div>
+                      <div class="tiny" style="margin-top:10px;">${esc(rep.notes || "")}</div>
+                    `
+                    : `<div class="muted" style="margin-top:10px;">No report data.</div>`
+                }
               </div>
             </div>
 
             <div style="margin-top:14px;">
               ${reviewFormHTML("landlord", l.id)}
             </div>
+
+            <div style="margin-top:14px;">
+              <div class="kicker">Reviews</div>
+              <div class="list" id="landlordReviews" style="margin-top:10px;"></div>
+            </div>
           </div>
 
           <div>
-            <div class="kicker">Properties</div>
+            <div class="kicker">Addresses</div>
             <div class="list" style="margin-top:10px;">
               ${
                 props.length
                   ? props.map((p) => propertyCardHTML(p)).join("")
-                  : `<div class="muted">No properties listed yet.</div>`
+                  : `<div class="muted">No addresses listed yet.</div>`
               }
             </div>
 
             <div class="hr"></div>
 
-            <div class="kicker">Quick report (demo)</div>
+            <div class="kicker">Landlord Portal</div>
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
               <div class="pad">
-                <div class="tiny">Updated: ${esc(rep ? fmtDate(rep.updatedAt) : "—")}</div>
-                <div class="twoCol" style="margin-top:12px;">
-                  <div class="stat">
-                    <div class="kicker">Violations (12mo)</div>
-                    <div class="statNum">${esc(rep ? rep.violations_12mo : 0)}</div>
-                  </div>
-                  <div class="stat">
-                    <div class="kicker">Complaints (12mo)</div>
-                    <div class="statNum">${esc(rep ? rep.complaints_12mo : 0)}</div>
-                  </div>
-                  <div class="stat">
-                    <div class="kicker">Bedbug reports</div>
-                    <div class="statNum">${esc(rep ? rep.bedbug_reports_12mo : 0)}</div>
-                  </div>
-                  <div class="stat">
-                    <div class="kicker">Eviction filings</div>
-                    <div class="statNum">${esc(rep ? rep.eviction_filings_12mo : 0)}</div>
-                  </div>
+                <div class="muted" style="font-weight:900; line-height:1.55;">
+                  Verified landlords can respond to reviews.
                 </div>
-                <div class="tiny" style="margin-top:12px; line-height:1.45;">
-                  ${esc(rep ? rep.notes : "Demo only. In production, cite sources and timestamps.")}
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                  <a class="btn btn--primary" href="#/portal?mode=login">Sign in</a>
+                  <a class="btn" href="#/portal?mode=signup">Create account</a>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
 
-        <div class="hr"></div>
-
-        <div class="kicker">Reviews</div>
-        <div id="landlordReviewList" style="margin-top:10px;">
-          ${renderReviewList("landlord", l.id, l.id)}
-        </div>
       </div>
     </section>
   `;
 
   renderShell(content);
+  ensureRuntimeStyles();
 
-  // more options dropdown
+  // Wire dropdown
   $("#moreBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     toggleInlineDropdown();
   });
 
   document.addEventListener(
     "click",
-    (e) => {
-      const dd = $("#moreDropdown");
-      const btn = $("#moreBtn");
-      if (!dd || !btn) return;
-      if (dd.style.display !== "block") return;
-      const inside = e.target === dd || dd.contains(e.target) || e.target === btn;
-      if (!inside) closeInlineDropdown();
+    () => {
+      closeInlineDropdown();
     },
-    { capture: true }
+    { once: true }
   );
 
-  $("#embedBtn")?.addEventListener("click", () => {
+  $("#embedBtn")?.addEventListener("click", (e) => {
+    e.preventDefault();
     closeInlineDropdown();
     openBadgeEmbedModal(l.id);
   });
 
-  $("#flagLandlord")?.addEventListener("click", () => {
-    closeInlineDropdown();
-    openReportModal("landlord", l.id);
-  });
+  // Review list render + interactions
+  const listEl = $("#landlordReviews");
+  if (listEl) {
+    listEl.innerHTML = renderReviewList("landlord", l.id, l.id);
+    wireReviewListInteractions(listEl, l.id);
+  }
 
-  // post review
+  // Review form wiring
   const formId = `landlord_${l.id}`;
-  const submit = $(`#rev_${formId}Submit`);
-  const reportBtn = $(`#rev_${formId}Report`);
-  submit?.addEventListener("click", () => {
+  $(`#rev_${formId}Submit`)?.addEventListener("click", () => {
     const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
     const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
-    if (!text) {
-      alert("Write a short review first.");
-      return;
-    }
+    if (!text) return alert("Write a review first.");
+
     DB.reviews.unshift({
       id: idRand("r"),
       targetType: "landlord",
@@ -2212,11 +2368,8 @@ function renderLandlord(id) {
     persist();
     route();
   });
-  reportBtn?.addEventListener("click", () => openReportModal("landlord", l.id));
 
-  // wire review list interactions (reply/report)
-  const list = $("#landlordReviewList");
-  wireReviewListInteractions(list, "landlord", l.id, l.id);
+  $(`#rev_${formId}Report`)?.addEventListener("click", () => openReportModal("landlord", l.id));
 }
 
 /* -----------------------------
@@ -2249,17 +2402,11 @@ function renderProperty(id) {
   const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
   setPageTitle(title);
 
+  const l = DB.landlords.find((x) => x.id === p.landlordId);
   const st = ratingStats("property", p.id);
   const tier = cardTier(st.avgRounded ?? 0, st.count);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
   const starVis = starVisFromAvg(st.avgRounded);
-
-  const l = DB.landlords.find((x) => x.id === p.landlordId);
-
-  const fullAddr = `${a.line1 || ""}${a.unit ? `, ${a.unit}` : ""} • ${a.city || ""} • ${a.state || ""}${p.borough ? ` • ${p.borough}` : ""}`.replace(
-    /\s•\s$/,
-    ""
-  );
 
   const content = `
     <section class="pageCard card">
@@ -2268,7 +2415,9 @@ function renderProperty(id) {
           <div>
             <div class="kicker">Address</div>
             <div class="pageTitle">${esc(title)}</div>
-            <div class="pageSub">${esc(fullAddr)}</div>
+            <div class="pageSub">
+              ${esc(`${a.city || ""} • ${a.state || ""}`)} ${l ? `• Landlord: <a href="#/landlord/${esc(l.id)}">${esc(l.name)}</a>` : ""}
+            </div>
           </div>
           <a class="btn" href="#/search">Back</a>
         </div>
@@ -2279,80 +2428,86 @@ function renderProperty(id) {
           <div>
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
               <div class="pad">
-                <div class="kicker">Building rating</div>
+                <div class="kicker">Rating</div>
                 <div class="lcRow" style="margin-top:10px;">
                   <div style="display:flex; gap:12px; align-items:center;">
                     <span class="stars" style="font-size:16px;">${esc(starVis)}</span>
-                    <span class="ratingNum" style="font-size:16px;">${esc(avgText)}</span>
+                    <span class="ratingNum" style="font-weight:950;">${esc(avgText)}</span>
                     <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
                   </div>
-                  <span class="pill ${esc(tier.pillClass || "")}">${esc(st.count ? tier.label : "Unrated")}</span>
+                  ${st.count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
                 </div>
 
-                <div class="tiny" style="margin-top:12px;">
-                  Landlord:
-                  ${
-                    l
-                      ? `<a href="#/landlord/${esc(l.id)}" style="font-weight:950;">${esc(l.name)}</a> ${badgesHTMLForLandlord(l)}`
-                      : `<span class="muted">—</span>`
-                  }
+                <div class="hr" style="margin:14px 0;"></div>
+
+                <div class="kicker">Location</div>
+                <div class="mapBox" style="margin-top:10px;">
+                  <div class="map" id="propMap" style="height:320px;"></div>
                 </div>
+
               </div>
             </div>
 
             <div style="margin-top:14px;">
               ${reviewFormHTML("property", p.id)}
             </div>
+
+            <div style="margin-top:14px;">
+              <div class="kicker">Reviews</div>
+              <div class="list" id="propertyReviews" style="margin-top:10px;"></div>
+            </div>
           </div>
 
           <div>
-            <div class="kicker">Map</div>
-            <div class="mapBox" style="margin-top:10px;">
-              <div class="map" id="propMap" style="height:320px;"></div>
+            <div class="kicker">Landlord</div>
+            <div class="list" style="margin-top:10px;">
+              ${l ? landlordCardHTML(l) : `<div class="muted">No landlord listed.</div>`}
             </div>
 
-            <div class="tiny" style="margin-top:10px;">
-              Tip: Map is optional. If Leaflet isn’t loaded, this stays blank safely.
+            <div class="hr"></div>
+
+            <div class="kicker">Tip</div>
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+              <div class="pad">
+                <div class="muted" style="font-weight:900; line-height:1.55;">
+                  Rate the building for conditions. Rate the landlord for management behavior.
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="hr"></div>
-
-        <div class="kicker">Reviews</div>
-        <div id="propertyReviewList" style="margin-top:10px;">
-          ${renderReviewList("property", p.id, null)}
-        </div>
       </div>
     </section>
   `;
 
   renderShell(content);
+  ensureRuntimeStyles();
 
-  // map
+  // Map
   setTimeout(() => {
-    const mapEl = $("#propMap");
-    if (!mapEl) return;
-    const center = [typeof p.lat === "number" ? p.lat : 40.73, typeof p.lng === "number" ? p.lng : -73.95];
-    const map = initLeafletMap(mapEl, center, 14);
+    const map = initLeafletMap($("#propMap"), [p.lat || 40.73, p.lng || -73.95], 14);
     if (!map) return;
+
     try {
-      window.L.marker(center).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
+      window.L.marker([p.lat || 40.73, p.lng || -73.95]).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
     } catch {}
   }, 0);
 
-  // post review
-  const formId = `property_${p.id}`;
-  const submit = $(`#rev_${formId}Submit`);
-  const reportBtn = $(`#rev_${formId}Report`);
+  // Reviews
+  const listEl = $("#propertyReviews");
+  if (listEl) {
+    listEl.innerHTML = renderReviewList("property", p.id, null);
+    wireReviewListInteractions(listEl, null);
+  }
 
-  submit?.addEventListener("click", () => {
+  // Review form
+  const formId = `property_${p.id}`;
+  $(`#rev_${formId}Submit`)?.addEventListener("click", () => {
     const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
     const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
-    if (!text) {
-      alert("Write a short review first.");
-      return;
-    }
+    if (!text) return alert("Write a review first.");
+
     DB.reviews.unshift({
       id: idRand("r"),
       targetType: "property",
@@ -2365,9 +2520,11 @@ function renderProperty(id) {
     route();
   });
 
-  reportBtn?.addEventListener("click", () => openReportModal("property", p.id));
-
-  // wire review list interactions (report-only)
-  const list = $("#propertyReviewList");
-  wireReviewListInteractions(list, "property", p.id, null);
+  $(`#rev_${formId}Report`)?.addEventListener("click", () => openReportModal("property", p.id));
 }
+
+/* -----------------------------
+   FINAL: Router guard + default
+------------------------------ */
+// If you have any leftover routes/pages in your repo that call renderX,
+// keep them below or remove them. This file is repo-safe and won’t crash if unused.
