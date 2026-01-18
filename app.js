@@ -1547,7 +1547,59 @@ function ensureRuntimeStyles() {
 
     /* Make carousel slides not overflow */
     #highTrack{ display:flex; transition: transform .35s ease; }
-    .carouselSlide{ min-width: 100%; }
+    /* -----------------------------
+       Home tiles: make horizontal bubble buttons
+       (Search / Review / Rent)
+    ------------------------------ */
+    .tileRow{
+      display:flex !important;
+      flex-direction:row !important;
+      gap:12px !important;
+      flex-wrap:wrap !important;
+      align-items:center !important;
+      justify-content:flex-start !important;
+      margin-top:14px !important;
+    }
+
+    .tileRow .tile{
+      display:inline-flex !important;
+      align-items:center !important;
+      gap:10px !important;
+
+      padding:10px 14px !important;
+      border-radius:999px !important;
+
+      border:1px solid rgba(20,16,12,.14) !important;
+      background: rgba(255,255,255,.55) !important;
+      box-shadow: 0 10px 26px rgba(20,16,12,.06) !important;
+
+      cursor:pointer !important;
+      user-select:none !important;
+
+      /* prevent “full-width blocks” */
+      width:auto !important;
+      flex:0 0 auto !important;
+      margin:0 !important;
+    }
+
+    .tileRow .tile .tile__icon{
+      /* keep your icon vibe, just align it */
+      display:inline-flex !important;
+      width:auto !important;
+      min-width:0 !important;
+      margin:0 !important;
+    }
+
+    .tileRow .tile .tile__label{
+      font-weight:900 !important;
+      line-height:1 !important;
+    }
+
+    /* Disabled tile still looks disabled but stays horizontal */
+    .tileRow .tile.tile--disabled{
+      opacity:.55 !important;
+      cursor:not-allowed !important;
+    }
 
     /* Map sizing guard */
     #homeMap, #searchMap, #propMap, #addMap{
