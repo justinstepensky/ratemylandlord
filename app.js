@@ -465,8 +465,11 @@ function openBadgeEmbedModal(landlordId) {
   const l = DB.landlords.find(x => x.id === landlordId);
   if (!l) return;
 
-  const snippet = casaEmbedSnippetForLandlord(l);
-
+const snippet = (typeof casaEmbedSnippetForLandlord === "function")
+  ? casaEmbedSnippetForLandlord(l)
+  : "";
+console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
+   
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">CASA badge embed</div>
