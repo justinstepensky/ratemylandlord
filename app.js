@@ -445,7 +445,6 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
           <span class="stars">${starVis}</span>
           <span class="ratingNum">${avgText}</span>
           <span class="muted">(${count} review${count===1?"":"s"})</span>
-          <span class="muted">Rating reflects review recency.</span>
         </div>
 
         <div class="smallNote"></div>
@@ -1202,7 +1201,6 @@ function renderLandlord(id) {
               <span class="stars">${starVis}</span>
               <span class="ratingNum">${avgText}</span>
               <span class="muted">${st.count ? `${st.count} review${st.count===1?"":"s"}` : "No ratings"}</span>
-              <span class="muted">Rating reflects review recency.</span>
               <span class="pill">${esc(cred === "CASA Rated" ? "CASA Rated" : (st.count ? "Not yet CASA Rated" : "Unrated"))}</span>
             </div>
 
