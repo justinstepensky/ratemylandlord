@@ -8,6 +8,12 @@
    - review modal fixed (z-index + layout)
    - rating is clickable stars
    - HARDENED: prevents blank app if any piece fails
+
+   NEW (added, no redesign):
+   - Building/landlord public report layer (demo city-data style)
+   - Tenant Toolkit page (multi-market strategy)
+   - CASA badge embed generator for landlords (Trustpilot-style credential)
+   - Page titles update by route for SEO shareability
 */
 
 /* -----------------------------
@@ -20,7 +26,6 @@
       const el = document.getElementById("app");
       if (!el) return;
 
-      // Minimal, non-invasive debug UI (only appears on fatal errors)
       el.innerHTML = `
         <section class="pageCard card">
           <div class="pad">
@@ -129,6 +134,44 @@ function seedDB() {
       { id: "r4", landlordId: "l3", stars: 5, text: "Fast maintenance and respectful staff.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 18 },
       { id: "r5", landlordId: "l3", stars: 4, text: "Solid experience overall; minor delays during holidays.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 58 }
     ],
+
+    /* NEW: public-report layer (demo “city data”) */
+    reports: [
+      {
+        landlordId: "l1",
+        updatedAt: Date.now() - 1000*60*60*24*2,
+        violations_12mo: 7,
+        complaints_12mo: 22,
+        bedbug_reports_12mo: 1,
+        hp_actions: 0,
+        permits_open: 2,
+        eviction_filings_12mo: 1,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      },
+      {
+        landlordId: "l2",
+        updatedAt: Date.now() - 1000*60*60*24*4,
+        violations_12mo: 18,
+        complaints_12mo: 49,
+        bedbug_reports_12mo: 3,
+        hp_actions: 1,
+        permits_open: 4,
+        eviction_filings_12mo: 6,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      },
+      {
+        landlordId: "l3",
+        updatedAt: Date.now() - 1000*60*60*24*1,
+        violations_12mo: 2,
+        complaints_12mo: 9,
+        bedbug_reports_12mo: 0,
+        hp_actions: 0,
+        permits_open: 1,
+        eviction_filings_12mo: 0,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      }
+    ],
+
     flags: [],
     replies: []
   };
@@ -172,23 +215,6 @@ function findExactLandlord(query) {
   const exact = DB.landlords.filter(l => norm(l.name) === q || norm(l.entity) === q);
   if (exact.length === 1) return exact[0];
   return null;
-}
-
-function findSimilarLandlords(query, borough = "") {
-  const q = norm(query);
-  const b = norm(borough);
-
-  let list = DB.landlords.filter(l => {
-    const bOk = !b || norm(l.borough) === b;
-    if (!bOk) return false;
-    if (!q) return true;
-    return landlordHaystack(l).includes(q);
-  });
-
-  if (q && list.length === 0) {
-    list = DB.landlords.filter(l => !b || norm(l.borough) === b);
-  }
-  return list;
 }
 
 /* Recency-weighted average:
@@ -267,6 +293,18 @@ function badgesHTML(l) {
   return `<span class="badges">${parts.join("")}</span>`;
 }
 
+/* NEW: report helper */
+function reportFor(landlordId) {
+  return (DB.reports || []).find(r => r.landlordId === landlordId) || null;
+}
+
+/* NEW: soft SEO title update */
+function setPageTitle(title) {
+  try {
+    document.title = title ? `${title} • casa` : "casa";
+  } catch {}
+}
+
 /* -----------------------------
    Drawer (mobile menu)
 ------------------------------ */
@@ -321,7 +359,6 @@ function openModal(innerHTML) {
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 
-  // One-time click handler
   const handler = (e) => {
     if (e.target === overlay) closeModal();
   };
@@ -351,11 +388,8 @@ function initLeafletMap(el, center, zoom = 12) {
     return null;
   }
 
-  // Avoid "Map container is already initialized" errors
   try {
-    if (el._leaflet_id) {
-      el._leaflet_id = null;
-    }
+    if (el._leaflet_id) el._leaflet_id = null;
   } catch {}
 
   let map = null;
@@ -366,7 +400,6 @@ function initLeafletMap(el, center, zoom = 12) {
       attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    // Fix 0-height/hidden containers (prevents blank tiles)
     setTimeout(() => {
       try { map.invalidateSize(); } catch {}
     }, 60);
@@ -396,6 +429,7 @@ function route() {
     if (base === "how") return renderHow();
     if (base === "trust") return renderTrust();
     if (base === "portal") return renderPortal();
+    if (base === "toolkit") return renderToolkit();
     if (base === "landlord" && param) return renderLandlord(param);
 
     renderHome();
@@ -593,6 +627,7 @@ function renderShell(content) {
    HOME
 ------------------------------ */
 function renderHome() {
+  setPageTitle("Know your landlord");
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -674,7 +709,6 @@ function renderHome() {
   `;
   renderShell(content);
 
-  // tile copy
   const tilePanel = $("#tilePanel");
   document.querySelectorAll("[data-home-tile]").forEach(el => {
     el.addEventListener("click", () => {
@@ -686,7 +720,6 @@ function renderHome() {
     });
   });
 
-  // search
   $("#homeSearch")?.addEventListener("click", () => {
     const q = $("#homeQ")?.value?.trim?.() || "";
 
@@ -702,7 +735,6 @@ function renderHome() {
     if (e.key === "Enter") $("#homeSearch")?.click();
   });
 
-  // Map
   setTimeout(() => {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
@@ -738,6 +770,7 @@ function getQueryParam(name) {
    SEARCH
 ------------------------------ */
 function renderSearch() {
+  setPageTitle("Search");
   const q = getQueryParam("q");
 
   const content = `
@@ -779,8 +812,6 @@ function renderSearch() {
   const qEl = $("#searchQ");
   const bEl = $("#searchB");
   const resultsEl = $("#results");
-
-  // safe guard
   if (!qEl || !bEl || !resultsEl) return;
 
   qEl.addEventListener("keydown", (e) => {
@@ -827,7 +858,6 @@ function renderSearch() {
       ? listToShow.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
       : `<div class="muted">No results.</div>`;
 
-    // Map
     const mapEl = $("#searchMap");
     if (mapEl) mapEl.innerHTML = "";
 
@@ -861,7 +891,6 @@ function renderSearch() {
 
   $("#doSearch")?.addEventListener("click", () => {
     const query = qEl.value.trim();
-    // Keep hash in sync for shareability
     location.hash = `#/search?q=${encodeURIComponent(query)}`;
     run();
   });
@@ -873,6 +902,7 @@ function renderSearch() {
    ADD
 ------------------------------ */
 function renderAdd() {
+  setPageTitle("Add a landlord");
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -983,6 +1013,21 @@ function renderAdd() {
     };
 
     DB.landlords.unshift(l);
+
+    /* auto create a default report object so profile never looks empty */
+    DB.reports = DB.reports || [];
+    DB.reports.push({
+      landlordId: id,
+      updatedAt: Date.now(),
+      violations_12mo: 0,
+      complaints_12mo: 0,
+      bedbug_reports_12mo: 0,
+      hp_actions: 0,
+      permits_open: 0,
+      eviction_filings_12mo: 0,
+      notes: "Demo report. Production: public datasets + sources."
+    });
+
     saveDB(DB);
 
     location.hash = `#/landlord/${id}`;
@@ -993,6 +1038,7 @@ function renderAdd() {
    HOW + TRUST + PORTAL
 ------------------------------ */
 function renderHow() {
+  setPageTitle("How it works");
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -1009,8 +1055,8 @@ function renderHow() {
 
         <div class="muted" style="font-weight:700;line-height:1.5">
           <div><b>Search</b><br/>Find a landlord by name, entity, address, or borough.</div>
-          <div style="margin-top:10px"><b>Review</b><br/>Post instantly. You’ll receive an edit link (no account required).</div>
-          <div style="margin-top:10px"><b>Respond</b><br/>Verified landlords can reply inline under reviews.</div>
+          <div style="margin-top:10px"><b>Review</b><br/>Post instantly. (No account required.)</div>
+          <div style="margin-top:10px"><b>Respond</b><br/>Verified landlords can reply inline under reviews (coming soon).</div>
           <div style="margin-top:10px"><b>Report issues</b><br/>Spam, harassment, and personal info can be reported for moderation.</div>
         </div>
       </div>
@@ -1020,6 +1066,7 @@ function renderHow() {
 }
 
 function renderTrust() {
+  setPageTitle("Trust & Safety");
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -1035,7 +1082,7 @@ function renderTrust() {
         <div class="hr"></div>
 
         <div class="muted" style="font-weight:700;line-height:1.55">
-          <div><b>No reviewer accounts</b><br/>Tenants can post without accounts; edits use an edit link.</div>
+          <div><b>No reviewer accounts</b><br/>Tenants can post without accounts.</div>
           <div style="margin-top:10px"><b>Verified landlord responses</b><br/>Landlords upload documentation and are reviewed before responding publicly.</div>
           <div style="margin-top:10px"><b>No doxxing</b><br/>Do not post phone numbers, emails, or private details.</div>
           <div style="margin-top:10px"><b>Reporting</b><br/>Spam, harassment, and inaccurate listings can be reported for moderation.</div>
@@ -1047,6 +1094,7 @@ function renderTrust() {
 }
 
 function renderPortal() {
+  setPageTitle("Landlord Portal");
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -1119,22 +1167,6 @@ function renderPortal() {
                 <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
               </div>
 
-              <div class="tiny" style="text-align:center;margin-top:10px;">or continue with</div>
-              <div class="oauth" style="margin-top:10px;">
-                <button class="oauthBtn" id="oauthGoogle2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
-                  Continue with Google
-                </button>
-                <button class="oauthBtn" id="oauthApple2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
-                  Continue with Apple
-                </button>
-                <button class="oauthBtn" id="oauthMicrosoft2">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
-                  Continue with Microsoft
-                </button>
-              </div>
-
               <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
               <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
             </div>
@@ -1163,11 +1195,78 @@ function renderPortal() {
   });
 
   const demo = (label) => alert(`${label} (demo)`);
-  ["oauthGoogle","oauthApple","oauthMicrosoft","oauthGoogle2","oauthApple2","oauthMicrosoft2"].forEach(id=>{
+  ["oauthGoogle","oauthApple","oauthMicrosoft"].forEach(id=>{
     $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
   });
   $("#psignin")?.addEventListener("click", ()=>demo("Sign in"));
   $("#signup")?.addEventListener("click", ()=>demo("Create account"));
+}
+
+/* -----------------------------
+   NEW: Tenant Toolkit (market expansion wedge)
+------------------------------ */
+function renderToolkit() {
+  setPageTitle("Tenant Toolkit");
+  const content = `
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Tenant Toolkit</div>
+            <div class="pageTitle">Resources by city</div>
+            <div class="pageSub">Practical links for renters. This helps CASA expand into new markets.</div>
+          </div>
+          <a class="btn" href="#/">Home</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="muted" style="font-weight:800;line-height:1.55">
+          Choose a city and access essential services: tenant rights, reporting issues, housing court basics.
+        </div>
+
+        <div class="toolkitGrid">
+          ${toolkitCityCard("New York City", [
+            ["NYC 311 (complaints & services)", "https://portal.311.nyc.gov/"],
+            ["HPD (housing preservation)", "https://www.nyc.gov/site/hpd/index.page"],
+            ["NYC Housing Court info", "https://ww2.nycourts.gov/courts/nyc/housing/index.shtml"],
+          ])}
+          ${toolkitCityCard("Boston", [
+            ["City of Boston 311", "https://www.boston.gov/departments/boston-311"],
+            ["Boston tenant rights", "https://www.boston.gov/departments/neighborhood-development/tenant-rights"],
+          ])}
+          ${toolkitCityCard("Miami", [
+            ["Miami-Dade 311", "https://www.miamidade.gov/global/service.page?Mduid_service=ser1577816385742078"],
+            ["Florida tenant rights overview", "https://www.myfloridalegal.com/"],
+          ])}
+          ${toolkitCityCard("Chicago", [
+            ["Chicago 311", "https://311.chicago.gov/"],
+            ["Chicago renters rights info", "https://www.chicago.gov/city/en/depts/doh.html"],
+          ])}
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="smallNote" style="margin-top:0">
+          <b>Expansion strategy:</b> Start with reviews everywhere, then add city datasets per market.
+          The toolkit page gives value even before your “report” data is available in that city.
+        </div>
+      </div>
+    </section>
+  `;
+  renderShell(content);
+}
+function toolkitCityCard(name, links) {
+  return `
+    <div class="toolkitItem">
+      <div class="kicker">${esc(name)}</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+        ${links.map(([label,url]) => `
+          <a class="btn miniBtn" target="_blank" rel="noopener noreferrer" href="${esc(url)}">${esc(label)}</a>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 /* -----------------------------
@@ -1177,14 +1276,46 @@ function renderLandlord(id) {
   const l = DB.landlords.find(x => x.id === id);
   if (!l) return renderHome();
 
+  setPageTitle(l.name);
+
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
   const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
   const cred = casaCredential(l.id);
   const badgeRow = badgesHTML(l);
-
   const distTotal = st.dist.reduce((a,b)=>a+b,0);
+
+  const rep = reportFor(l.id);
+
+  const reportHTML = rep ? `
+    <div class="kicker" style="margin-top:18px;">Public report (demo)</div>
+    <div class="muted" style="margin-top:6px;font-weight:800">
+      This is where CASA adds “receipts” (city datasets). Updated: ${fmtDate(rep.updatedAt)}.
+    </div>
+
+    <div class="reportGrid">
+      <div class="reportCard">
+        ${reportRow("Violations (12mo)", rep.violations_12mo)}
+        ${reportRow("Complaints (12mo)", rep.complaints_12mo)}
+        ${reportRow("Bedbug reports (12mo)", rep.bedbug_reports_12mo)}
+      </div>
+      <div class="reportCard">
+        ${reportRow("HP Actions", rep.hp_actions)}
+        ${reportRow("Open permits", rep.permits_open)}
+        ${reportRow("Eviction filings (12mo)", rep.eviction_filings_12mo)}
+      </div>
+    </div>
+
+    <div class="smallNote">
+      ${esc(rep.notes || "Demo report. Production: public datasets + sources.")}
+    </div>
+  ` : `
+    <div class="kicker" style="margin-top:18px;">Public report</div>
+    <div class="muted" style="margin-top:8px;font-weight:800">
+      No report data yet for this landlord.
+    </div>
+  `;
 
   const content = `
     <section class="pageCard card">
@@ -1206,6 +1337,10 @@ function renderLandlord(id) {
 
             <div class="addrLine">
               ${esc(l.address?.line1 || "")}${l.address?.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address?.city || "")}, ${esc(l.address?.state || "")}
+            </div>
+
+            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn miniBtn" id="embedBtn">Get CASA badge embed</button>
             </div>
           </div>
 
@@ -1239,6 +1374,8 @@ function renderLandlord(id) {
                 `;
               }).join("")}
             </div>
+
+            ${reportHTML}
           </div>
 
           <div>
@@ -1293,6 +1430,87 @@ function renderLandlord(id) {
   });
 
   $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
+
+  /* NEW: CASA embed badge modal */
+  $("#embedBtn")?.addEventListener("click", () => openEmbedModal(l));
+}
+
+function reportRow(k, v) {
+  return `
+    <div class="reportRow">
+      <div class="reportKey">${esc(k)}</div>
+      <div class="reportVal">${esc(String(v ?? "—"))}</div>
+    </div>
+  `;
+}
+
+function openEmbedModal(landlord) {
+  const st = ratingStats(landlord.id);
+  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+
+  const pageUrl = `${location.origin}${location.pathname}#/landlord/${encodeURIComponent(landlord.id)}`;
+  const html = `<a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;border:1px solid rgba(20,16,12,.14);background:rgba(255,255,255,.75);padding:10px 12px;border-radius:999px;color:rgba(21,17,14,.92);font-weight:800;">
+  <img src="${location.origin}${location.pathname}assets/badge-casa.png" alt="CASA" style="width:18px;height:18px;border-radius:5px;"/>
+  Rated on CASA • ${avgText}/5
+</a>`;
+
+  openModal(`
+    <div class="modalHead">
+      <div class="modalTitle">CASA badge embed</div>
+      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="kicker">Landlord credential</div>
+      <div class="muted" style="margin-top:6px;font-weight:800;line-height:1.55">
+        Landlords can embed this on their website or listing pages — like a Trustpilot rating.
+      </div>
+
+      <div class="embedBox">
+        <div class="kicker" style="margin-bottom:8px;">HTML snippet</div>
+        <textarea class="codeField" id="embedCode" rows="5">${esc(html)}</textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn btn--primary miniBtn" id="copyEmbed">Copy embed</button>
+          <button class="btn miniBtn" id="previewEmbed">Preview</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="mCancel">Close</button>
+    </div>
+  `);
+
+  $("#mClose")?.addEventListener("click", closeModal);
+  $("#mCancel")?.addEventListener("click", closeModal);
+
+  $("#copyEmbed")?.addEventListener("click", async () => {
+    try {
+      const val = $("#embedCode")?.value || "";
+      await navigator.clipboard.writeText(val);
+      alert("Copied.");
+    } catch {
+      alert("Copy failed. Select text and copy manually.");
+    }
+  });
+
+  $("#previewEmbed")?.addEventListener("click", () => {
+    openModal(`
+      <div class="modalHead">
+        <div class="modalTitle">Preview</div>
+        <button class="iconBtn" id="mClose2" aria-label="Close">×</button>
+      </div>
+      <div class="modalBody">
+        <div class="kicker">Preview</div>
+        <div style="margin-top:12px;">${html}</div>
+      </div>
+      <div class="modalFoot">
+        <button class="btn" id="mCancel2">Close</button>
+      </div>
+    `);
+    $("#mClose2")?.addEventListener("click", closeModal);
+    $("#mCancel2")?.addEventListener("click", closeModal);
+  });
 }
 
 /* -----------------------------
