@@ -302,19 +302,17 @@ function casaBrandFontInlineCSS() {
     "text-transform: lowercase"
   ].join("; ");
 }
-
 function casaLogoSVGInline(size = 18) {
-  // Exact same logo as your header (do not change the paths)
+  // Inline SVG (never broken, no external files)
   return `
-  <svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none"
-       xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
-       style="display:block; color: rgba(21,17,14,.82);">
-    <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
-    <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
-    <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
-    <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
-    <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
-  </svg>`;
+<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none"
+     xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
+  <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
+  <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
+  <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
+  <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
+</svg>`.trim();
 }
 
 function casaEmbedSnippetForLandlord(l) {
@@ -346,7 +344,9 @@ function casaEmbedSnippetForLandlord(l) {
      border:1px solid rgba(20,16,12,.08);
      display:grid; place-items:center;
    ">
-    ${casaLogoSVGInline(18).replace(/\n/g, "")}
+    <span style="display:block; color: rgba(21,17,14,.82);">
+      ${casaLogoSVGInline(18)}
+    </span>
   </span>
 
   <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
