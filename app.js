@@ -322,6 +322,7 @@ function casaEmbedSnippetForLandlord(l) {
   const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
   const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
 
+  // Badge mark is CSS-only (no img/svg), so it will never "fail to load"
   return `
 <a href="${profileURL}" target="_blank" rel="noopener noreferrer"
    style="
@@ -337,15 +338,42 @@ function casaEmbedSnippetForLandlord(l) {
      box-shadow: 0 10px 26px rgba(20,16,12,.06);
      line-height:1;
    ">
-  <span style="
-     width:28px; height:28px;
-     border-radius:999px;
-     background: rgba(20,16,12,.05);
-     border:1px solid rgba(20,16,12,.08);
-     display:grid; place-items:center;
-   ">
-    <span style="display:block; color: rgba(21,17,14,.82);">
-      ${casaLogoSVGInline(18)}
+
+  <!-- CASA mark (CSS-drawn) -->
+  <span aria-hidden="true"
+        style="
+          width:28px;height:28px;
+          border-radius:999px;
+          background: rgba(20,16,12,.05);
+          border:1px solid rgba(20,16,12,.08);
+          display:grid;
+          place-items:center;
+        ">
+    <span style="position:relative; width:18px; height:18px; display:block;">
+      <span style="
+        position:absolute; left:1px; right:1px; top:3px;
+        height:2px; border-radius:999px;
+        background: rgba(21,17,14,.72);
+        opacity:.95;
+      "></span>
+      <span style="
+        position:absolute; left:2px; right:2px; top:7px;
+        height:2px; border-radius:999px;
+        background: rgba(21,17,14,.62);
+        opacity:.88;
+      "></span>
+      <span style="
+        position:absolute; left:3px; right:3px; top:11px;
+        height:2px; border-radius:999px;
+        background: rgba(21,17,14,.52);
+        opacity:.82;
+      "></span>
+      <span style="
+        position:absolute; left:4px; right:4px; top:15px;
+        height:2px; border-radius:999px;
+        background: rgba(21,17,14,.44);
+        opacity:.74;
+      "></span>
     </span>
   </span>
 
