@@ -317,12 +317,16 @@ function casaLogoSVGInline(size = 18) {
 
 function casaEmbedSnippetForLandlord(l) {
   const st = ratingStats(l.id);
-  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+
+  // Whole stars only (no half-stars)
+  // If unrated, show 0/5 and empty stars.
+  const whole = st.count ? Math.max(1, Math.min(5, Math.round(st.avg || 0))) : 0;
+
+  const starsText = "★".repeat(whole) + "☆".repeat(5 - whole);
 
   const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
   const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
 
-  // Badge mark is CSS-only (no img/svg), so it will never "fail to load"
   return `
 <a href="${profileURL}" target="_blank" rel="noopener noreferrer"
    style="
@@ -338,45 +342,6 @@ function casaEmbedSnippetForLandlord(l) {
      box-shadow: 0 10px 26px rgba(20,16,12,.06);
      line-height:1;
    ">
-
-  <!-- CASA mark (CSS-drawn) -->
-  <span aria-hidden="true"
-        style="
-          width:28px;height:28px;
-          border-radius:999px;
-          background: rgba(20,16,12,.05);
-          border:1px solid rgba(20,16,12,.08);
-          display:grid;
-          place-items:center;
-        ">
-    <span style="position:relative; width:18px; height:18px; display:block;">
-      <span style="
-        position:absolute; left:1px; right:1px; top:3px;
-        height:2px; border-radius:999px;
-        background: rgba(21,17,14,.72);
-        opacity:.95;
-      "></span>
-      <span style="
-        position:absolute; left:2px; right:2px; top:7px;
-        height:2px; border-radius:999px;
-        background: rgba(21,17,14,.62);
-        opacity:.88;
-      "></span>
-      <span style="
-        position:absolute; left:3px; right:3px; top:11px;
-        height:2px; border-radius:999px;
-        background: rgba(21,17,14,.52);
-        opacity:.82;
-      "></span>
-      <span style="
-        position:absolute; left:4px; right:4px; top:15px;
-        height:2px; border-radius:999px;
-        background: rgba(21,17,14,.44);
-        opacity:.74;
-      "></span>
-    </span>
-  </span>
-
   <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
     Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
   </span>
@@ -386,8 +351,9 @@ function casaEmbedSnippetForLandlord(l) {
      font-weight: 900;
      font-size:13px;
      color: rgba(21,17,14,.72);
+     letter-spacing: 1px;
    ">
-    • ${avgText}/5
+    • ${starsText} ${whole}/5
   </span>
 </a>`.trim();
 }
@@ -402,6 +368,27 @@ function setPageTitle(title) {
   try {
     document.title = title ? `${title} • casa` : "casa";
   } catch {}
+}
+function closeInlineDropdown() {
+  const dd = document.getElementById("moreDropdown");
+  const btn = document.getElementById("moreBtn");
+  if (!dd || !btn) return;
+  dd.style.display = "none";
+  btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleInlineDropdown() {
+  const dd = document.getElementById("moreDropdown");
+  const btn = document.getElementById("moreBtn");
+  if (!dd || !btn) return;
+
+  const isOpen = dd.style.display === "block";
+  if (isOpen) {
+    closeInlineDropdown();
+  } else {
+    dd.style.display = "block";
+    btn.setAttribute("aria-expanded", "true");
+  }
 }
 
 /* -----------------------------
@@ -1510,17 +1497,41 @@ function renderLandlord(id) {
             <div class="addrLine">
               ${esc(l.address?.line1 || "")}${l.address?.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address?.city || "")}, ${esc(l.address?.state || "")}
             </div>
-
-            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn miniBtn" id="embedBtn">Get CASA badge embed</button>
-            </div>
           </div>
 
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-  <a class="btn" href="#/search">Back</a>
-  <button class="btn" id="embedBtn">Get CASA badge embed</button>
-  <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
-</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <a class="btn" href="#/search">Back</a>
+
+            <!-- More options dropdown -->
+            <div style="position:relative;">
+              <button class="btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">
+                More options
+              </button>
+
+              <div id="moreDropdown"
+                   style="
+                     display:none;
+                     position:absolute;
+                     right:0;
+                     top:calc(100% + 8px);
+                     min-width:260px;
+                     background: rgba(255,255,255,.92);
+                     border:1px solid rgba(20,16,12,.14);
+                     border-radius: 14px;
+                     box-shadow: 0 30px 80px rgba(0,0,0,.18);
+                     padding:10px;
+                     z-index:95;
+                   ">
+                <button class="btn" id="embedBtn"
+                        style="width:100%; justify-content:flex-start; border-radius:12px;">
+                  Get <span style="${casaBrandFontInlineCSS()}; margin:0 4px;">casa</span> badge embed
+                </button>
+              </div>
+            </div>
+
+            <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
+          </div>
+        </div>
 
         <div class="hr"></div>
 
@@ -1602,7 +1613,41 @@ function renderLandlord(id) {
   });
 
   $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
-   $("#embedBtn")?.addEventListener("click", () => openBadgeEmbedModal(l.id));
+  $("#moreBtn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleInlineDropdown();
+  });
+
+  $("#embedBtn")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeInlineDropdown();
+    openBadgeEmbedModal(l.id);
+  });
+
+  // Remove old global handlers (prevents stacking on route changes)
+  window.__casaMoreOutsideClick?.();
+  window.__casaMoreEsc?.();
+
+  const outsideClick = (e) => {
+    const dd = document.getElementById("moreDropdown");
+    const btn = document.getElementById("moreBtn");
+    if (!dd || !btn) return;
+
+    const within = dd.contains(e.target) || btn.contains(e.target);
+    if (!within) closeInlineDropdown();
+  };
+
+  const onEsc = (e) => {
+    if (e.key === "Escape") closeInlineDropdown();
+  };
+
+  document.addEventListener("click", outsideClick);
+  document.addEventListener("keydown", onEsc);
+
+  // store cleanup fns
+  window.__casaMoreOutsideClick = () => document.removeEventListener("click", outsideClick);
+  window.__casaMoreEsc = () => document.removeEventListener("keydown", onEsc);
 
 
   /* NEW: CASA embed badge modal */
