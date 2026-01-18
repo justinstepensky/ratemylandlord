@@ -334,11 +334,9 @@ function casaEmbedSnippetForLandlord(l) {
     const full = Math.floor(v);
     const frac = v - full;
 
-    // Material-ish star path for a 24x24 coordinate system
     const starPath =
       "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
 
-    // We draw in 24x24 coords but display at px
     const scale = px / 24;
     const step = px + gap;
     const width = (px * 5) + (gap * 4);
@@ -352,7 +350,6 @@ function casaEmbedSnippetForLandlord(l) {
       const gid = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
       const x = i * step;
 
-      // empty color uses stop-opacity (SVG-safe)
       stars.push(`
         <g transform="translate(${x},0) scale(${scale})">
           <defs>
@@ -416,7 +413,44 @@ function casaEmbedSnippetForLandlord(l) {
 </a>`.trim();
 }
 
-    const width = 5 * size + 4 * gap;
+  const starsSVG = starRowSVG(avgClamped, 16, 4);
+
+  return `
+<a href="${profileURL}" target="_blank" rel="noopener noreferrer"
+   style="
+     display:inline-flex;
+     align-items:center;
+     gap:10px;
+     padding:10px 14px;
+     border-radius:999px;
+     border:1px solid rgba(20,16,12,.14);
+     background: rgba(255,255,255,.65);
+     text-decoration:none;
+     color: rgba(21,17,14,.9);
+     box-shadow: 0 10px 26px rgba(20,16,12,.06);
+     line-height:1;
+     white-space:nowrap;
+   ">
+
+  <span style="${brandCSS}; font-size:14px; display:inline-flex; align-items:baseline; white-space:nowrap;">
+    <span>Rated on&nbsp;</span><span style="${brandCSS};">casa</span>
+  </span>
+
+  <span style="
+     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+     font-weight: 900;
+     font-size:13px;
+     color: rgba(21,17,14,.72);
+     display:inline-flex;
+     align-items:center;
+     white-space:nowrap;
+   ">
+    <span style="margin-right:8px;">•</span>
+    ${starsSVG}
+    <span style="margin-left:8px;">${avgText}/5</span>
+  </span>
+</a>`.trim();
+}
 
     return `
       <svg width="${width}" height="${size}" viewBox="0 0 ${width} ${size}"
@@ -1783,9 +1817,6 @@ function renderLandlord(id) {
   window.__casaMoreOutsideClick = () => document.removeEventListener("click", outsideClick);
   window.__casaMoreEsc = () => document.removeEventListener("keydown", onEsc);
 
-
-  /* NEW: CASA embed badge modal */
-  $("#embedBtn")?.addEventListener("click", () => openEmbedModal(l));
 }
 
 function reportRow(k, v) {
@@ -1795,74 +1826,6 @@ function reportRow(k, v) {
       <div class="reportVal">${esc(String(v ?? "—"))}</div>
     </div>
   `;
-}
-
-function openEmbedModal(landlord) {
-  const st = ratingStats(landlord.id);
-  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-
-  const pageUrl = `${location.origin}${location.pathname}#/landlord/${encodeURIComponent(landlord.id)}`;
-  const html = `<a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;border:1px solid rgba(20,16,12,.14);background:rgba(255,255,255,.75);padding:10px 12px;border-radius:999px;color:rgba(21,17,14,.92);font-weight:800;">
-  <img src="${location.origin}${location.pathname}assets/badge-casa.png" alt="CASA" style="width:18px;height:18px;border-radius:5px;"/>
-Rated on <span style="${casaBrandFontInlineCSS()};">casa</span></a>`;
-
-  openModal(`
-    <div class="modalHead">
-      <div class="modalTitle">CASA badge embed</div>
-      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
-    </div>
-
-    <div class="modalBody">
-      <div class="kicker">Landlord credential</div>
-      <div class="muted" style="margin-top:6px;font-weight:800;line-height:1.55">
-        Landlords can embed this on their website or listing pages — like a Trustpilot rating.
-      </div>
-
-      <div class="embedBox">
-        <div class="kicker" style="margin-bottom:8px;">HTML snippet</div>
-        <textarea class="codeField" id="embedCode" rows="5">${esc(html)}</textarea>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-          <button class="btn btn--primary miniBtn" id="copyEmbed">Copy embed</button>
-          <button class="btn miniBtn" id="previewEmbed">Preview</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="modalFoot">
-      <button class="btn" id="mCancel">Close</button>
-    </div>
-  `);
-
-  $("#mClose")?.addEventListener("click", closeModal);
-  $("#mCancel")?.addEventListener("click", closeModal);
-
-  $("#copyEmbed")?.addEventListener("click", async () => {
-    try {
-      const val = $("#embedCode")?.value || "";
-      await navigator.clipboard.writeText(val);
-      alert("Copied.");
-    } catch {
-      alert("Copy failed. Select text and copy manually.");
-    }
-  });
-
-  $("#previewEmbed")?.addEventListener("click", () => {
-    openModal(`
-      <div class="modalHead">
-        <div class="modalTitle">Preview</div>
-        <button class="iconBtn" id="mClose2" aria-label="Close">×</button>
-      </div>
-      <div class="modalBody">
-        <div class="kicker">Preview</div>
-        <div style="margin-top:12px;">${html}</div>
-      </div>
-      <div class="modalFoot">
-        <button class="btn" id="mCancel2">Close</button>
-      </div>
-    `);
-    $("#mClose2")?.addEventListener("click", closeModal);
-    $("#mCancel2")?.addEventListener("click", closeModal);
-  });
 }
 
 /* -----------------------------
