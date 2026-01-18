@@ -82,41 +82,34 @@ ${msg}
     } catch {}
   };
 
-  window.addEventListener("error", (e) =>
-    showOverlayError(
-      "Uncaught error",
-      e && (e.error || e.message) ? e.error || e.message : e
-    )
-  );
-
 window.addEventListener("unhandledrejection", (e) => {
   try {
-    const r = e && "reason" in e ? e.reason : e;
+    const reason = e && "reason" in e ? e.reason : e;
+    const msg = String(
+      reason && (reason.stack || reason.message) ? reason.stack || reason.message : reason
+    );
 
-    // iOS Safari often throws benign abort/load-failed rejections during map/tile teardown.
-    const name = r && r.name ? String(r.name) : "";
-    const msg = r && (r.message || r.stack) ? String(r.message || r.stack) : String(r || "");
-
+    // Safari "webkit-masked-url://hidden" rejections are very commonly
+    // tile/network/Leaflet related. Don't brick the whole SPA for those.
     const looksBenign =
-      name === "AbortError" ||
-      /aborted/i.test(msg) ||
-      /load failed/i.test(msg) ||
-      /The operation was aborted/i.test(msg);
+      msg.includes("webkit-masked-url://hidden") ||
+      msg.includes("Load failed") ||
+      msg.includes("NetworkError") ||
+      msg.includes("Failed to fetch");
 
     if (looksBenign) {
-      console.warn("Ignored benign promise rejection:", r);
-      // prevent default logging noise
-      try { e && e.preventDefault && e.preventDefault(); } catch {}
+      try {
+        console.warn("Ignored unhandled rejection:", msg);
+      } catch {}
+      if (e && typeof e.preventDefault === "function") e.preventDefault();
       return;
     }
 
-    showOverlayError("Unhandled promise rejection", r);
+    showOverlayError("Unhandled promise rejection", reason);
   } catch (err) {
-    // If our handler fails, fall back to the overlay
-    showOverlayError("Unhandled promise rejection (handler failed)", err);
+    showOverlayError("Unhandled promise rejection", err);
   }
 });
-})();
 
 /* -----------------------------
    Storage / Seed / Migration
@@ -1052,12 +1045,23 @@ function initLeafletMap(el, center, zoom = 12) {
       el._casaMap = map;
     } catch {}
 
-    window.L
-      .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap",
-      })
-      .addTo(map);
+ try {
+  const tl = window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap",
+    crossOrigin: true,
+  });
+
+  if (tl && typeof tl.on === "function") {
+    tl.on("tileerror", (ev) => {
+      try { console.warn("Tile load error (ignored):", ev); } catch {}
+    });
+  }
+
+  tl.addTo(map);
+} catch (e) {
+  console.warn("Tile layer failed (ignored):", e);
+}
 
     setTimeout(() => {
       try {
