@@ -1,16 +1,20 @@
-           /* CASA — single-file SPA app.js (DROP-IN REPLACEMENT)
-   Keeps your current aesthetic/classes — only fixes + adds:
+@@ -1,1845 +1,1901 @@
+/* CASA — single-file SPA app.js
+   - hash routing
+   - premium cards
+   - rating tint tiers (rounded 1 decimal)
+   - badges (assets/badge-verified.png + assets/badge-top.png)
+   - Recent highlights carousel w/ dots only (max 5)
+   - mobile drawer works
+   - review modal fixed (z-index + layout)
+   - rating is clickable stars
+   - HARDENED: prevents blank app if any piece fails
 
-   ✅ App loads (no syntax errors)
-   ✅ Landlord badges show (assets/badge-verified.png + assets/badge-top.png)
-   ✅ Landlord page: ONE "More options" button (dropdown)
-      - Dropdown item: Get casa badge embed (casa in brand font)
-   ✅ Embed modal: preview + HTML on SAME screen
-      - "Copy embed" copies directly to clipboard (no forced textarea copy)
-   ✅ Embed badge shows fractional stars (e.g., 3.4 fills 0.4 of a star)
-   ✅ Recent highlights carousel (dots only, max 5)
-   ✅ Mobile drawer works
-   ✅ Safety net overlay if runtime error
+   NEW (added, no redesign):
+   - Building/landlord public report layer (demo city-data style)
+   - Tenant Toolkit page (multi-market strategy)
+   - CASA badge embed generator for landlords (Trustpilot-style credential)
+   - Page titles update by route for SEO shareability
 */
 
 /* -----------------------------
@@ -29,7 +33,7 @@
             <div class="kicker">CASA</div>
             <div class="pageTitle" style="margin-top:6px;">Something went wrong</div>
             <div class="pageSub" style="margin-top:8px;">
-              The app hit an error and stopped rendering.
+              The app hit a runtime error and stopped rendering.
             </div>
             <div class="hr"></div>
             <div class="smallNote" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
@@ -57,8 +61,13 @@ ${String(err && (err.stack || err.message) ? (err.stack || err.message) : err)}
     } catch {}
   };
 
-  window.addEventListener("error", (e) => showOverlayError("Uncaught error", e?.error || e?.message || e));
-  window.addEventListener("unhandledrejection", (e) => showOverlayError("Unhandled promise rejection", e?.reason || e));
+  window.addEventListener("error", (e) => {
+    showOverlayError("Uncaught error", e?.error || e?.message || e);
+  });
+
+  window.addEventListener("unhandledrejection", (e) => {
+    showOverlayError("Unhandled promise rejection", e?.reason || e);
+  });
 })();
 
 /* -----------------------------
@@ -74,7 +83,9 @@ function loadDB() {
   return seedDB();
 }
 function saveDB(db) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(db)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(db));
+  } catch {}
 }
 
 function seedDB() {
@@ -124,11 +135,44 @@ function seedDB() {
       { id: "r4", landlordId: "l3", stars: 5, text: "Fast maintenance and respectful staff.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 18 },
       { id: "r5", landlordId: "l3", stars: 4, text: "Solid experience overall; minor delays during holidays.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 58 }
     ],
+
+    /* NEW: public-report layer (demo “city data”) */
     reports: [
-      { landlordId: "l1", updatedAt: Date.now() - 1000*60*60*24*2, violations_12mo: 7, complaints_12mo: 22, bedbug_reports_12mo: 1, hp_actions: 0, permits_open: 2, eviction_filings_12mo: 1, notes: "Data is demo only. Production: pull from city datasets + add sources." },
-      { landlordId: "l2", updatedAt: Date.now() - 1000*60*60*24*4, violations_12mo: 18, complaints_12mo: 49, bedbug_reports_12mo: 3, hp_actions: 1, permits_open: 4, eviction_filings_12mo: 6, notes: "Data is demo only. Production: pull from city datasets + add sources." },
-      { landlordId: "l3", updatedAt: Date.now() - 1000*60*60*24*1, violations_12mo: 2, complaints_12mo: 9, bedbug_reports_12mo: 0, hp_actions: 0, permits_open: 1, eviction_filings_12mo: 0, notes: "Data is demo only. Production: pull from city datasets + add sources." }
+      {
+        landlordId: "l1",
+        updatedAt: Date.now() - 1000*60*60*24*2,
+        violations_12mo: 7,
+        complaints_12mo: 22,
+        bedbug_reports_12mo: 1,
+        hp_actions: 0,
+        permits_open: 2,
+        eviction_filings_12mo: 1,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      },
+      {
+        landlordId: "l2",
+        updatedAt: Date.now() - 1000*60*60*24*4,
+        violations_12mo: 18,
+        complaints_12mo: 49,
+        bedbug_reports_12mo: 3,
+        hp_actions: 1,
+        permits_open: 4,
+        eviction_filings_12mo: 6,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      },
+      {
+        landlordId: "l3",
+        updatedAt: Date.now() - 1000*60*60*24*1,
+        violations_12mo: 2,
+        complaints_12mo: 9,
+        bedbug_reports_12mo: 0,
+        hp_actions: 0,
+        permits_open: 1,
+        eviction_filings_12mo: 0,
+        notes: "Data is demo only. Production: pull from city datasets + add sources."
+      }
     ],
+
     flags: [],
     replies: []
   };
@@ -148,16 +192,24 @@ function esc(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
 function fmtDate(ts) {
   const d = new Date(ts);
   return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
 }
-function round1(n) { return Math.round(n * 10) / 10; }
-function norm(s) { return String(s || "").trim().toLowerCase(); }
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+function norm(s) {
+  return String(s || "").trim().toLowerCase();
+}
 
 function landlordHaystack(l) {
   return norm(`${l.name} ${l.entity || ""} ${l.address?.line1 || ""} ${l.address?.city || ""} ${l.address?.state || ""}`);
 }
+
 function findExactLandlord(query) {
   const q = norm(query);
   if (!q) return null;
@@ -166,12 +218,15 @@ function findExactLandlord(query) {
   return null;
 }
 
-/* Recency-weighted average (half-life 180 days) */
+/* Recency-weighted average:
+   weight halves every 180 days
+*/
 function weightedAverageStars(reviews) {
   if (!reviews.length) return null;
   const now = Date.now();
   const halfLifeDays = 180;
   let num = 0, den = 0;
+
   for (const r of reviews) {
     const ageDays = Math.max(0, (now - r.createdAt) / (1000*60*60*24));
     const w = Math.pow(0.5, ageDays / halfLifeDays);
@@ -183,8 +238,11 @@ function weightedAverageStars(reviews) {
 }
 
 function landlordReviews(landlordId) {
-  return DB.reviews.filter(r => r.landlordId === landlordId).sort((a,b)=>b.createdAt-a.createdAt);
+  return DB.reviews
+    .filter(r => r.landlordId === landlordId)
+    .sort((a,b)=>b.createdAt-a.createdAt);
 }
+
 function ratingStats(landlordId) {
   const rs = landlordReviews(landlordId);
   const count = rs.length;
@@ -195,36 +253,48 @@ function ratingStats(landlordId) {
   for (const r of rs) dist[r.stars - 1] += 1;
   return { count, avg, avgRounded, dist };
 }
+
 function cardTier(avgRounded, reviewCount) {
   if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
+
   const r = avgRounded;
   if (r >= 1.0 && r <= 2.99) return { tier: "red", label: "Low Rating", pillClass: "pill--red" };
   if (r > 2.99 && r <= 3.99) return { tier: "yellow", label: "Mixed Reviews", pillClass: "pill--yellow" };
   if (r >= 4.0 && r <= 5.0) return { tier: "green", label: "Highly Rated", pillClass: "pill--green" };
+
   return { tier: "none", label: "Unrated", pillClass: "" };
 }
+
 function casaCredential(landlordId) {
   const rs = landlordReviews(landlordId);
   const now = Date.now();
   const last12mo = rs.filter(r => (now - r.createdAt) <= 365*24*60*60*1000);
   const total = rs.length;
   const in12 = last12mo.length;
+
   if (total === 0) return "Unrated";
   if (!(total >= 10 && in12 >= 3)) return "Not yet CASA Rated — needs more reviews";
   return "CASA Rated";
 }
 
-/* Badges */
+/* badges */
 function badgesHTML(l) {
   const parts = [];
-  if (l.verified) parts.push(`<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)"/>`);
-  if (l.top) parts.push(`<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)"/>`);
+  if (l.verified) {
+    parts.push(
+      `<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)" onerror="this.remove()"/>`
+    );
+  }
+  if (l.top) {
+    parts.push(
+      `<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)" onerror="this.remove()"/>`
+    );
+  }
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
-
-/* Brand font (matches header) */
 function casaBrandFontInlineCSS() {
+  // Matches .brand__name in styles.css
   return [
     "font-family: ui-serif, Georgia, 'Times New Roman', Times, serif",
     "font-style: italic",
@@ -233,12 +303,29 @@ function casaBrandFontInlineCSS() {
     "text-transform: lowercase"
   ].join("; ");
 }
+function casaLogoSVGInline(size = 18) {
+  // Inline SVG (never broken, no external files)
+  return `
+<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none"
+     xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
+  <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
+  <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
+  <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
+  <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
+</svg>`.trim();
+}
 
-/* -----------------------------
-   Embed snippet (with fractional stars)
------------------------------- */
 function casaEmbedSnippetForLandlord(l) {
   const st = ratingStats(l.id);
+
+  // Whole stars only (no half-stars)
+  // If unrated, show 0/5 and empty stars.
+  const whole = st.count ? Math.max(1, Math.min(5, Math.round(st.avg || 0))) : 0;
+
+  const starsText = "★".repeat(whole) + "☆".repeat(5 - whole);
+  // Use the real weighted average to support fractional stars
+  // If unrated: show 0.0 and empty stars
   const avg = st.count ? Number(st.avg || 0) : 0;
   const avgClamped = Math.max(0, Math.min(5, avg));
   const avgText = st.count ? avgClamped.toFixed(1) : "0.0";
@@ -248,44 +335,44 @@ function casaEmbedSnippetForLandlord(l) {
 
   const brandCSS = casaBrandFontInlineCSS();
 
-  function starRowSVG(value, px = 16, gap = 4) {
+  // --- SVG partial-star renderer (no external assets) ---
+  function starRowSVG(value, size = 16, gap = 4) {
     const v = Math.max(0, Math.min(5, Number(value) || 0));
     const full = Math.floor(v);
     const frac = v - full;
 
-    const starPath = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
-    const scale = px / 24;
-    const step = px + gap;
-    const width = (px * 5) + (gap * 4);
+    const starPath =
+      "M12 .9l3.09 6.26 6.91 1-5 4.87 1.18 6.87L12 16.93 5.82 19.9 7 13.03 2 8.16l6.91-1L12 .9z";
 
     const stars = [];
     for (let i = 0; i < 5; i++) {
       let fillPct = 0;
       if (i < full) fillPct = 1;
       else if (i === full) fillPct = frac;
+      else fillPct = 0;
 
-      const gid = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
-      const x = i * step;
+      const id = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
+      const x = i * (size + gap);
 
       stars.push(`
-        <g transform="translate(${x},0) scale(${scale})">
+        <g transform="translate(${x},0)">
           <defs>
-            <linearGradient id="${gid}" x1="0" y1="0" x2="24" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#b88900" stop-opacity="1"/>
-              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#15110e" stop-opacity="0.22"/>
+            <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#b88900"/>
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="rgba(20,16,12,.22)"/>
             </linearGradient>
           </defs>
-          <path d="${starPath}" fill="url(#${gid})"></path>
+          <path d="${starPath}" fill="url(#${id})" />
         </g>
       `.trim());
     }
 
+    const width = 5 * size + 4 * gap;
+
     return `
-      <svg width="${width}" height="${px}"
-           viewBox="0 0 ${width} ${px}"
-           xmlns="http://www.w3.org/2000/svg"
-           aria-hidden="true"
-           style="display:inline-block; vertical-align:middle;">
+      <svg width="${width}" height="${size}" viewBox="0 0 ${width} ${size}"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+           style="display:block;">
         ${stars.join("")}
       </svg>
     `.trim();
@@ -309,6 +396,10 @@ function casaEmbedSnippetForLandlord(l) {
      line-height:1;
      white-space:nowrap;
    ">
+  <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
+    Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
+
+  <!-- Keep as a single flex child to avoid weird spacing -->
   <span style="${brandCSS}; font-size:14px; display:inline-flex; align-items:baseline; white-space:nowrap;">
     <span>Rated on&nbsp;</span><span style="${brandCSS};">casa</span>
   </span>
@@ -318,30 +409,30 @@ function casaEmbedSnippetForLandlord(l) {
      font-weight: 900;
      font-size:13px;
      color: rgba(21,17,14,.72);
+     letter-spacing: 1px;
      display:inline-flex;
      align-items:center;
      white-space:nowrap;
    ">
+    • ${starsText} ${whole}/5
     <span style="margin-right:8px;">•</span>
-    ${starsSVG}
+    <span style="display:inline-flex; align-items:center;">${starsSVG}</span>
     <span style="margin-left:8px;">${avgText}/5</span>
   </span>
 </a>`.trim();
 }
 
-/* Reports */
+/* NEW: report helper */
 function reportFor(landlordId) {
   return (DB.reports || []).find(r => r.landlordId === landlordId) || null;
 }
 
-/* SEO title */
+/* NEW: soft SEO title update */
 function setPageTitle(title) {
-  try { document.title = title ? `${title} • casa` : "casa"; } catch {}
+  try {
+    document.title = title ? `${title} • casa` : "casa";
+  } catch {}
 }
-
-/* -----------------------------
-   Dropdown helpers
------------------------------- */
 function closeInlineDropdown() {
   const dd = document.getElementById("moreDropdown");
   const btn = document.getElementById("moreBtn");
@@ -349,20 +440,23 @@ function closeInlineDropdown() {
   dd.style.display = "none";
   btn.setAttribute("aria-expanded", "false");
 }
+
 function toggleInlineDropdown() {
   const dd = document.getElementById("moreDropdown");
   const btn = document.getElementById("moreBtn");
   if (!dd || !btn) return;
+
   const isOpen = dd.style.display === "block";
-  if (isOpen) closeInlineDropdown();
-  else {
+  if (isOpen) {
+    closeInlineDropdown();
+  } else {
     dd.style.display = "block";
     btn.setAttribute("aria-expanded", "true");
   }
 }
 
 /* -----------------------------
-   Drawer (mobile)
+   Drawer (mobile menu)
 ------------------------------ */
 function initDrawer() {
   const btn = $("#menuBtn");
@@ -388,11 +482,15 @@ function initDrawer() {
   btn.addEventListener("click", open);
   closeBtn.addEventListener("click", close);
   overlay.addEventListener("click", close);
+
   drawer.addEventListener("click", (e) => {
     const a = e.target.closest("[data-drawer-link]");
     if (a) close();
   });
-  window.addEventListener("resize", () => { if (window.innerWidth >= 981) close(); });
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth >= 981) close();
+  });
 }
 
 /* -----------------------------
@@ -402,14 +500,27 @@ function openModal(innerHTML) {
   const overlay = $("#modalOverlay");
   if (!overlay) return;
 
-  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerHTML}</div>`;
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      ${innerHTML}
+    </div>
+  `;
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 
-  const handler = (e) => { if (e.target === overlay) closeModal(); };
+  // HARDEN: remove any <img> tags inside modal content (prevents broken badge icons)
+  try {
+    overlay.querySelectorAll("img").forEach(img => img.remove());
+  } catch {}
+
+  // One-time click handler
+  const handler = (e) => {
+    if (e.target === overlay) closeModal();
+  };
   overlay.addEventListener("click", handler, { once: true });
 }
+
 function closeModal() {
   const overlay = $("#modalOverlay");
   if (!overlay) return;
@@ -418,13 +529,14 @@ function closeModal() {
   overlay.innerHTML = "";
   document.body.style.overflow = "";
 }
-
-/* Embed modal (ONE screen) */
 function openBadgeEmbedModal(landlordId) {
   const l = DB.landlords.find(x => x.id === landlordId);
   if (!l) return;
 
-  const snippet = casaEmbedSnippetForLandlord(l);
+const snippet = (typeof casaEmbedSnippetForLandlord === "function")
+  ? casaEmbedSnippetForLandlord(l)
+  : "";
+console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
 
   openModal(`
     <div class="modalHead">
@@ -433,65 +545,55 @@ function openBadgeEmbedModal(landlordId) {
     </div>
 
     <div class="modalBody">
-      <div class="tiny" style="margin-bottom:12px;">
+      <div class="tiny" style="margin-bottom:10px;">
         Copy/paste this into a website or listing description. It links to your CASA profile.
       </div>
 
       <div class="field">
+        <label>Embed code</label>
+        <textarea class="textarea" id="embedBox" spellcheck="false">${esc(snippet)}</textarea>
+        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn btn--primary" id="copyEmbed">Copy</button>
+          <button class="btn" id="previewEmbed">Preview</button>
+        </div>
+      </div>
+
+      <div class="field" id="embedPreviewWrap" style="display:none;">
         <label>Preview</label>
         <div class="card" style="box-shadow:none;">
           <div class="pad" id="embedPreview"></div>
         </div>
       </div>
-
-      <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-        <button class="btn btn--primary" id="copyEmbed">Copy embed</button>
-        <button class="btn" id="toggleHTML">Show HTML</button>
-      </div>
-
-      <div class="field" id="htmlWrap" style="display:none;">
-        <label>HTML snippet</label>
-        <textarea class="textarea" id="embedBox" spellcheck="false" readonly></textarea>
-      </div>
-    </div>
-
-    <div class="modalFoot">
-      <button class="btn" id="mDone">Close</button>
     </div>
   `);
 
   $("#mClose")?.addEventListener("click", closeModal);
-  $("#mDone")?.addEventListener("click", closeModal);
-
-  const prev = $("#embedPreview");
-  if (prev) prev.innerHTML = snippet;
-
-  const box = $("#embedBox");
-  if (box) box.value = snippet;
 
   $("#copyEmbed")?.addEventListener("click", async () => {
+    const txt = $("#embedBox")?.value || snippet;
     try {
-      await navigator.clipboard.writeText(snippet);
-      alert("Copied embed HTML!");
+      await navigator.clipboard.writeText(txt);
+      alert("Copied!");
     } catch {
-      try {
-        box?.focus?.();
-        box?.select?.();
+      // fallback
+      const ta = $("#embedBox");
+      if (ta) {
+        ta.focus();
+        ta.select();
         document.execCommand("copy");
-        alert("Copied embed HTML!");
-      } catch {
-        alert("Copy failed.");
+        alert("Copied!");
       }
     }
   });
 
-  $("#toggleHTML")?.addEventListener("click", () => {
-    const wrap = $("#htmlWrap");
-    const btn = $("#toggleHTML");
-    if (!wrap || !btn) return;
-    const shown = wrap.style.display !== "none";
-    wrap.style.display = shown ? "none" : "block";
-    btn.textContent = shown ? "Show HTML" : "Hide HTML";
+  $("#previewEmbed")?.addEventListener("click", () => {
+    const wrap = $("#embedPreviewWrap");
+    const prev = $("#embedPreview");
+    if (!wrap || !prev) return;
+    wrap.style.display = "block";
+    // Render the HTML snippet safely in our own page context
+prev.innerHTML = snippet;
+ prev.querySelectorAll("img").forEach(img => img.remove());    
   });
 }
 
@@ -501,13 +603,19 @@ function openBadgeEmbedModal(landlordId) {
 function leafletReady() {
   return typeof window.L !== "undefined" && typeof window.L.map === "function";
 }
+
 function initLeafletMap(el, center, zoom = 12) {
   if (!el) return null;
-  if (!leafletReady()) { console.warn("Leaflet not ready; skipping map init."); return null; }
+  if (!leafletReady()) {
+    console.warn("Leaflet not ready; skipping map init.");
+    return null;
+  }
 
-  try { if (el._leaflet_id) el._leaflet_id = null; } catch {}
+  try {
+    if (el._leaflet_id) el._leaflet_id = null;
+  } catch {}
+
   let map = null;
-
   try {
     map = L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -515,7 +623,10 @@ function initLeafletMap(el, center, zoom = 12) {
       attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    setTimeout(() => { try { map.invalidateSize(); } catch {} }, 60);
+    setTimeout(() => {
+      try { map.invalidateSize(); } catch {}
+    }, 60);
+
     return map;
   } catch (e) {
     console.error("Map init failed:", e);
@@ -527,23 +638,28 @@ function initLeafletMap(el, center, zoom = 12) {
    Router
 ------------------------------ */
 function route() {
-  const hash = location.hash || "#/";
-  const path = hash.replace("#", "");
-  const cleanPath = path.split("?")[0];
-  const parts = cleanPath.split("/").filter(Boolean);
-  const base = parts[0] || "";
-  const param = parts[1] || "";
+  try {
+    const hash = location.hash || "#/";
+    const path = hash.replace("#", "");
+    const cleanPath = path.split("?")[0];
+    const parts = cleanPath.split("/").filter(Boolean);
+    const base = parts[0] || "";
+    const param = parts[1] || "";
 
-  if (!base) return renderHome();
-  if (base === "search") return renderSearch();
-  if (base === "add") return renderAdd();
-  if (base === "how") return renderHow();
-  if (base === "trust") return renderTrust();
-  if (base === "portal") return renderPortal();
-  if (base === "toolkit") return renderToolkit();
-  if (base === "landlord" && param) return renderLandlord(param);
+    if (!base) return renderHome();
+    if (base === "search") return renderSearch();
+    if (base === "add") return renderAdd();
+    if (base === "how") return renderHow();
+    if (base === "trust") return renderTrust();
+    if (base === "portal") return renderPortal();
+    if (base === "toolkit") return renderToolkit();
+    if (base === "landlord" && param) return renderLandlord(param);
 
-  renderHome();
+    renderHome();
+  } catch (e) {
+    console.error("Route error:", e);
+    renderHome();
+  }
 }
 
 window.addEventListener("hashchange", route);
@@ -587,6 +703,8 @@ function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
           <span class="ratingNum">${avgText}</span>
           <span class="muted">(${count} review${count===1?"":"s"})</span>
         </div>
+
+        <div class="smallNote"></div>
       </div>
 
       <div class="lcRight">
@@ -608,13 +726,24 @@ function highlightsData() {
     .slice()
     .sort((a,b)=>b.createdAt-a.createdAt)
     .slice(0, 5)
-    .map(r => ({ r, l: DB.landlords.find(x => x.id === r.landlordId) }))
+    .map(r => {
+      const l = DB.landlords.find(x => x.id === r.landlordId);
+      return { r, l };
+    })
     .filter(x => x.l);
 }
+
 function renderHighlightsCarousel() {
   const items = highlightsData();
+
   if (items.length === 0) {
-    return `<div class="carousel"><div class="carouselSlide"><div class="muted">No highlights yet.</div></div></div>`;
+    return `
+      <div class="carousel">
+        <div class="carouselSlide">
+          <div class="muted">No highlights yet.</div>
+        </div>
+      </div>
+    `;
   }
 
   const slides = items.map(({r,l}) => {
@@ -647,6 +776,7 @@ function renderHighlightsCarousel() {
             </div>
 
             <div class="smallNote">${esc(r.text)}</div>
+            <div class="smallNote"></div>
           </div>
           <div class="lcRight">
             ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
@@ -668,6 +798,7 @@ function renderHighlightsCarousel() {
     </div>
   `;
 }
+
 function setupCarousel() {
   const wrap = $("#highCarousel");
   if (!wrap) return;
@@ -683,6 +814,7 @@ function setupCarousel() {
   }
 
   let idx = 0;
+
   function go(n) {
     idx = (n + items.length) % items.length;
     track.style.transform = `translateX(${-idx * 100}%)`;
@@ -690,6 +822,7 @@ function setupCarousel() {
   }
 
   dots.forEach((d) => d.addEventListener("click", () => go(Number(d.dataset.dot))));
+
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(() => go(idx + 1), 4500);
 }
@@ -718,7 +851,6 @@ function renderShell(content) {
 ------------------------------ */
 function renderHome() {
   setPageTitle("Know your landlord");
-
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -739,15 +871,21 @@ function renderHome() {
         <div class="tileRow">
           <div class="tile" data-home-tile="search">
             <div class="tile__icon">⌕</div>
-            <div><div class="tile__label">Search</div></div>
+            <div>
+              <div class="tile__label">Search</div>
+            </div>
           </div>
           <div class="tile" data-home-tile="review">
             <div class="tile__icon">★</div>
-            <div><div class="tile__label">Review</div></div>
+            <div>
+              <div class="tile__label">Review</div>
+            </div>
           </div>
           <div class="tile tile--disabled">
             <div class="tile__icon">⌂</div>
-            <div><div class="tile__label">Rent</div></div>
+            <div>
+              <div class="tile__label">Rent</div>
+            </div>
           </div>
         </div>
         <div class="tilePanel" id="tilePanel" style="display:none"></div>
@@ -801,17 +939,24 @@ function renderHome() {
       if (!tilePanel) return;
       tilePanel.style.display = "block";
       if (k === "search") tilePanel.textContent = "Search by name, entity or address";
-      if (k === "review") tilePanel.textContent = "Leave a rating based on your experience";
+      if (k === "review") tilePanel.textContent = "Leave a rating based on select categories";
     });
   });
 
   $("#homeSearch")?.addEventListener("click", () => {
     const q = $("#homeQ")?.value?.trim?.() || "";
+
     const exact = findExactLandlord(q);
-    if (exact) { location.hash = `#/landlord/${exact.id}`; return; }
+    if (exact) {
+      location.hash = `#/landlord/${exact.id}`;
+      return;
+    }
     location.hash = `#/search?q=${encodeURIComponent(q)}`;
   });
-  $("#homeQ")?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#homeSearch")?.click(); });
+
+  $("#homeQ")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#homeSearch")?.click();
+  });
 
   setTimeout(() => {
     const mapEl = $("#homeMap");
@@ -823,7 +968,9 @@ function renderHome() {
       if (typeof l.lat === "number" && typeof l.lng === "number") {
         const st = ratingStats(l.id);
         const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
-        try { L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`); } catch {}
+        try {
+          L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+        } catch {}
       }
     }
   }, 0);
@@ -831,7 +978,9 @@ function renderHome() {
   setupCarousel();
 }
 
-/* Query params */
+/* -----------------------------
+   Query params
+------------------------------ */
 function getQueryParam(name) {
   const hash = location.hash || "";
   const qIndex = hash.indexOf("?");
@@ -888,11 +1037,13 @@ function renderSearch() {
   const resultsEl = $("#results");
   if (!qEl || !bEl || !resultsEl) return;
 
-  qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#doSearch")?.click(); });
+  qEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#doSearch")?.click();
+  });
 
   function matches(l, query, borough) {
     const t = (query || "").toLowerCase();
-    const hay = landlordHaystack(l);
+    const hay = `${l.name} ${l.entity || ""} ${l.address?.line1 || ""} ${l.address?.city || ""} ${l.address?.state || ""}`.toLowerCase();
     const qOk = !t || hay.includes(t);
     const bOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
     return qOk && bOk;
@@ -952,7 +1103,7 @@ function renderSearch() {
       btn.addEventListener("click", () => {
         const id = btn.dataset.center;
         const l = DB.landlords.find(x => x.id === id);
-        if (!l || typeof l.lat !== "number" || typeof l.lng !== "number")        return;
+        if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
         try {
           map.setView([l.lat, l.lng], 14, { animate: true });
           markers.get(id)?.openPopup();
@@ -1086,6 +1237,7 @@ function renderAdd() {
 
     DB.landlords.unshift(l);
 
+    /* auto create a default report object so profile never looks empty */
     DB.reports = DB.reports || [];
     DB.reports.push({
       landlordId: id,
@@ -1100,17 +1252,17 @@ function renderAdd() {
     });
 
     saveDB(DB);
+
     location.hash = `#/landlord/${id}`;
   });
 }
 
 /* -----------------------------
-   HOW / TRUST / PORTAL / TOOLKIT
-   (kept lean — same structure you already had)
+   HOW + TRUST + PORTAL
 ------------------------------ */
 function renderHow() {
   setPageTitle("How it works");
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -1121,7 +1273,9 @@ function renderHow() {
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
+
         <div class="hr"></div>
+
         <div class="muted" style="font-weight:700;line-height:1.5">
           <div><b>Search</b><br/>Find a landlord by name, entity, address, or borough.</div>
           <div style="margin-top:10px"><b>Review</b><br/>Post instantly. (No account required.)</div>
@@ -1130,11 +1284,13 @@ function renderHow() {
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
 }
+
 function renderTrust() {
   setPageTitle("Trust & Safety");
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -1145,7 +1301,9 @@ function renderTrust() {
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
+
         <div class="hr"></div>
+
         <div class="muted" style="font-weight:700;line-height:1.55">
           <div><b>No reviewer accounts</b><br/>Tenants can post without accounts.</div>
           <div style="margin-top:10px"><b>Verified landlord responses</b><br/>Landlords upload documentation and are reviewed before responding publicly.</div>
@@ -1154,11 +1312,13 @@ function renderTrust() {
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
 }
+
 function renderPortal() {
   setPageTitle("Landlord Portal");
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
@@ -1169,48 +1329,172 @@ function renderPortal() {
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
-        <div class="hr"></div>
-        <div class="muted" style="font-weight:800;line-height:1.55">
-          Demo portal UI only (your existing portal UI can be pasted here unchanged).
+
+        <div class="portalGrid">
+          <div class="card" style="box-shadow:none;">
+            <div class="pad">
+              <div class="kicker">Sign in</div>
+
+              <div class="field">
+                <label>Email</label>
+                <input class="input" id="pe" placeholder="you@company.com" />
+              </div>
+              <div class="field">
+                <label>Password</label>
+                <input class="input" id="pp" type="password" placeholder="Password" />
+              </div>
+
+              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="psignin">Sign in</button>
+
+              <div class="tiny" style="text-align:center;margin-top:12px;">or continue with</div>
+
+              <div class="oauth">
+                <button class="oauthBtn" id="oauthGoogle">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
+                  Continue with Google
+                </button>
+                <button class="oauthBtn" id="oauthApple">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
+                  Continue with Apple
+                </button>
+                <button class="oauthBtn" id="oauthMicrosoft">
+                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
+                  Continue with Microsoft
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="box-shadow:none;">
+            <div class="pad">
+              <div class="kicker">Create account</div>
+
+              <div class="field">
+                <label>Email</label>
+                <input class="input" id="se" placeholder="you@company.com" />
+              </div>
+              <div class="field">
+                <label>Password</label>
+                <input class="input" id="sp" type="password" placeholder="Create a password" />
+              </div>
+
+              <div class="field">
+                <label>Verification document (demo)</label>
+
+                <div class="fileRow">
+                  <div class="fileName" id="fileName">No file chosen</div>
+                  <label class="filePick" for="doc">Choose file</label>
+                  <input id="doc" type="file" />
+                </div>
+
+                <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
+              </div>
+
+              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
+              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="box-shadow:none;margin-top:14px;">
+          <div class="pad">
+            <div style="font-weight:900">Plans (demo copy)</div>
+            <div class="muted" style="margin-top:4px;font-weight:800">
+              Claimed — $39/mo • Verified — $99/mo • Certified/Pro — $299/mo
+            </div>
+            <div class="tiny" style="margin-top:6px;">Landlords must subscribe to claim or verify.</div>
+          </div>
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
+
+  const doc = $("#doc");
+  const fileName = $("#fileName");
+  doc?.addEventListener("change", () => {
+    if (!fileName) return;
+    fileName.textContent = doc.files?.[0]?.name || "No file chosen";
+  });
+
+  const demo = (label) => alert(`${label} (demo)`);
+  ["oauthGoogle","oauthApple","oauthMicrosoft"].forEach(id=>{
+    $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
+  });
+  $("#psignin")?.addEventListener("click", ()=>demo("Sign in"));
+  $("#signup")?.addEventListener("click", ()=>demo("Create account"));
 }
+
+/* -----------------------------
+   NEW: Tenant Toolkit (market expansion wedge)
+------------------------------ */
 function renderToolkit() {
   setPageTitle("Tenant Toolkit");
-  renderShell(`
+  const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Tenant Toolkit</div>
             <div class="pageTitle">Resources by city</div>
-            <div class="pageSub">Practical links for renters. Helps CASA expand into new markets.</div>
+            <div class="pageSub">Practical links for renters. This helps CASA expand into new markets.</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
+
         <div class="hr"></div>
+
         <div class="muted" style="font-weight:800;line-height:1.55">
-          Add your city cards here (you already had these — keep yours if preferred).
+          Choose a city and access essential services: tenant rights, reporting issues, housing court basics.
+        </div>
+
+        <div class="toolkitGrid">
+          ${toolkitCityCard("New York City", [
+            ["NYC 311 (complaints & services)", "https://portal.311.nyc.gov/"],
+            ["HPD (housing preservation)", "https://www.nyc.gov/site/hpd/index.page"],
+            ["NYC Housing Court info", "https://ww2.nycourts.gov/courts/nyc/housing/index.shtml"],
+          ])}
+          ${toolkitCityCard("Boston", [
+            ["City of Boston 311", "https://www.boston.gov/departments/boston-311"],
+            ["Boston tenant rights", "https://www.boston.gov/departments/neighborhood-development/tenant-rights"],
+          ])}
+          ${toolkitCityCard("Miami", [
+            ["Miami-Dade 311", "https://www.miamidade.gov/global/service.page?Mduid_service=ser1577816385742078"],
+            ["Florida tenant rights overview", "https://www.myfloridalegal.com/"],
+          ])}
+          ${toolkitCityCard("Chicago", [
+            ["Chicago 311", "https://311.chicago.gov/"],
+            ["Chicago renters rights info", "https://www.chicago.gov/city/en/depts/doh.html"],
+          ])}
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="smallNote" style="margin-top:0">
+          <b>Expansion strategy:</b> Start with reviews everywhere, then add city datasets per market.
+          The toolkit page gives value even before your “report” data is available in that city.
         </div>
       </div>
     </section>
-  `);
+  `;
+  renderShell(content);
+}
+function toolkitCityCard(name, links) {
+  return `
+    <div class="toolkitItem">
+      <div class="kicker">${esc(name)}</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+        ${links.map(([label,url]) => `
+          <a class="btn miniBtn" target="_blank" rel="noopener noreferrer" href="${esc(url)}">${esc(label)}</a>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 /* -----------------------------
    LANDLORD PROFILE
 ------------------------------ */
-function reportRow(k, v) {
-  return `
-    <div class="reportRow">
-      <div class="reportKey">${esc(k)}</div>
-      <div class="reportVal">${esc(String(v ?? "—"))}</div>
-    </div>
-  `;
-}
-
 function renderLandlord(id) {
   const l = DB.landlords.find(x => x.id === id);
   if (!l) return renderHome();
@@ -1219,22 +1503,20 @@ function renderLandlord(id) {
 
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-  const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (
-    st.avgRounded >= 4 ? "★★★★☆" :
-    st.avgRounded >= 3 ? "★★★☆☆" :
-    st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆"
-  );
+  const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
 
   const cred = casaCredential(l.id);
   const badgeRow = badgesHTML(l);
   const distTotal = st.dist.reduce((a,b)=>a+b,0);
+
   const rep = reportFor(l.id);
 
   const reportHTML = rep ? `
     <div class="kicker" style="margin-top:18px;">Public report (demo)</div>
     <div class="muted" style="margin-top:6px;font-weight:800">
-      Updated: ${fmtDate(rep.updatedAt)}.
+      This is where CASA adds “receipts” (city datasets). Updated: ${fmtDate(rep.updatedAt)}.
     </div>
+
     <div class="reportGrid">
       <div class="reportCard">
         ${reportRow("Violations (12mo)", rep.violations_12mo)}
@@ -1247,10 +1529,15 @@ function renderLandlord(id) {
         ${reportRow("Eviction filings (12mo)", rep.eviction_filings_12mo)}
       </div>
     </div>
-    <div class="smallNote">${esc(rep.notes || "")}</div>
+
+    <div class="smallNote">
+      ${esc(rep.notes || "Demo report. Production: public datasets + sources.")}
+    </div>
   ` : `
     <div class="kicker" style="margin-top:18px;">Public report</div>
-    <div class="muted" style="margin-top:8px;font-weight:800">No report data yet for this landlord.</div>
+    <div class="muted" style="margin-top:8px;font-weight:800">
+      No report data yet for this landlord.
+    </div>
   `;
 
   const content = `
@@ -1279,8 +1566,11 @@ function renderLandlord(id) {
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <a class="btn" href="#/search">Back</a>
 
+            <!-- More options dropdown -->
             <div style="position:relative;">
-              <button class="btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">More options</button>
+              <button class="btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">
+                More options
+              </button>
 
               <div id="moreDropdown"
                    style="
@@ -1296,9 +1586,16 @@ function renderLandlord(id) {
                      padding:10px;
                      z-index:95;
                    ">
-                <button class="btn" id="embedBtn" style="width:100%; justify-content:flex-start; border-radius:12px;">
-                  Get <span style="${casaBrandFontInlineCSS()};">casa</span> badge embed
+                <button class="btn" id="embedBtn"
+                        style="width:100%; justify-content:flex-start; border-radius:12px;">
+                  Get <span style="${casaBrandFontInlineCSS()}; margin:0 4px;">casa</span> badge embed
                 </button>
+              <button class="btn" id="embedBtn"
+        style="width:100%; justify-content:flex-start; border-radius:12px;">
+  <span>
+    Get <span style="${casaBrandFontInlineCSS()};">casa</span> badge embed
+  </span>
+</button>
               </div>
             </div>
 
@@ -1319,13 +1616,13 @@ function renderLandlord(id) {
             <div class="histo">
               <div class="kicker" style="margin-top:18px;">Rating distribution</div>
               ${[5,4,3,2,1].map(star=>{
-                const c = st.dist[star-1] || 0;
-                const pct = distTotal ? Math.round((c/distTotal)*100) : 0;
+                const count = st.dist[star-1] || 0;
+                const pct = distTotal ? Math.round((count/distTotal)*100) : 0;
                 return `
                   <div class="hRow">
                     <div class="muted">${star}★</div>
                     <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-                    <div class="muted">${c}</div>
+                    <div class="muted">${count}</div>
                   </div>
                 `;
               }).join("")}
@@ -1364,7 +1661,6 @@ function renderLandlord(id) {
   `;
   renderShell(content);
 
-  // Map
   setTimeout(() => {
     const map = initLeafletMap($("#profileMap"), [l.lat ?? 40.73, l.lng ?? -73.95], 12);
     if (!map) return;
@@ -1373,6 +1669,7 @@ function renderLandlord(id) {
     if (typeof l.lat === "number" && typeof l.lng === "number") {
       try { marker = L.marker([l.lat, l.lng]).addTo(map); } catch {}
     }
+
     $("#centerProfile")?.addEventListener("click", () => {
       try {
         map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
@@ -1381,15 +1678,11 @@ function renderLandlord(id) {
     });
   }, 0);
 
-  // Report review buttons
   document.querySelectorAll("[data-report]").forEach(btn => {
     btn.addEventListener("click", () => alert("Report submitted (demo)."));
   });
 
-  // Review modal
   $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
-
-  // More options dropdown
   $("#moreBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1402,7 +1695,7 @@ function renderLandlord(id) {
     openBadgeEmbedModal(l.id);
   });
 
-  // cleanup previous listeners
+  // Remove old global handlers (prevents stacking on route changes)
   window.__casaMoreOutsideClick?.();
   window.__casaMoreEsc?.();
 
@@ -1410,27 +1703,117 @@ function renderLandlord(id) {
     const dd = document.getElementById("moreDropdown");
     const btn = document.getElementById("moreBtn");
     if (!dd || !btn) return;
+
     const within = dd.contains(e.target) || btn.contains(e.target);
     if (!within) closeInlineDropdown();
   };
-  const onEsc = (e) => { if (e.key === "Escape") closeInlineDropdown(); };
+
+  const onEsc = (e) => {
+    if (e.key === "Escape") closeInlineDropdown();
+  };
 
   document.addEventListener("click", outsideClick);
   document.addEventListener("keydown", onEsc);
 
+  // store cleanup fns
   window.__casaMoreOutsideClick = () => document.removeEventListener("click", outsideClick);
   window.__casaMoreEsc = () => document.removeEventListener("keydown", onEsc);
+
+
+  /* NEW: CASA embed badge modal */
+  $("#embedBtn")?.addEventListener("click", () => openEmbedModal(l));
+}
+
+function reportRow(k, v) {
+  return `
+    <div class="reportRow">
+      <div class="reportKey">${esc(k)}</div>
+      <div class="reportVal">${esc(String(v ?? "—"))}</div>
+    </div>
+  `;
+}
+
+function openEmbedModal(landlord) {
+  const st = ratingStats(landlord.id);
+  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+
+  const pageUrl = `${location.origin}${location.pathname}#/landlord/${encodeURIComponent(landlord.id)}`;
+  const html = `<a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;border:1px solid rgba(20,16,12,.14);background:rgba(255,255,255,.75);padding:10px 12px;border-radius:999px;color:rgba(21,17,14,.92);font-weight:800;">
+  <img src="${location.origin}${location.pathname}assets/badge-casa.png" alt="CASA" style="width:18px;height:18px;border-radius:5px;"/>
+Rated on <span style="${casaBrandFontInlineCSS()};">casa</span></a>`;
+
+  openModal(`
+    <div class="modalHead">
+      <div class="modalTitle">CASA badge embed</div>
+      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="kicker">Landlord credential</div>
+      <div class="muted" style="margin-top:6px;font-weight:800;line-height:1.55">
+        Landlords can embed this on their website or listing pages — like a Trustpilot rating.
+      </div>
+
+      <div class="embedBox">
+        <div class="kicker" style="margin-bottom:8px;">HTML snippet</div>
+        <textarea class="codeField" id="embedCode" rows="5">${esc(html)}</textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn btn--primary miniBtn" id="copyEmbed">Copy embed</button>
+          <button class="btn miniBtn" id="previewEmbed">Preview</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="mCancel">Close</button>
+    </div>
+  `);
+
+  $("#mClose")?.addEventListener("click", closeModal);
+  $("#mCancel")?.addEventListener("click", closeModal);
+
+  $("#copyEmbed")?.addEventListener("click", async () => {
+    try {
+      const val = $("#embedCode")?.value || "";
+      await navigator.clipboard.writeText(val);
+      alert("Copied.");
+    } catch {
+      alert("Copy failed. Select text and copy manually.");
+    }
+  });
+
+  $("#previewEmbed")?.addEventListener("click", () => {
+    openModal(`
+      <div class="modalHead">
+        <div class="modalTitle">Preview</div>
+        <button class="iconBtn" id="mClose2" aria-label="Close">×</button>
+      </div>
+      <div class="modalBody">
+        <div class="kicker">Preview</div>
+        <div style="margin-top:12px;">${html}</div>
+      </div>
+      <div class="modalFoot">
+        <button class="btn" id="mCancel2">Close</button>
+      </div>
+    `);
+    $("#mClose2")?.addEventListener("click", closeModal);
+    $("#mCancel2")?.addEventListener("click", closeModal);
+  });
 }
 
 /* -----------------------------
-   Star picker + Review modal
+   Star picker
 ------------------------------ */
 function starPickerHTML(defaultValue = 5) {
   const v = Math.max(1, Math.min(5, Number(defaultValue) || 5));
   return `
     <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
       ${[1,2,3,4,5].map(i => `
-        <button type="button" class="starBtn" data-star="${i}" aria-label="${i} star${i===1?"":"s"}" aria-pressed="false">
+        <button type="button"
+          class="starBtn"
+          data-star="${i}"
+          aria-label="${i} star${i===1?"":"s"}"
+          aria-pressed="false">
           <span class="starChar" aria-hidden="true">★</span>
         </button>
       `).join("")}
@@ -1440,31 +1823,43 @@ function starPickerHTML(defaultValue = 5) {
     <div class="tiny" style="margin-top:6px;">Click a star to rate.</div>
   `;
 }
+
 function applyStarPickerVisual(value) {
   const v = Math.max(1, Math.min(5, Number(value) || 1));
   const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
+
   btns.forEach(btn => {
     const s = Number(btn.dataset.star);
     const on = s <= v;
     btn.classList.toggle("isOn", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   });
-  $("#starValue") && ($("#starValue").textContent = `${v}/5`);
-  $("#mStars") && ($("#mStars").value = String(v));
+
+  const out = $("#starValue");
+  if (out) out.textContent = `${v}/5`;
+
+  const hidden = $("#mStars");
+  if (hidden) hidden.value = String(v);
 }
+
 function bindStarPicker(defaultValue = 5) {
   let current = Math.max(1, Math.min(5, Number(defaultValue) || 5));
   applyStarPickerVisual(current);
 
   document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
     btn.addEventListener("mouseenter", () => applyStarPickerVisual(btn.dataset.star));
+  });
+  $("#starPicker")?.addEventListener("mouseleave", () => applyStarPickerVisual(current));
+
+  document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
     btn.addEventListener("click", () => {
       current = Number(btn.dataset.star);
       applyStarPickerVisual(current);
     });
   });
-  $("#starPicker")?.addEventListener("mouseleave", () => applyStarPickerVisual(current));
 }
+
+/* Review modal */
 function openReviewModal(landlordId) {
   openModal(`
     <div class="modalHead">
