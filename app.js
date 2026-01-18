@@ -523,11 +523,10 @@ function openBadgeEmbedModal(landlordId) {
   const l = DB.landlords.find(x => x.id === landlordId);
   if (!l) return;
 
-const snippet = (typeof casaEmbedSnippetForLandlord === "function")
-  ? casaEmbedSnippetForLandlord(l)
-  : "";
-console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
-   
+  const snippet = (typeof casaEmbedSnippetForLandlord === "function")
+    ? casaEmbedSnippetForLandlord(l)
+    : "";
+
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">CASA badge embed</div>
@@ -535,55 +534,79 @@ console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
     </div>
 
     <div class="modalBody">
-      <div class="tiny" style="margin-bottom:10px;">
+      <div class="tiny" style="margin-bottom:12px;">
         Copy/paste this into a website or listing description. It links to your CASA profile.
       </div>
 
       <div class="field">
-        <label>Embed code</label>
-        <textarea class="textarea" id="embedBox" spellcheck="false">${esc(snippet)}</textarea>
-        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-          <button class="btn btn--primary" id="copyEmbed">Copy</button>
-          <button class="btn" id="previewEmbed">Preview</button>
-        </div>
-      </div>
-
-      <div class="field" id="embedPreviewWrap" style="display:none;">
         <label>Preview</label>
         <div class="card" style="box-shadow:none;">
           <div class="pad" id="embedPreview"></div>
         </div>
       </div>
+
+      <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+        <button class="btn btn--primary" id="copyEmbed">Copy embed</button>
+        <button class="btn" id="showHTML">Show HTML</button>
+      </div>
+
+      <div class="field" id="htmlWrap" style="display:none;">
+        <label>HTML snippet</label>
+        <textarea class="textarea" id="embedBox" spellcheck="false" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="mDone">Close</button>
     </div>
   `);
 
+  // Close
   $("#mClose")?.addEventListener("click", closeModal);
+  $("#mDone")?.addEventListener("click", closeModal);
 
+  // Put snippet into hidden textarea (for optional viewing + fallback copy)
+  const box = $("#embedBox");
+  if (box) box.value = snippet;
+
+  // Render preview safely (same-tab)
+  const prev = $("#embedPreview");
+  if (prev) {
+    prev.innerHTML = snippet;
+
+    // If anything inside uses SVG, ensure it lays out inline (some browsers treat it oddly in flex)
+    prev.querySelectorAll("svg").forEach(svg => {
+      svg.style.display = "inline-block";
+      svg.style.verticalAlign = "middle";
+    });
+  }
+
+  // Copy button copies the snippet directly (no need to show full snippet)
   $("#copyEmbed")?.addEventListener("click", async () => {
-    const txt = $("#embedBox")?.value || snippet;
     try {
-      await navigator.clipboard.writeText(txt);
-      alert("Copied!");
+      await navigator.clipboard.writeText(snippet);
+      alert("Copied embed HTML!");
     } catch {
       // fallback
-      const ta = $("#embedBox");
-      if (ta) {
-        ta.focus();
-        ta.select();
+      if (box) {
+        box.style.display = "block";
+        box.focus();
+        box.select();
         document.execCommand("copy");
-        alert("Copied!");
+        alert("Copied embed HTML!");
+      } else {
+        alert("Copy failed. Try again.");
       }
     }
   });
 
-  $("#previewEmbed")?.addEventListener("click", () => {
-    const wrap = $("#embedPreviewWrap");
-    const prev = $("#embedPreview");
-    if (!wrap || !prev) return;
-    wrap.style.display = "block";
-    // Render the HTML snippet safely in our own page context
-prev.innerHTML = snippet;
- prev.querySelectorAll("img").forEach(img => img.remove());    
+  // Toggle HTML snippet visibility
+  $("#showHTML")?.addEventListener("click", () => {
+    const wrap = $("#htmlWrap");
+    if (!wrap) return;
+    const shown = wrap.style.display !== "none";
+    wrap.style.display = shown ? "none" : "block";
+    $("#showHTML").textContent = shown ? "Show HTML" : "Hide HTML";
   });
 }
 
