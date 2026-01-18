@@ -520,7 +520,7 @@ function renderHighlightsCarousel() {
             </div>
 
             <div class="smallNote">${esc(r.text)}</div>
-            <div class="smallNote">Rating reflects review recency.</div>
+            <div class="smallNote"></div>
           </div>
           <div class="lcRight">
             ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
