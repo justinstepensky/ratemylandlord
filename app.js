@@ -318,14 +318,61 @@ function casaLogoSVGInline(size = 18) {
 function casaEmbedSnippetForLandlord(l) {
   const st = ratingStats(l.id);
 
-  // Whole stars only (no half-stars)
-  // If unrated, show 0/5 and empty stars.
-  const whole = st.count ? Math.max(1, Math.min(5, Math.round(st.avg || 0))) : 0;
-
-  const starsText = "★".repeat(whole) + "☆".repeat(5 - whole);
+  // Use the real weighted average to support fractional stars
+  // If unrated: show 0.0 and empty stars
+  const avg = st.count ? Number(st.avg || 0) : 0;
+  const avgClamped = Math.max(0, Math.min(5, avg));
+  const avgText = st.count ? avgClamped.toFixed(1) : "0.0";
 
   const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
   const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
+
+  const brandCSS = casaBrandFontInlineCSS();
+
+  // --- SVG partial-star renderer (no external assets) ---
+  function starRowSVG(value, size = 16, gap = 4) {
+    const v = Math.max(0, Math.min(5, Number(value) || 0));
+    const full = Math.floor(v);
+    const frac = v - full;
+
+    const starPath =
+      "M12 .9l3.09 6.26 6.91 1-5 4.87 1.18 6.87L12 16.93 5.82 19.9 7 13.03 2 8.16l6.91-1L12 .9z";
+
+    const stars = [];
+    for (let i = 0; i < 5; i++) {
+      let fillPct = 0;
+      if (i < full) fillPct = 1;
+      else if (i === full) fillPct = frac;
+      else fillPct = 0;
+
+      const id = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
+      const x = i * (size + gap);
+
+      stars.push(`
+        <g transform="translate(${x},0)">
+          <defs>
+            <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#b88900"/>
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="rgba(20,16,12,.22)"/>
+            </linearGradient>
+          </defs>
+          <path d="${starPath}" fill="url(#${id})" />
+        </g>
+      `.trim());
+    }
+
+    const width = 5 * size + 4 * gap;
+
+    return `
+      <svg width="${width}" height="${size}" viewBox="0 0 ${width} ${size}"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+           style="display:block;">
+        ${stars.join("")}
+      </svg>
+    `.trim();
+  }
+
+  const starsSVG = starRowSVG(avgClamped, 16, 4);
 
   return `
 <a href="${profileURL}" target="_blank" rel="noopener noreferrer"
@@ -341,9 +388,12 @@ function casaEmbedSnippetForLandlord(l) {
      color: rgba(21,17,14,.9);
      box-shadow: 0 10px 26px rgba(20,16,12,.06);
      line-height:1;
+     white-space:nowrap;
    ">
-  <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
-    Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
+
+  <!-- Keep as a single flex child to avoid weird spacing -->
+  <span style="${brandCSS}; font-size:14px; display:inline-flex; align-items:baseline; white-space:nowrap;">
+    <span>Rated on&nbsp;</span><span style="${brandCSS};">casa</span>
   </span>
 
   <span style="
@@ -351,9 +401,13 @@ function casaEmbedSnippetForLandlord(l) {
      font-weight: 900;
      font-size:13px;
      color: rgba(21,17,14,.72);
-     letter-spacing: 1px;
+     display:inline-flex;
+     align-items:center;
+     white-space:nowrap;
    ">
-    • ${starsText} ${whole}/5
+    <span style="margin-right:8px;">•</span>
+    <span style="display:inline-flex; align-items:center;">${starsSVG}</span>
+    <span style="margin-left:8px;">${avgText}/5</span>
   </span>
 </a>`.trim();
 }
@@ -1522,10 +1576,12 @@ function renderLandlord(id) {
                      padding:10px;
                      z-index:95;
                    ">
-                <button class="btn" id="embedBtn"
-                        style="width:100%; justify-content:flex-start; border-radius:12px;">
-                  Get <span style="${casaBrandFontInlineCSS()}; margin:0 4px;">casa</span> badge embed
-                </button>
+              <button class="btn" id="embedBtn"
+        style="width:100%; justify-content:flex-start; border-radius:12px;">
+  <span>
+    Get <span style="${casaBrandFontInlineCSS()};">casa</span> badge embed
+  </span>
+</button>
               </div>
             </div>
 
