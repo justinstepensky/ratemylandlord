@@ -710,12 +710,60 @@ function toggleInlineDropdown() {
 /* -----------------------------
    Drawer (mobile) — safe if not present
 ------------------------------ */
+function fixDrawerBubbles() {
+  const drawer = document.getElementById("drawer");
+  if (!drawer) return;
+
+  // Find the 3 primary action links/buttons in the drawer:
+  // (We match common patterns: data-drawer-link, hrefs, or visible text.)
+  const candidates = Array.from(drawer.querySelectorAll("a, button")).filter((el) => {
+    const t = (el.textContent || "").trim().toLowerCase();
+    const href = (el.getAttribute && el.getAttribute("href")) || "";
+    const isActionText =
+      t === "search" || t === "review" || t === "rent";
+    const isActionHref =
+      href.includes("#/search") || href.includes("#/add") || href.includes("#/rent");
+    const isDrawerLinkAttr =
+      el.hasAttribute && (el.hasAttribute("data-drawer-link") || el.hasAttribute("data-drawerlink"));
+
+    return isActionText || isActionHref || isDrawerLinkAttr;
+  });
+
+  // Keep only first 3 unique (Search/Review/Rent)
+  const picked = [];
+  const seen = new Set();
+  for (const el of candidates) {
+    const key = ((el.textContent || "").trim().toLowerCase()) || (el.getAttribute("href") || "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    picked.push(el);
+    if (picked.length >= 3) break;
+  }
+
+  if (picked.length < 2) return; // nothing to fix
+
+  // Create (or reuse) a dedicated row wrapper
+  let row = drawer.querySelector(".drawerBubbleRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.className = "drawerBubbleRow";
+    // Put it near the top of the drawer content
+    drawer.prepend(row);
+  } else {
+    row.innerHTML = "";
+  }
+
+  // Move the picked elements into the row
+  picked.forEach((el) => row.appendChild(el));
+}
+
 function initDrawer() {
   const btn = $("#menuBtn");
   const drawer = $("#drawer");
   const overlay = $("#drawerOverlay");
   const closeBtn = $("#drawerClose");
   if (!btn || !drawer || !overlay || !closeBtn) return;
+   fixDrawerBubbles();
 
   function open() {
     drawer.classList.add("isOpen");
@@ -1510,32 +1558,20 @@ function ensureRuntimeStyles() {
     }
 
     /* -----------------------------
-       Drawer menu: horizontal bubbles
-       (Search / Review / Rent)
+       Drawer bubbles: horizontal row (guaranteed)
     ------------------------------ */
-
-    /* Make drawer links container horizontal */
-    #drawer nav,
-    .drawer nav,
-    #drawer .drawerLinks,
-    .drawer .drawerLinks,
-    #drawerLinks {
+    #drawer .drawerBubbleRow{
       display:flex !important;
       flex-direction:row !important;
       gap:10px !important;
       flex-wrap:wrap !important;
-      padding:12px !important;
       align-items:center !important;
       justify-content:flex-start !important;
+      padding:12px !important;
     }
 
-    /* Bubble style for each link */
-    #drawer nav a,
-    .drawer nav a,
-    #drawer .drawerLinks a,
-    .drawer .drawerLinks a,
-    #drawerLinks a,
-    #drawer a {
+    #drawer .drawerBubbleRow a,
+    #drawer .drawerBubbleRow button{
       display:inline-flex !important;
       align-items:center !important;
       justify-content:center !important;
@@ -1551,21 +1587,12 @@ function ensureRuntimeStyles() {
       box-shadow:0 10px 26px rgba(20,16,12,.06) !important;
       width:auto !important;
       margin:0 !important;
+      flex: 0 0 auto !important;
+      cursor:pointer !important;
     }
 
-    /* Remove vertical stacking margins */
-    #drawer nav a + a,
-    .drawer nav a + a,
-    #drawer .drawerLinks a + a,
-    .drawer .drawerLinks a + a {
-      margin-top:0 !important;
-    }
-
-    /* Hover */
-    #drawer nav a:hover,
-    .drawer nav a:hover,
-    #drawer .drawerLinks a:hover,
-    .drawer .drawerLinks a:hover {
+    #drawer .drawerBubbleRow a:hover,
+    #drawer .drawerBubbleRow button:hover{
       background:rgba(255,255,255,.72) !important;
     }
   `.trim();
