@@ -1,3 +1,4 @@
+alert("app.js loaded");
 /* CASA — single-file SPA app.js
    - hash routing
    - premium cards
@@ -1322,7 +1323,7 @@ function openReviewModal(landlordId) {
     const starsInt = Math.max(1, Math.min(5, Number($("#mStars").value) || 5));
     const text = $("#mText").value.trim();
 
-      if (!text || text.length < 20) {
+    if (!text || text.length < 20) {
       alert("Please write at least 20 characters.");
       return;
     }
@@ -1340,3 +1341,22 @@ function openReviewModal(landlordId) {
     route();
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
