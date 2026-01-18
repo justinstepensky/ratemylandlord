@@ -1,87 +1,124 @@
-@@ -1,1845 +1,1901 @@
-/* CASA — single-file SPA app.js
-   - hash routing
-   - premium cards
-   - rating tint tiers (rounded 1 decimal)
-   - badges (assets/badge-verified.png + assets/badge-top.png)
-   - Recent highlights carousel w/ dots only (max 5)
-   - mobile drawer works
-   - review modal fixed (z-index + layout)
-   - rating is clickable stars
-   - HARDENED: prevents blank app if any piece fails
+/* CASA — single-file SPA app.js (DROP-IN REPLACEMENT)
+   Theme/aesthetic untouched (uses your existing classes).
 
-   NEW (added, no redesign):
-   - Building/landlord public report layer (demo city-data style)
-   - Tenant Toolkit page (multi-market strategy)
-   - CASA badge embed generator for landlords (Trustpilot-style credential)
-   - Page titles update by route for SEO shareability
+   Fixes + Adds (repo-safe):
+   ✅ App won’t go down (hard safety net + guarded rendering)
+   ✅ Split search results: Landlords (left) + Addresses (right)
+      - Works from BOTH Home search + Search page
+   ✅ Landlords can have multiple properties
+   ✅ Address/Property profile pages (#/property/:id) + reviews
+   ✅ Tenant Toolkit is real + usable (NYC, MIA, LA, CHI cards)
+   ✅ All columns fit and collapse cleanly on mobile (via your existing layout classes)
+   ✅ Map safe-init (Leaflet optional)
+   ✅ Keeps badges (assets/badge-verified.png + assets/badge-top.png)
+   ✅ Landlord page “More options” dropdown + CASA embed modal w/ fractional stars
 */
 
 /* -----------------------------
-   Global hardening + Debug
+   Global hardening + Safety net
 ------------------------------ */
 (function installSafetyNet() {
   const showOverlayError = (title, err) => {
     try {
       console.error(title, err);
+
       const el = document.getElementById("app");
       if (!el) return;
+
+      const msg = String(
+        err && (err.stack || err.message) ? err.stack || err.message : err
+      );
 
       el.innerHTML = `
         <section class="pageCard card">
           <div class="pad">
             <div class="kicker">CASA</div>
+
             <div class="pageTitle" style="margin-top:6px;">Something went wrong</div>
             <div class="pageSub" style="margin-top:8px;">
-              The app hit a runtime error and stopped rendering.
+              The app hit an error and stopped rendering.
             </div>
+
             <div class="hr"></div>
-            <div class="smallNote" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+
+            <div class="smallNote"
+                 style="white-space:pre-wrap;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,'Liberation Mono','Courier New', monospace;">
 ${String(title || "Error")}
-${String(err && (err.stack || err.message) ? (err.stack || err.message) : err)}
+${msg}
             </div>
+
             <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
               <a class="btn btn--primary" href="#/">Go Home</a>
-              <button class="btn" id="reloadBtn">Reload</button>
-              <button class="btn" id="resetBtn">Reset demo data</button>
+              <button class="btn" id="reloadBtn" type="button">Reload</button>
+              <button class="btn" id="resetBtn" type="button">Reset demo data</button>
             </div>
+
             <div class="tiny" style="margin-top:10px;">
               Tip: open DevTools → Console to see the full error log.
             </div>
           </div>
         </section>
       `;
-      document.getElementById("reloadBtn")?.addEventListener("click", () => location.reload());
-      document.getElementById("resetBtn")?.addEventListener("click", () => {
-        try {
-          localStorage.removeItem("casa_demo_v1");
-          location.reload();
-        } catch {}
-      });
+
+      const rb = document.getElementById("reloadBtn");
+      const xb = document.getElementById("resetBtn");
+
+      rb && rb.addEventListener("click", () => location.reload());
+      xb &&
+        xb.addEventListener("click", () => {
+          try {
+            localStorage.removeItem("casa_demo_v2");
+            localStorage.removeItem("casa_demo_v1");
+            location.reload();
+          } catch {}
+        });
     } catch {}
   };
 
-  window.addEventListener("error", (e) => {
-    showOverlayError("Uncaught error", e?.error || e?.message || e);
-  });
+  window.addEventListener("error", (e) =>
+    showOverlayError("Uncaught error", e && (e.error || e.message) ? e.error || e.message : e)
+  );
 
-  window.addEventListener("unhandledrejection", (e) => {
-    showOverlayError("Unhandled promise rejection", e?.reason || e);
-  });
+  window.addEventListener("unhandledrejection", (e) =>
+    showOverlayError("Unhandled promise rejection", e && e.reason ? e.reason : e)
+  );
 })();
 
 /* -----------------------------
-   Storage / Demo seed
+   Storage / Seed / Migration
 ------------------------------ */
-const LS_KEY = "casa_demo_v1";
+const LS_KEY = "casa_demo_v2";
+const LEGACY_LS_KEY = "casa_demo_v1";
+
+function safeParseJSON(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 function loadDB() {
+  // v2
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = safeParseJSON(raw);
+      if (parsed && typeof parsed === "object") return normalizeDB(parsed);
+    }
   } catch {}
+
+  // migrate legacy v1 if present
+  const legacy = safeParseJSON(localStorage.getItem(LEGACY_LS_KEY) || "");
+  if (legacy && legacy.landlords && legacy.reviews) {
+    const migrated = migrateLegacyToV2(legacy);
+    saveDB(migrated);
+    return migrated;
+  }
+
   return seedDB();
 }
+
 function saveDB(db) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(db));
@@ -89,95 +126,283 @@ function saveDB(db) {
 }
 
 function seedDB() {
-  const db = {
-    landlords: [
-      {
-        id: "l1",
-        name: "Northside Properties",
-        entity: "",
-        address: { line1: "123 Main St", unit: "", city: "Brooklyn", state: "NY" },
-        borough: "Brooklyn",
-        lat: 40.7081,
-        lng: -73.9571,
-        verified: true,
-        top: false,
-        createdAt: Date.now() - 1000 * 60 * 60 * 24 * 16,
-      },
-      {
-        id: "l2",
-        name: "Park Ave Management",
-        entity: "Park Ave Management LLC",
-        address: { line1: "22 Park Ave", unit: "", city: "New York", state: "NY" },
-        borough: "Manhattan",
-        lat: 40.7433,
-        lng: -73.9822,
-        verified: false,
-        top: false,
-        createdAt: Date.now() - 1000 * 60 * 60 * 24 * 28,
-      },
-      {
-        id: "l3",
-        name: "Elmhurst Holdings",
-        entity: "",
-        address: { line1: "86-12 Broadway", unit: "", city: "Queens", state: "NY" },
-        borough: "Queens",
-        lat: 40.7404,
-        lng: -73.8794,
-        verified: true,
-        top: true,
-        createdAt: Date.now() - 1000 * 60 * 60 * 24 * 35,
-      }
-    ],
-    reviews: [
-      { id: "r1", landlordId: "l1", stars: 4, text: "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 11 },
-      { id: "r2", landlordId: "l2", stars: 3, text: "Great location, but communication was slow. Security deposit itemization took weeks.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 45 },
-      { id: "r3", landlordId: "l3", stars: 5, text: "Responsive management. Clear lease terms and quick repairs.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 6 },
-      { id: "r4", landlordId: "l3", stars: 5, text: "Fast maintenance and respectful staff.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 18 },
-      { id: "r5", landlordId: "l3", stars: 4, text: "Solid experience overall; minor delays during holidays.", createdAt: Date.now() - 1000 * 60 * 60 * 24 * 58 }
-    ],
+  const now = Date.now();
 
-    /* NEW: public-report layer (demo “city data”) */
-    reports: [
-      {
-        landlordId: "l1",
-        updatedAt: Date.now() - 1000*60*60*24*2,
-        violations_12mo: 7,
-        complaints_12mo: 22,
-        bedbug_reports_12mo: 1,
-        hp_actions: 0,
-        permits_open: 2,
-        eviction_filings_12mo: 1,
-        notes: "Data is demo only. Production: pull from city datasets + add sources."
-      },
-      {
-        landlordId: "l2",
-        updatedAt: Date.now() - 1000*60*60*24*4,
-        violations_12mo: 18,
-        complaints_12mo: 49,
-        bedbug_reports_12mo: 3,
-        hp_actions: 1,
-        permits_open: 4,
-        eviction_filings_12mo: 6,
-        notes: "Data is demo only. Production: pull from city datasets + add sources."
-      },
-      {
-        landlordId: "l3",
-        updatedAt: Date.now() - 1000*60*60*24*1,
-        violations_12mo: 2,
-        complaints_12mo: 9,
-        bedbug_reports_12mo: 0,
-        hp_actions: 0,
-        permits_open: 1,
-        eviction_filings_12mo: 0,
-        notes: "Data is demo only. Production: pull from city datasets + add sources."
-      }
-    ],
+  const landlords = [
+    {
+      id: "l1",
+      name: "Northside Properties",
+      entity: "",
+      verified: true,
+      top: false,
+      createdAt: now - 1000 * 60 * 60 * 24 * 16,
+    },
+    {
+      id: "l2",
+      name: "Park Ave Management",
+      entity: "Park Ave Management LLC",
+      verified: false,
+      top: false,
+      createdAt: now - 1000 * 60 * 60 * 24 * 28,
+    },
+    {
+      id: "l3",
+      name: "Elmhurst Holdings",
+      entity: "",
+      verified: true,
+      top: true,
+      createdAt: now - 1000 * 60 * 60 * 24 * 35,
+    },
+  ];
 
-    flags: [],
-    replies: []
-  };
+  const properties = [
+    {
+      id: "p1",
+      landlordId: "l1",
+      address: { line1: "123 Main St", unit: "", city: "Brooklyn", state: "NY" },
+      borough: "Brooklyn",
+      lat: 40.7081,
+      lng: -73.9571,
+      createdAt: now - 1000 * 60 * 60 * 24 * 16,
+    },
+    {
+      id: "p2",
+      landlordId: "l2",
+      address: { line1: "22 Park Ave", unit: "", city: "New York", state: "NY" },
+      borough: "Manhattan",
+      lat: 40.7433,
+      lng: -73.9822,
+      createdAt: now - 1000 * 60 * 60 * 24 * 28,
+    },
+    {
+      id: "p3",
+      landlordId: "l3",
+      address: { line1: "86-12 Broadway", unit: "", city: "Queens", state: "NY" },
+      borough: "Queens",
+      lat: 40.7404,
+      lng: -73.8794,
+      createdAt: now - 1000 * 60 * 60 * 24 * 35,
+    },
+    // demonstrate multiple properties for one landlord:
+    {
+      id: "p4",
+      landlordId: "l3",
+      address: { line1: "41-12 75th St", unit: "", city: "Queens", state: "NY" },
+      borough: "Queens",
+      lat: 40.7462,
+      lng: -73.8892,
+      createdAt: now - 1000 * 60 * 60 * 24 * 20,
+    },
+  ];
+
+  const reviews = [
+    // landlord reviews
+    {
+      id: "r1",
+      targetType: "landlord",
+      targetId: "l1",
+      stars: 4,
+      text:
+        "Work orders were acknowledged quickly. A leak was fixed within a week. Noise policy was enforced inconsistently.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 11,
+    },
+    {
+      id: "r2",
+      targetType: "landlord",
+      targetId: "l2",
+      stars: 3,
+      text:
+        "Great location, but communication was slow. Security deposit itemization took weeks.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 45,
+    },
+    {
+      id: "r3",
+      targetType: "landlord",
+      targetId: "l3",
+      stars: 5,
+      text: "Responsive management. Clear lease terms and quick repairs.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 6,
+    },
+    {
+      id: "r4",
+      targetType: "landlord",
+      targetId: "l3",
+      stars: 5,
+      text: "Fast maintenance and respectful staff.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 18,
+    },
+    {
+      id: "r5",
+      targetType: "landlord",
+      targetId: "l3",
+      stars: 4,
+      text: "Solid experience overall; minor delays during holidays.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 58,
+    },
+
+    // property reviews (separate from landlord)
+    {
+      id: "r6",
+      targetType: "property",
+      targetId: "p3",
+      stars: 4,
+      text: "Building is quiet and clean. Elevator had occasional downtime.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 9,
+    },
+    {
+      id: "r7",
+      targetType: "property",
+      targetId: "p4",
+      stars: 2,
+      text: "Heat issues in winter and slow hallway lighting repairs.",
+      createdAt: now - 1000 * 60 * 60 * 24 * 32,
+    },
+  ];
+
+  const reports = [
+    {
+      landlordId: "l1",
+      updatedAt: now - 1000 * 60 * 60 * 24 * 2,
+      violations_12mo: 7,
+      complaints_12mo: 22,
+      bedbug_reports_12mo: 1,
+      hp_actions: 0,
+      permits_open: 2,
+      eviction_filings_12mo: 1,
+      notes: "Data is demo only. Production: pull from city datasets + add sources.",
+    },
+    {
+      landlordId: "l2",
+      updatedAt: now - 1000 * 60 * 60 * 24 * 4,
+      violations_12mo: 18,
+      complaints_12mo: 49,
+      bedbug_reports_12mo: 3,
+      hp_actions: 1,
+      permits_open: 4,
+      eviction_filings_12mo: 6,
+      notes: "Data is demo only. Production: pull from city datasets + add sources.",
+    },
+    {
+      landlordId: "l3",
+      updatedAt: now - 1000 * 60 * 60 * 24 * 1,
+      violations_12mo: 2,
+      complaints_12mo: 9,
+      bedbug_reports_12mo: 0,
+      hp_actions: 0,
+      permits_open: 1,
+      eviction_filings_12mo: 0,
+      notes: "Data is demo only. Production: pull from city datasets + add sources.",
+    },
+  ];
+
+  const db = { landlords, properties, reviews, reports, flags: [], replies: [] };
   saveDB(db);
   return db;
+}
+
+function normalizeDB(db) {
+  const out = {
+    landlords: Array.isArray(db.landlords) ? db.landlords : [],
+    properties: Array.isArray(db.properties) ? db.properties : [],
+    reviews: Array.isArray(db.reviews) ? db.reviews : [],
+    reports: Array.isArray(db.reports) ? db.reports : [],
+    flags: Array.isArray(db.flags) ? db.flags : [],
+    replies: Array.isArray(db.replies) ? db.replies : [],
+  };
+
+  // ensure every review has targetType/targetId
+  out.reviews = out.reviews
+    .map((r) => {
+      if (r && r.targetType && r.targetId) return r;
+      if (r && r.landlordId) return { ...r, targetType: "landlord", targetId: r.landlordId };
+      if (r && r.propertyId) return { ...r, targetType: "property", targetId: r.propertyId };
+      return r;
+    })
+    .filter(Boolean);
+
+  // ensure every landlord has core fields
+  out.landlords = out.landlords
+    .map((l) => ({
+      id: String(l && l.id ? l.id : ""),
+      name: String(l && l.name ? l.name : ""),
+      entity: String(l && l.entity ? l.entity : ""),
+      verified: !!(l && l.verified),
+      top: !!(l && l.top),
+      createdAt: Number(l && l.createdAt ? l.createdAt : Date.now()),
+    }))
+    .filter((l) => l.id && l.name);
+
+  // ensure every property has core fields
+  out.properties = out.properties
+    .map((p) => ({
+      id: String(p && p.id ? p.id : ""),
+      landlordId: String(p && p.landlordId ? p.landlordId : ""),
+      address: {
+        line1: String(p && p.address && p.address.line1 ? p.address.line1 : ""),
+        unit: String(p && p.address && p.address.unit ? p.address.unit : ""),
+        city: String(p && p.address && p.address.city ? p.address.city : ""),
+        state: String(p && p.address && p.address.state ? p.address.state : ""),
+      },
+      borough: String(p && p.borough ? p.borough : ""),
+      lat: typeof (p && p.lat) === "number" ? p.lat : null,
+      lng: typeof (p && p.lng) === "number" ? p.lng : null,
+      createdAt: Number(p && p.createdAt ? p.createdAt : Date.now()),
+    }))
+    .filter((p) => p.id && p.address && p.address.line1);
+
+  return out;
+}
+
+function migrateLegacyToV2(legacy) {
+  const now = Date.now();
+
+  const landlords = (legacy.landlords || [])
+    .map((l) => ({
+      id: String(l && l.id ? l.id : "l" + Math.random().toString(16).slice(2)),
+      name: String(l && l.name ? l.name : ""),
+      entity: String(l && l.entity ? l.entity : ""),
+      verified: !!(l && l.verified),
+      top: !!(l && l.top),
+      createdAt: Number(l && l.createdAt ? l.createdAt : now),
+    }))
+    .filter((l) => l.id && l.name);
+
+  // create 1 property per legacy landlord (from legacy address/lat/lng)
+  const properties = landlords
+    .map((l) => {
+      const legacyL =
+        (legacy.landlords || []).find((x) => String(x && x.id ? x.id : "") === l.id) || {};
+      return {
+        id: "p" + Math.random().toString(16).slice(2),
+        landlordId: l.id,
+        address: {
+          line1: String(legacyL && legacyL.address && legacyL.address.line1 ? legacyL.address.line1 : ""),
+          unit: String(legacyL && legacyL.address && legacyL.address.unit ? legacyL.address.unit : ""),
+          city: String(legacyL && legacyL.address && legacyL.address.city ? legacyL.address.city : ""),
+          state: String(legacyL && legacyL.address && legacyL.address.state ? legacyL.address.state : ""),
+        },
+        borough: String(legacyL && legacyL.borough ? legacyL.borough : ""),
+        lat: typeof (legacyL && legacyL.lat) === "number" ? legacyL.lat : 40.73,
+        lng: typeof (legacyL && legacyL.lng) === "number" ? legacyL.lng : -73.95,
+        createdAt: Number(legacyL && legacyL.createdAt ? legacyL.createdAt : now),
+      };
+    })
+    .filter((p) => p.address && p.address.line1);
+
+  // migrate reviews -> landlord reviews
+  const reviews = (legacy.reviews || [])
+    .map((r) => ({
+      id: String(r && r.id ? r.id : "r" + Math.random().toString(16).slice(2)),
+      targetType: "landlord",
+      targetId: String(r && r.landlordId ? r.landlordId : ""),
+      stars: Math.max(1, Math.min(5, Number(r && r.stars ? r.stars : 5))),
+      text: String(r && r.text ? r.text : ""),
+      createdAt: Number(r && r.createdAt ? r.createdAt : now),
+    }))
+    .filter((r) => r.targetId);
+
+  const reports = Array.isArray(legacy.reports) ? legacy.reports : [];
+  return normalizeDB({ landlords, properties, reviews, reports, flags: [], replies: [] });
 }
 
 let DB = loadDB();
@@ -188,14 +413,14 @@ let DB = loadDB();
 const $ = (sel, root = document) => root.querySelector(sel);
 
 function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
+  return String(s ?? "").replace(/[&<>"']/g, (c) => {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
 }
 
 function fmtDate(ts) {
   const d = new Date(ts);
-  return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
 function round1(n) {
@@ -206,29 +431,50 @@ function norm(s) {
   return String(s || "").trim().toLowerCase();
 }
 
+function idRand(prefix) {
+  return prefix + Math.random().toString(16).slice(2);
+}
+
+/* -----------------------------
+   Search haystacks
+------------------------------ */
 function landlordHaystack(l) {
-  return norm(`${l.name} ${l.entity || ""} ${l.address?.line1 || ""} ${l.address?.city || ""} ${l.address?.state || ""}`);
+  return norm(`${l.name} ${l.entity || ""}`);
+}
+
+function propertyHaystack(p) {
+  const a = p.address || {};
+  return norm(`${a.line1 || ""} ${a.unit || ""} ${a.city || ""} ${a.state || ""} ${p.borough || ""}`);
 }
 
 function findExactLandlord(query) {
   const q = norm(query);
   if (!q) return null;
-  const exact = DB.landlords.filter(l => norm(l.name) === q || norm(l.entity) === q);
-  if (exact.length === 1) return exact[0];
-  return null;
+  const exact = DB.landlords.filter((l) => norm(l.name) === q || norm(l.entity) === q);
+  return exact.length === 1 ? exact[0] : null;
 }
 
-/* Recency-weighted average:
-   weight halves every 180 days
-*/
+function findExactProperty(query) {
+  const q = norm(query);
+  if (!q) return null;
+  const exact = DB.properties.filter((p) => norm((p.address && p.address.line1) || "") === q);
+  return exact.length === 1 ? exact[0] : null;
+}
+
+/* -----------------------------
+   Ratings
+------------------------------ */
+/* Recency-weighted average (half-life 180 days) */
 function weightedAverageStars(reviews) {
   if (!reviews.length) return null;
   const now = Date.now();
   const halfLifeDays = 180;
-  let num = 0, den = 0;
+
+  let num = 0;
+  let den = 0;
 
   for (const r of reviews) {
-    const ageDays = Math.max(0, (now - r.createdAt) / (1000*60*60*24));
+    const ageDays = Math.max(0, (now - r.createdAt) / (1000 * 60 * 60 * 24));
     const w = Math.pow(0.5, ageDays / halfLifeDays);
     num += r.stars * w;
     den += w;
@@ -237,27 +483,30 @@ function weightedAverageStars(reviews) {
   return num / den;
 }
 
-function landlordReviews(landlordId) {
+function reviewsFor(targetType, targetId) {
   return DB.reviews
-    .filter(r => r.landlordId === landlordId)
-    .sort((a,b)=>b.createdAt-a.createdAt);
+    .filter((r) => r.targetType === targetType && r.targetId === targetId)
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
-function ratingStats(landlordId) {
-  const rs = landlordReviews(landlordId);
+function ratingStats(targetType, targetId) {
+  const rs = reviewsFor(targetType, targetId);
   const count = rs.length;
-  if (count === 0) return { count: 0, avg: null, avgRounded: null, dist: [0,0,0,0,0] };
+
+  if (count === 0) return { count: 0, avg: null, avgRounded: null, dist: [0, 0, 0, 0, 0] };
+
   const avg = weightedAverageStars(rs);
   const avgRounded = round1(avg);
-  const dist = [0,0,0,0,0];
+  const dist = [0, 0, 0, 0, 0];
   for (const r of rs) dist[r.stars - 1] += 1;
+
   return { count, avg, avgRounded, dist };
 }
 
 function cardTier(avgRounded, reviewCount) {
   if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
-
   const r = avgRounded;
+
   if (r >= 1.0 && r <= 2.99) return { tier: "red", label: "Low Rating", pillClass: "pill--red" };
   if (r > 2.99 && r <= 3.99) return { tier: "yellow", label: "Mixed Reviews", pillClass: "pill--yellow" };
   if (r >= 4.0 && r <= 5.0) return { tier: "green", label: "Highly Rated", pillClass: "pill--green" };
@@ -265,10 +514,10 @@ function cardTier(avgRounded, reviewCount) {
   return { tier: "none", label: "Unrated", pillClass: "" };
 }
 
-function casaCredential(landlordId) {
-  const rs = landlordReviews(landlordId);
+function casaCredentialForLandlord(landlordId) {
+  const rs = reviewsFor("landlord", landlordId);
   const now = Date.now();
-  const last12mo = rs.filter(r => (now - r.createdAt) <= 365*24*60*60*1000);
+  const last12mo = rs.filter((r) => now - r.createdAt <= 365 * 24 * 60 * 60 * 1000);
   const total = rs.length;
   const in12 = last12mo.length;
 
@@ -277,102 +526,89 @@ function casaCredential(landlordId) {
   return "CASA Rated";
 }
 
-/* badges */
-function badgesHTML(l) {
+/* -----------------------------
+   Badges
+------------------------------ */
+function badgeChipImg(src, alt, title) {
+  return `
+    <span class="badgeChip" title="${esc(title)}" aria-label="${esc(alt)}">
+      <img src="${esc(src)}" alt="${esc(alt)}" style="width:14px;height:14px;display:block;opacity:.95" />
+    </span>
+  `.trim();
+}
+
+function badgesHTMLForLandlord(l) {
   const parts = [];
-  if (l.verified) {
-    parts.push(
-      `<img class="badgeImg" src="assets/badge-verified.png" alt="Verified" title="Verified Landlord (ownership verified)" onerror="this.remove()"/>`
-    );
-  }
-  if (l.top) {
-    parts.push(
-      `<img class="badgeImg" src="assets/badge-top.png" alt="Top" title="Top Landlord (high rating + consistent performance)" onerror="this.remove()"/>`
-    );
-  }
+  if (l.verified) parts.push(badgeChipImg("assets/badge-verified.png", "Verified", "Verified Landlord (ownership verified)"));
+  if (l.top) parts.push(badgeChipImg("assets/badge-top.png", "Top", "Top Landlord (high rating + consistent performance)"));
   if (!parts.length) return "";
   return `<span class="badges">${parts.join("")}</span>`;
 }
+
+/* Brand font (matches header) */
 function casaBrandFontInlineCSS() {
-  // Matches .brand__name in styles.css
   return [
     "font-family: ui-serif, Georgia, 'Times New Roman', Times, serif",
     "font-style: italic",
     "font-weight: 650",
     "letter-spacing: -0.02em",
-    "text-transform: lowercase"
+    "text-transform: lowercase",
   ].join("; ");
 }
-function casaLogoSVGInline(size = 18) {
-  // Inline SVG (never broken, no external files)
-  return `
-<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none"
-     xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <path d="M10 18 C 24 9, 40 9, 54 18" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".95"/>
-  <path d="M12 26 C 25 18, 39 18, 52 26" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
-  <path d="M14 34 C 26 28, 38 28, 50 34" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".82"/>
-  <path d="M16 42 C 27 37, 37 37, 48 42" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".74"/>
-  <path d="M18 50 C 28 46, 36 46, 46 50" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".66"/>
-</svg>`.trim();
-}
 
+/* -----------------------------
+   Embed snippet (fractional stars)
+------------------------------ */
 function casaEmbedSnippetForLandlord(l) {
-  const st = ratingStats(l.id);
-
-  // Whole stars only (no half-stars)
-  // If unrated, show 0/5 and empty stars.
-  const whole = st.count ? Math.max(1, Math.min(5, Math.round(st.avg || 0))) : 0;
-
-  const starsText = "★".repeat(whole) + "☆".repeat(5 - whole);
-  // Use the real weighted average to support fractional stars
-  // If unrated: show 0.0 and empty stars
+  const st = ratingStats("landlord", l.id);
   const avg = st.count ? Number(st.avg || 0) : 0;
   const avgClamped = Math.max(0, Math.min(5, avg));
   const avgText = st.count ? avgClamped.toFixed(1) : "0.0";
 
   const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
   const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
-
   const brandCSS = casaBrandFontInlineCSS();
 
-  // --- SVG partial-star renderer (no external assets) ---
-  function starRowSVG(value, size = 16, gap = 4) {
+  function starRowSVG(value, px = 16, gap = 4) {
     const v = Math.max(0, Math.min(5, Number(value) || 0));
     const full = Math.floor(v);
     const frac = v - full;
 
     const starPath =
-      "M12 .9l3.09 6.26 6.91 1-5 4.87 1.18 6.87L12 16.93 5.82 19.9 7 13.03 2 8.16l6.91-1L12 .9z";
+      "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+
+    const scale = px / 24;
+    const step = px + gap;
+    const width = px * 5 + gap * 4;
 
     const stars = [];
     for (let i = 0; i < 5; i++) {
       let fillPct = 0;
       if (i < full) fillPct = 1;
       else if (i === full) fillPct = frac;
-      else fillPct = 0;
 
-      const id = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
-      const x = i * (size + gap);
+      const gid = `casaStarGrad_${Math.random().toString(16).slice(2)}_${i}`;
+      const x = i * step;
 
       stars.push(`
-        <g transform="translate(${x},0)">
+        <g transform="translate(${x},0) scale(${scale})">
           <defs>
-            <linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#b88900"/>
-              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="rgba(20,16,12,.22)"/>
+            <linearGradient id="${gid}" x1="0" y1="0" x2="24" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#b88900" stop-opacity="1"></stop>
+              <stop offset="${(fillPct * 100).toFixed(2)}%" stop-color="#15110e" stop-opacity="0.22"></stop>
             </linearGradient>
           </defs>
-          <path d="${starPath}" fill="url(#${id})" />
+          <path d="${starPath}" fill="url(#${gid})"></path>
         </g>
-      `.trim());
+      `);
     }
 
-    const width = 5 * size + 4 * gap;
-
     return `
-      <svg width="${width}" height="${size}" viewBox="0 0 ${width} ${size}"
-           xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
-           style="display:block;">
+      <svg width="${width}" height="${px}"
+           viewBox="0 0 ${width} ${px}"
+           xmlns="http://www.w3.org/2000/svg"
+           aria-hidden="true"
+           style="display:inline-block; vertical-align:middle;">
         ${stars.join("")}
       </svg>
     `.trim();
@@ -381,58 +617,59 @@ function casaEmbedSnippetForLandlord(l) {
   const starsSVG = starRowSVG(avgClamped, 16, 4);
 
   return `
-<a href="${profileURL}" target="_blank" rel="noopener noreferrer"
-   style="
-     display:inline-flex;
-     align-items:center;
-     gap:10px;
-     padding:10px 14px;
-     border-radius:999px;
-     border:1px solid rgba(20,16,12,.14);
-     background: rgba(255,255,255,.65);
-     text-decoration:none;
-     color: rgba(21,17,14,.9);
-     box-shadow: 0 10px 26px rgba(20,16,12,.06);
-     line-height:1;
-     white-space:nowrap;
-   ">
-  <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
-    Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
+    <a href="${profileURL}" target="_blank" rel="noopener noreferrer"
+       style="
+         display:inline-flex;
+         align-items:center;
+         gap:10px;
+         padding:10px 14px;
+         border-radius:999px;
+         border:1px solid rgba(20,16,12,.14);
+         background: rgba(255,255,255,.65);
+         text-decoration:none;
+         color: rgba(21,17,14,.9);
+         box-shadow: 0 10px 26px rgba(20,16,12,.06);
+         line-height:1;
+         white-space:nowrap;
+       ">
+      <span style="${brandCSS}; font-size:14px; display:inline-flex; align-items:baseline; white-space:nowrap;">
+        <span>Rated on&nbsp;</span><span style="${brandCSS};">casa</span>
+      </span>
 
-  <!-- Keep as a single flex child to avoid weird spacing -->
-  <span style="${brandCSS}; font-size:14px; display:inline-flex; align-items:baseline; white-space:nowrap;">
-    <span>Rated on&nbsp;</span><span style="${brandCSS};">casa</span>
-  </span>
-
-  <span style="
-     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-     font-weight: 900;
-     font-size:13px;
-     color: rgba(21,17,14,.72);
-     letter-spacing: 1px;
-     display:inline-flex;
-     align-items:center;
-     white-space:nowrap;
-   ">
-    • ${starsText} ${whole}/5
-    <span style="margin-right:8px;">•</span>
-    <span style="display:inline-flex; align-items:center;">${starsSVG}</span>
-    <span style="margin-left:8px;">${avgText}/5</span>
-  </span>
-</a>`.trim();
+      <span style="
+         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+         font-weight: 900;
+         font-size:13px;
+         color: rgba(21,17,14,.72);
+         display:inline-flex;
+         align-items:center;
+         white-space:nowrap;
+       ">
+        <span style="margin-right:8px;">•</span>
+        ${starsSVG}
+        <span style="margin-left:8px;">${avgText}/5</span>
+      </span>
+    </a>
+  `.trim();
 }
 
-/* NEW: report helper */
+/* -----------------------------
+   Reports
+------------------------------ */
 function reportFor(landlordId) {
-  return (DB.reports || []).find(r => r.landlordId === landlordId) || null;
+  return (DB.reports || []).find((r) => r.landlordId === landlordId) || null;
 }
 
-/* NEW: soft SEO title update */
+/* SEO title */
 function setPageTitle(title) {
   try {
     document.title = title ? `${title} • casa` : "casa";
   } catch {}
 }
+
+/* -----------------------------
+   Dropdown helpers
+------------------------------ */
 function closeInlineDropdown() {
   const dd = document.getElementById("moreDropdown");
   const btn = document.getElementById("moreBtn");
@@ -440,30 +677,26 @@ function closeInlineDropdown() {
   dd.style.display = "none";
   btn.setAttribute("aria-expanded", "false");
 }
-
 function toggleInlineDropdown() {
   const dd = document.getElementById("moreDropdown");
   const btn = document.getElementById("moreBtn");
   if (!dd || !btn) return;
-
   const isOpen = dd.style.display === "block";
-  if (isOpen) {
-    closeInlineDropdown();
-  } else {
+  if (isOpen) closeInlineDropdown();
+  else {
     dd.style.display = "block";
     btn.setAttribute("aria-expanded", "true");
   }
 }
 
 /* -----------------------------
-   Drawer (mobile menu)
+   Drawer (mobile) — safe if not present
 ------------------------------ */
 function initDrawer() {
   const btn = $("#menuBtn");
   const drawer = $("#drawer");
   const overlay = $("#drawerOverlay");
   const closeBtn = $("#drawerClose");
-
   if (!btn || !drawer || !overlay || !closeBtn) return;
 
   function open() {
@@ -482,7 +715,6 @@ function initDrawer() {
   btn.addEventListener("click", open);
   closeBtn.addEventListener("click", close);
   overlay.addEventListener("click", close);
-
   drawer.addEventListener("click", (e) => {
     const a = e.target.closest("[data-drawer-link]");
     if (a) close();
@@ -494,33 +726,22 @@ function initDrawer() {
 }
 
 /* -----------------------------
-   Modal
+   Modal — requires #modalOverlay (safe if absent)
 ------------------------------ */
 function openModal(innerHTML) {
   const overlay = $("#modalOverlay");
   if (!overlay) return;
 
-  overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true">
-      ${innerHTML}
-    </div>
-  `;
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerHTML}</div>`;
   overlay.classList.add("isOpen");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 
-  // HARDEN: remove any <img> tags inside modal content (prevents broken badge icons)
-  try {
-    overlay.querySelectorAll("img").forEach(img => img.remove());
-  } catch {}
-
-  // One-time click handler
   const handler = (e) => {
     if (e.target === overlay) closeModal();
   };
   overlay.addEventListener("click", handler, { once: true });
 }
-
 function closeModal() {
   const overlay = $("#modalOverlay");
   if (!overlay) return;
@@ -529,72 +750,87 @@ function closeModal() {
   overlay.innerHTML = "";
   document.body.style.overflow = "";
 }
+
+/* Embed modal */
 function openBadgeEmbedModal(landlordId) {
-  const l = DB.landlords.find(x => x.id === landlordId);
+  const l = DB.landlords.find((x) => x.id === landlordId);
   if (!l) return;
 
-const snippet = (typeof casaEmbedSnippetForLandlord === "function")
-  ? casaEmbedSnippetForLandlord(l)
-  : "";
-console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
+  const snippet = casaEmbedSnippetForLandlord(l);
 
   openModal(`
     <div class="modalHead">
       <div class="modalTitle">CASA badge embed</div>
-      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
+      <button class="iconBtn" id="mClose" aria-label="Close" type="button">×</button>
     </div>
 
     <div class="modalBody">
-      <div class="tiny" style="margin-bottom:10px;">
+      <div class="tiny" style="margin-bottom:12px;">
         Copy/paste this into a website or listing description. It links to your CASA profile.
       </div>
 
       <div class="field">
-        <label>Embed code</label>
-        <textarea class="textarea" id="embedBox" spellcheck="false">${esc(snippet)}</textarea>
-        <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-          <button class="btn btn--primary" id="copyEmbed">Copy</button>
-          <button class="btn" id="previewEmbed">Preview</button>
-        </div>
-      </div>
-
-      <div class="field" id="embedPreviewWrap" style="display:none;">
         <label>Preview</label>
         <div class="card" style="box-shadow:none;">
           <div class="pad" id="embedPreview"></div>
         </div>
       </div>
+
+      <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+        <button class="btn btn--primary" id="copyEmbed" type="button">Copy embed</button>
+        <button class="btn" id="toggleHTML" type="button">Show HTML</button>
+      </div>
+
+      <div class="field" id="htmlWrap" style="display:none;">
+        <label>HTML snippet</label>
+        <textarea class="textarea" id="embedBox" spellcheck="false" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="mDone" type="button">Close</button>
     </div>
   `);
 
-  $("#mClose")?.addEventListener("click", closeModal);
+  const mClose = $("#mClose");
+  const mDone = $("#mDone");
+  mClose && mClose.addEventListener("click", closeModal);
+  mDone && mDone.addEventListener("click", closeModal);
 
-  $("#copyEmbed")?.addEventListener("click", async () => {
-    const txt = $("#embedBox")?.value || snippet;
-    try {
-      await navigator.clipboard.writeText(txt);
-      alert("Copied!");
-    } catch {
-      // fallback
-      const ta = $("#embedBox");
-      if (ta) {
-        ta.focus();
-        ta.select();
-        document.execCommand("copy");
-        alert("Copied!");
+  const prev = $("#embedPreview");
+  if (prev) prev.innerHTML = snippet;
+
+  const box = $("#embedBox");
+  if (box) box.value = snippet;
+
+  const copyBtn = $("#copyEmbed");
+  copyBtn &&
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(snippet);
+        alert("Copied embed HTML!");
+      } catch {
+        try {
+          box && box.focus && box.focus();
+          box && box.select && box.select();
+          document.execCommand("copy");
+          alert("Copied embed HTML!");
+        } catch {
+          alert("Copy failed.");
+        }
       }
-    }
-  });
+    });
 
-  $("#previewEmbed")?.addEventListener("click", () => {
-    const wrap = $("#embedPreviewWrap");
-    const prev = $("#embedPreview");
-    if (!wrap || !prev) return;
-    wrap.style.display = "block";
-    // Render the HTML snippet safely in our own page context
-prev.innerHTML = snippet;
- prev.querySelectorAll("img").forEach(img => img.remove());    
-  });
+  const toggle = $("#toggleHTML");
+  toggle &&
+    toggle.addEventListener("click", () => {
+      const wrap = $("#htmlWrap");
+      const btn = $("#toggleHTML");
+      if (!wrap || !btn) return;
+      const shown = wrap.style.display !== "none";
+      wrap.style.display = shown ? "none" : "block";
+      btn.textContent = shown ? "Show HTML" : "Hide HTML";
+    });
 }
 
 /* -----------------------------
@@ -612,19 +848,22 @@ function initLeafletMap(el, center, zoom = 12) {
   }
 
   try {
+    // if re-rendering, Leaflet can complain — best effort reset
     if (el._leaflet_id) el._leaflet_id = null;
   } catch {}
 
   let map = null;
   try {
-    map = L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    map = window.L.map(el, { zoomControl: true, scrollWheelZoom: false }).setView(center, zoom);
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap"
+      attribution: "&copy; OpenStreetMap",
     }).addTo(map);
 
     setTimeout(() => {
-      try { map.invalidateSize(); } catch {}
+      try {
+        map.invalidateSize();
+      } catch {}
     }, 60);
 
     return map;
@@ -638,28 +877,25 @@ function initLeafletMap(el, center, zoom = 12) {
    Router
 ------------------------------ */
 function route() {
-  try {
-    const hash = location.hash || "#/";
-    const path = hash.replace("#", "");
-    const cleanPath = path.split("?")[0];
-    const parts = cleanPath.split("/").filter(Boolean);
-    const base = parts[0] || "";
-    const param = parts[1] || "";
+  const hash = location.hash || "#/";
+  const path = hash.replace("#", "");
+  const cleanPath = path.split("?")[0];
+  const parts = cleanPath.split("/").filter(Boolean);
 
-    if (!base) return renderHome();
-    if (base === "search") return renderSearch();
-    if (base === "add") return renderAdd();
-    if (base === "how") return renderHow();
-    if (base === "trust") return renderTrust();
-    if (base === "portal") return renderPortal();
-    if (base === "toolkit") return renderToolkit();
-    if (base === "landlord" && param) return renderLandlord(param);
+  const base = parts[0] || "";
+  const param = parts[1] || "";
 
-    renderHome();
-  } catch (e) {
-    console.error("Route error:", e);
-    renderHome();
-  }
+  if (!base) return renderHome();
+  if (base === "search") return renderSearch();
+  if (base === "add") return renderAdd();
+  if (base === "how") return renderHow();
+  if (base === "trust") return renderTrust();
+  if (base === "portal") return renderPortal();
+  if (base === "toolkit") return renderToolkit();
+  if (base === "landlord" && param) return renderLandlord(param);
+  if (base === "property" && param) return renderProperty(param);
+
+  renderHome();
 }
 
 window.addEventListener("hashchange", route);
@@ -669,73 +905,142 @@ window.addEventListener("load", () => {
 });
 
 /* -----------------------------
-   Components
+   Components: Stars / cards
 ------------------------------ */
-function landlordCardHTML(l, { showCenter = false, showView = true } = {}) {
-  const st = ratingStats(l.id);
+function starVisFromAvg(avgRounded) {
+  if (avgRounded == null) return "☆☆☆☆☆";
+  return avgRounded >= 4 ? "★★★★☆" : avgRounded >= 3 ? "★★★☆☆" : avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆";
+}
+
+function landlordCardHTML(l, opts = {}) {
+  const showView = opts && opts.showView === false ? false : true;
+
+  const st = ratingStats("landlord", l.id);
   const avg = st.avgRounded;
   const count = st.count;
 
   const tier = cardTier(avg ?? 0, count);
   const tintClass =
-    tier.tier === "green" ? "lc--green" :
-    tier.tier === "yellow" ? "lc--yellow" :
-    tier.tier === "red" ? "lc--red" : "";
+    tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
-  const avgText = (avg == null) ? "—" : avg.toFixed(1);
-  const starVis =
-    (avg == null) ? "☆☆☆☆☆" :
-    (avg >= 4 ? "★★★★☆" : avg >= 3 ? "★★★☆☆" : avg >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+  const avgText = avg == null ? "—" : avg.toFixed(1);
+  const stars = starVisFromAvg(avg);
 
-  const addr = `${esc(l.address?.line1 || "")} • ${esc(l.address?.city || "")} • ${esc(l.address?.state || "")} • ${esc(l.borough || "")}`.replace(/\s•\s$/,"");
+  const props = DB.properties.filter((p) => p.landlordId === l.id);
+  const propNote = props.length ? `${props.length} propert${props.length === 1 ? "y" : "ies"}` : "No properties yet";
 
   return `
     <div class="lc ${tintClass}">
       <div class="lcLeft">
         <div class="lcName">
           <span>${esc(l.name)}</span>
-          ${badgesHTML(l)}
+          ${badgesHTMLForLandlord(l)}
         </div>
-        <div class="lcMeta">${esc(addr)}</div>
+
+        <div class="lcMeta">${esc(l.entity || propNote)}</div>
 
         <div class="lcRow">
-          <span class="stars">${starVis}</span>
-          <span class="ratingNum">${avgText}</span>
-          <span class="muted">(${count} review${count===1?"":"s"})</span>
+          <span class="stars">${stars}</span>
+          <span class="ratingNum">${esc(avgText)}</span>
+          <span class="muted">(${count} review${count === 1 ? "" : "s"})</span>
         </div>
-
-        <div class="smallNote"></div>
       </div>
 
       <div class="lcRight">
-        ${count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
+        ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
         ${showView ? `<a class="btn btn--primary miniBtn" href="#/landlord/${esc(l.id)}">View</a>` : ``}
-        ${showCenter ? `<button class="btn miniBtn" data-center="${esc(l.id)}">Center on map</button>` : ``}
       </div>
     </div>
-  `;
+  `.trim();
+}
+
+function propertyCardHTML(p, opts = {}) {
+  const showView = opts && opts.showView === false ? false : true;
+
+  const st = ratingStats("property", p.id);
+  const avg = st.avgRounded;
+  const count = st.count;
+
+  const tier = cardTier(avg ?? 0, count);
+  const tintClass =
+    tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
+
+  const avgText = avg == null ? "—" : avg.toFixed(1);
+  const stars = starVisFromAvg(avg);
+
+  const a = p.address || {};
+  const addr = `${a.line1 || ""}${a.unit ? `, ${a.unit}` : ""} • ${a.city || ""} • ${a.state || ""}${p.borough ? ` • ${p.borough}` : ""}`.replace(
+    /\s•\s$/,
+    ""
+  );
+
+  const ll = DB.landlords.find((l) => l.id === p.landlordId);
+
+  return `
+    <div class="lc ${tintClass}">
+      <div class="lcLeft">
+        <div class="lcName">
+          <span>${esc(a.line1 || "Address")}${a.unit ? `, ${esc(a.unit)}` : ""}</span>
+        </div>
+
+        <div class="lcMeta">${esc(addr)}</div>
+
+        <div class="lcRow">
+          <span class="stars">${stars}</span>
+          <span class="ratingNum">${esc(avgText)}</span>
+          <span class="muted">(${count} review${count === 1 ? "" : "s"})</span>
+        </div>
+
+        <div class="tiny" style="margin-top:8px;">
+          Landlord: ${ll ? esc(ll.name) : "—"}
+        </div>
+      </div>
+
+      <div class="lcRight">
+        ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
+        ${showView ? `<a class="btn btn--primary miniBtn" href="#/property/${esc(p.id)}">View</a>` : ``}
+      </div>
+    </div>
+  `.trim();
 }
 
 /* -----------------------------
-   Highlights carousel
+   Highlights carousel (latest 5 across landlord+property)
 ------------------------------ */
 let carouselTimer = null;
 
 function highlightsData() {
   return DB.reviews
     .slice()
-    .sort((a,b)=>b.createdAt-a.createdAt)
+    .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5)
-    .map(r => {
-      const l = DB.landlords.find(x => x.id === r.landlordId);
-      return { r, l };
+    .map((r) => {
+      if (r.targetType === "landlord") {
+        const l = DB.landlords.find((x) => x.id === r.targetId);
+        return l
+          ? {
+              r,
+              kind: "landlord",
+              title: l.name,
+              href: `#/landlord/${l.id}`,
+              badgeHTML: badgesHTMLForLandlord(l),
+            }
+          : null;
+      }
+      if (r.targetType === "property") {
+        const p = DB.properties.find((x) => x.id === r.targetId);
+        if (!p) return null;
+        const a = p.address || {};
+        const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+        return { r, kind: "property", title, href: `#/property/${p.id}`, badgeHTML: "" };
+      }
+      return null;
     })
-    .filter(x => x.l);
+    .filter(Boolean);
 }
 
 function renderHighlightsCarousel() {
   const items = highlightsData();
-
   if (items.length === 0) {
     return `
       <div class="carousel">
@@ -743,60 +1048,59 @@ function renderHighlightsCarousel() {
           <div class="muted">No highlights yet.</div>
         </div>
       </div>
-    `;
+    `.trim();
   }
 
-  const slides = items.map(({r,l}) => {
-    const st = ratingStats(l.id);
-    const tier = cardTier(st.avgRounded ?? 0, st.count);
-    const tintClass =
-      tier.tier === "green" ? "lc--green" :
-      tier.tier === "yellow" ? "lc--yellow" :
-      tier.tier === "red" ? "lc--red" : "";
+  const slides = items
+    .map((it) => {
+      const r = it.r;
+      const st = ratingStats(r.targetType, r.targetId);
+      const tier = cardTier(st.avgRounded ?? 0, st.count);
+      const tintClass =
+        tier.tier === "green" ? "lc--green" : tier.tier === "yellow" ? "lc--yellow" : tier.tier === "red" ? "lc--red" : "";
 
-    const avgText = (st.avgRounded == null) ? "—" : st.avgRounded.toFixed(1);
-    const starVis =
-      (st.avgRounded == null) ? "☆☆☆☆☆" :
-      (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+      const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+      const starVis = starVisFromAvg(st.avgRounded);
 
-    return `
-      <div class="carouselSlide">
-        <div class="lc ${tintClass}">
-          <div class="lcLeft">
-            <div class="lcName">
-              <span>${esc(l.name)}</span>
-              ${badgesHTML(l)}
+      return `
+        <div class="carouselSlide">
+          <div class="lc ${tintClass}">
+            <div class="lcLeft">
+              <div class="lcName">
+                <span>${esc(it.title)}</span>
+                ${it.badgeHTML || ""}
+              </div>
+              <div class="lcMeta">${esc(fmtDate(r.createdAt))}</div>
+
+              <div class="lcRow">
+                <span class="stars">${starVis}</span>
+                <span class="ratingNum">${esc(avgText)}</span>
+                <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
+              </div>
+
+              <div class="smallNote">${esc(r.text)}</div>
             </div>
-            <div class="lcMeta">${fmtDate(r.createdAt)}</div>
 
-            <div class="lcRow">
-              <span class="stars">${starVis}</span>
-              <span class="ratingNum">${avgText}</span>
-              <span class="muted">(${st.count} review${st.count===1?"":"s"})</span>
+            <div class="lcRight">
+              ${st.count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
+              <a class="btn btn--primary miniBtn" href="${esc(it.href)}">View</a>
             </div>
-
-            <div class="smallNote">${esc(r.text)}</div>
-            <div class="smallNote"></div>
-          </div>
-          <div class="lcRight">
-            ${st.count ? `<span class="pill ${tier.pillClass}">${tier.label}</span>` : `<span class="pill">Unrated</span>`}
-            <a class="btn btn--primary miniBtn" href="#/landlord/${esc(l.id)}">View</a>
           </div>
         </div>
-      </div>
-    `;
-  }).join("");
+      `.trim();
+    })
+    .join("");
 
-  const dots = items.map((_, i) =>
-    `<span class="dot ${i===0?"isActive":""}" data-dot="${i}" aria-label="Go to slide ${i+1}"></span>`
-  ).join("");
+  const dots = items
+    .map((_, i) => `<span class="dot ${i === 0 ? "isActive" : ""}" data-dot="${i}" aria-label="Go to slide ${i + 1}"></span>`)
+    .join("");
 
   return `
     <div class="carousel" id="highCarousel">
       <div class="carouselTrack" id="highTrack">${slides}</div>
       <div class="dots" id="highDots">${dots}</div>
     </div>
-  `;
+  `.trim();
 }
 
 function setupCarousel() {
@@ -822,28 +1126,37 @@ function setupCarousel() {
   }
 
   dots.forEach((d) => d.addEventListener("click", () => go(Number(d.dataset.dot))));
-
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(() => go(idx + 1), 4500);
 }
 
 /* -----------------------------
-   Pages base shell
+   Shell + query params
 ------------------------------ */
 function renderShell(content) {
   const app = $("#app");
   if (!app) return;
+
   app.innerHTML = `
     ${content}
     <div class="footer">
       <div>© ${new Date().getFullYear()} casa</div>
-      <div style="display:flex;gap:14px;align-items:center">
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
         <a href="#/trust">Trust &amp; Safety</a>
         <a href="#/how">How it works</a>
+        <a href="#/toolkit">Tenant Toolkit</a>
         <a href="#/search">Search</a>
       </div>
     </div>
   `;
+}
+
+function getQueryParam(name) {
+  const hash = location.hash || "";
+  const qIndex = hash.indexOf("?");
+  if (qIndex === -1) return "";
+  const params = new URLSearchParams(hash.slice(qIndex + 1));
+  return params.get(name) || "";
 }
 
 /* -----------------------------
@@ -851,6 +1164,7 @@ function renderShell(content) {
 ------------------------------ */
 function renderHome() {
   setPageTitle("Know your landlord");
+
   const content = `
     <section class="pageCard card">
       <div class="pad">
@@ -860,7 +1174,7 @@ function renderHome() {
 
         <div class="heroSearch">
           <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
-          <button class="btn btn--primary" id="homeSearch">Search</button>
+          <button class="btn btn--primary" id="homeSearch" type="button">Search</button>
           <a class="btn" href="#/add">Add a landlord</a>
         </div>
 
@@ -871,23 +1185,18 @@ function renderHome() {
         <div class="tileRow">
           <div class="tile" data-home-tile="search">
             <div class="tile__icon">⌕</div>
-            <div>
-              <div class="tile__label">Search</div>
-            </div>
+            <div><div class="tile__label">Search</div></div>
           </div>
           <div class="tile" data-home-tile="review">
             <div class="tile__icon">★</div>
-            <div>
-              <div class="tile__label">Review</div>
-            </div>
+            <div><div class="tile__label">Review</div></div>
           </div>
           <div class="tile tile--disabled">
             <div class="tile__icon">⌂</div>
-            <div>
-              <div class="tile__label">Rent</div>
-            </div>
+            <div><div class="tile__label">Rent</div></div>
           </div>
         </div>
+
         <div class="tilePanel" id="tilePanel" style="display:none"></div>
       </div>
     </section>
@@ -899,7 +1208,7 @@ function renderHome() {
             <div>
               <div class="kicker">Featured reviews</div>
               <h2 class="sectionTitle">Recent highlights</h2>
-              <div class="sectionDesc">Browse ratings and landlord profiles.</div>
+              <div class="sectionDesc">Browse ratings and profiles.</div>
             </div>
             <a class="btn miniBtn" href="#/search">Browse all</a>
           </div>
@@ -916,7 +1225,7 @@ function renderHome() {
             <div>
               <div class="kicker">Map</div>
               <h2 class="sectionTitle">Browse by location</h2>
-              <div class="sectionDesc">Pins reflect existing ratings.</div>
+              <div class="sectionDesc">Pins reflect address ratings.</div>
             </div>
             <a class="btn miniBtn" href="#/search">Open search</a>
           </div>
@@ -930,46 +1239,63 @@ function renderHome() {
       </div>
     </section>
   `;
+
   renderShell(content);
 
   const tilePanel = $("#tilePanel");
-  document.querySelectorAll("[data-home-tile]").forEach(el => {
+  document.querySelectorAll("[data-home-tile]").forEach((el) => {
     el.addEventListener("click", () => {
       const k = el.dataset.homeTile;
       if (!tilePanel) return;
       tilePanel.style.display = "block";
-      if (k === "search") tilePanel.textContent = "Search by name, entity or address";
-      if (k === "review") tilePanel.textContent = "Leave a rating based on select categories";
+      if (k === "search") tilePanel.textContent = "Search by landlord name, entity, or address — then pick Landlord or Address.";
+      if (k === "review") tilePanel.textContent = "Leave a public star rating (no account required).";
     });
   });
 
-  $("#homeSearch")?.addEventListener("click", () => {
-    const q = $("#homeQ")?.value?.trim?.() || "";
+  const homeSearch = $("#homeSearch");
+  const homeQ = $("#homeQ");
 
-    const exact = findExactLandlord(q);
-    if (exact) {
-      location.hash = `#/landlord/${exact.id}`;
-      return;
-    }
-    location.hash = `#/search?q=${encodeURIComponent(q)}`;
-  });
+  homeSearch &&
+    homeSearch.addEventListener("click", () => {
+      const q = homeQ && homeQ.value ? String(homeQ.value).trim() : "";
+      const exactL = findExactLandlord(q);
+      if (exactL) {
+        location.hash = `#/landlord/${exactL.id}`;
+        return;
+      }
+      const exactP = findExactProperty(q);
+      if (exactP) {
+        location.hash = `#/property/${exactP.id}`;
+        return;
+      }
+      location.hash = `#/search?q=${encodeURIComponent(q)}`;
+    });
 
-  $("#homeQ")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#homeSearch")?.click();
-  });
+  homeQ &&
+    homeQ.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") homeSearch && homeSearch.click();
+    });
 
+  // Map pins (properties)
   setTimeout(() => {
     const mapEl = $("#homeMap");
     if (!mapEl) return;
+
     const map = initLeafletMap(mapEl, [40.73, -73.95], 11);
     if (!map) return;
 
-    for (const l of DB.landlords) {
-      if (typeof l.lat === "number" && typeof l.lng === "number") {
-        const st = ratingStats(l.id);
+    for (const p of DB.properties) {
+      if (typeof p.lat === "number" && typeof p.lng === "number") {
+        const a = p.address || {};
+        const st = ratingStats("property", p.id);
         const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
+        const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+
         try {
-          L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
+          window.L.marker([p.lat, p.lng])
+            .addTo(map)
+            .bindPopup(`<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`);
         } catch {}
       }
     }
@@ -979,18 +1305,7 @@ function renderHome() {
 }
 
 /* -----------------------------
-   Query params
------------------------------- */
-function getQueryParam(name) {
-  const hash = location.hash || "";
-  const qIndex = hash.indexOf("?");
-  if (qIndex === -1) return "";
-  const params = new URLSearchParams(hash.slice(qIndex + 1));
-  return params.get(name) || "";
-}
-
-/* -----------------------------
-   SEARCH
+   SEARCH (Split columns: Landlords + Addresses)
 ------------------------------ */
 function renderSearch() {
   setPageTitle("Search");
@@ -1002,8 +1317,8 @@ function renderSearch() {
         <div class="topRow">
           <div>
             <div class="kicker">Search</div>
-            <div class="pageTitle">Find a landlord</div>
-            <div class="pageSub">Search by name, entity or address. Filter by borough.</div>
+            <div class="pageTitle">Find a landlord or address</div>
+            <div class="pageSub">Results are split: Landlords (left) and Addresses (right).</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
@@ -1018,7 +1333,7 @@ function renderSearch() {
             <option>Bronx</option>
             <option>Staten Island</option>
           </select>
-          <button class="btn btn--primary" id="doSearch">Search</button>
+          <button class="btn btn--primary" id="doSearch" type="button">Search</button>
         </div>
 
         <div class="mapBox" style="margin-top:14px;">
@@ -1026,26 +1341,50 @@ function renderSearch() {
         </div>
 
         <div class="hr"></div>
-        <div class="list" id="results"></div>
+
+        <div class="splitRow" style="margin-top:0;">
+          <div>
+            <div class="kicker">Landlords</div>
+            <div class="list" id="landlordResults" style="margin-top:10px;"></div>
+          </div>
+          <div>
+            <div class="kicker">Addresses</div>
+            <div class="list" id="propertyResults" style="margin-top:10px;"></div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="tiny">
+          Tip: If you don’t see an address, add it from <a href="#/add">Add Landlord</a>.
+        </div>
       </div>
     </section>
   `;
+
   renderShell(content);
 
   const qEl = $("#searchQ");
   const bEl = $("#searchB");
-  const resultsEl = $("#results");
-  if (!qEl || !bEl || !resultsEl) return;
+  const lResEl = $("#landlordResults");
+  const pResEl = $("#propertyResults");
+  const doBtn = $("#doSearch");
+
+  if (!qEl || !bEl || !lResEl || !pResEl) return;
 
   qEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#doSearch")?.click();
+    if (e.key === "Enter") doBtn && doBtn.click();
   });
 
-  function matches(l, query, borough) {
+  function matchesLandlord(l, query) {
     const t = (query || "").toLowerCase();
-    const hay = `${l.name} ${l.entity || ""} ${l.address?.line1 || ""} ${l.address?.city || ""} ${l.address?.state || ""}`.toLowerCase();
+    const hay = landlordHaystack(l);
+    return !t || hay.includes(t);
+  }
+  function matchesProperty(p, query, borough) {
+    const t = (query || "").toLowerCase();
+    const hay = propertyHaystack(p);
     const qOk = !t || hay.includes(t);
-    const bOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
+    const bOk = !borough || String(p.borough || "").toLowerCase() === String(borough).toLowerCase();
     return qOk && bOk;
   }
 
@@ -1057,83 +1396,85 @@ function renderSearch() {
       .replace(/[^\w\s]/g, "");
   }
 
-  function run() {
+  function runSearchAndRender() {
     const query = qEl.value.trim();
     const borough = bEl.value;
 
-    const normalList = DB.landlords.filter(l => matches(l, query, borough));
-
+    // Exact: landlord name/entity
     const nq = normalizeName(query);
-    const exactMatches = !nq ? [] : DB.landlords.filter(l => {
-      const nameOk = normalizeName(l.name) === nq;
-      const boroughOk = !borough || (String(l.borough || "").toLowerCase() === String(borough).toLowerCase());
-      return nameOk && boroughOk;
-    });
-
-    if (exactMatches.length === 1) {
-      location.hash = `#/landlord/${encodeURIComponent(exactMatches[0].id)}`;
+    const exactLandlords = !nq
+      ? []
+      : DB.landlords.filter((l) => normalizeName(l.name) === nq || (l.entity && normalizeName(l.entity) === nq));
+    if (exactLandlords.length === 1) {
+      location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`;
       return;
     }
 
-    const listToShow = exactMatches.length >= 2 ? exactMatches : normalList;
+    // Exact: address line1
+    const exactProps = !nq
+      ? []
+      : DB.properties.filter((p) => {
+          const a = p.address || {};
+          const addrOk = normalizeName(a.line1 || "") === nq;
+          const boroughOk = !borough || String(p.borough || "").toLowerCase() === String(borough).toLowerCase();
+          return addrOk && boroughOk;
+        });
+    if (exactProps.length === 1) {
+      location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`;
+      return;
+    }
 
-    resultsEl.innerHTML = listToShow.length
-      ? listToShow.map(l => landlordCardHTML(l, { showCenter: true, showView: true })).join("")
-      : `<div class="muted">No results.</div>`;
+    const landlords = DB.landlords.filter((l) => matchesLandlord(l, query));
+    const props = DB.properties.filter((p) => matchesProperty(p, query, borough));
 
+    lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
+    pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
+
+    // Map: plot properties only (addresses)
     const mapEl = $("#searchMap");
     if (mapEl) mapEl.innerHTML = "";
-
     const map = initLeafletMap(mapEl, [40.73, -73.95], 10);
     if (!map) return;
 
-    const markers = new Map();
-    for (const l of listToShow) {
-      if (typeof l.lat === "number" && typeof l.lng === "number") {
-        const st = ratingStats(l.id);
+    for (const p of props) {
+      if (typeof p.lat === "number" && typeof p.lng === "number") {
+        const a = p.address || {};
+        const st = ratingStats("property", p.id);
         const label = st.avgRounded == null ? "Unrated" : `${st.avgRounded.toFixed(1)} (${st.count})`;
+        const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
         try {
-          const m = L.marker([l.lat, l.lng]).addTo(map).bindPopup(`<b>${esc(l.name)}</b><br/>${esc(label)}`);
-          markers.set(l.id, m);
+          window.L.marker([p.lat, p.lng])
+            .addTo(map)
+            .bindPopup(`<b>${esc(title)}</b><br/>${esc(label)}<br/><a href="#/property/${esc(p.id)}">View</a>`);
         } catch {}
       }
     }
-
-    document.querySelectorAll("[data-center]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.center;
-        const l = DB.landlords.find(x => x.id === id);
-        if (!l || typeof l.lat !== "number" || typeof l.lng !== "number") return;
-        try {
-          map.setView([l.lat, l.lng], 14, { animate: true });
-          markers.get(id)?.openPopup();
-        } catch {}
-      });
-    });
   }
 
-  $("#doSearch")?.addEventListener("click", () => {
-    const query = qEl.value.trim();
-    location.hash = `#/search?q=${encodeURIComponent(query)}`;
-    run();
-  });
+  doBtn &&
+    doBtn.addEventListener("click", () => {
+      const query = qEl.value.trim();
+      location.hash = `#/search?q=${encodeURIComponent(query)}`;
+      runSearchAndRender();
+    });
 
-  run();
+  runSearchAndRender();
 }
 
 /* -----------------------------
-   ADD
+   ADD (adds landlord + first property)
 ------------------------------ */
 function renderAdd() {
   setPageTitle("Add a landlord");
+
   const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Add</div>
-            <div class="pageTitle">Add a landlord</div>
-            <div class="pageSub">Add the landlord first. You can rate them immediately after.</div>
+            <div class="pageTitle">Add a landlord + address</div>
+            <div class="pageSub">Add the landlord once, then add one address (you can add more later).</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
@@ -1150,6 +1491,8 @@ function renderAdd() {
                 <label>Entity (optional)</label>
                 <input class="input" id="le" placeholder="e.g., Park Ave Management LLC" />
               </div>
+
+              <div class="hr"></div>
 
               <div class="field">
                 <label>Address <span style="color:#b91c1c">*</span></label>
@@ -1171,8 +1514,22 @@ function renderAdd() {
                 <input class="input" id="state" placeholder="NY" />
               </div>
 
-              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="addBtn">Add landlord</button>
-              <div class="tiny" style="margin-top:10px;">After adding, you’ll be taken to the landlord page where you can rate them.</div>
+              <div class="field">
+                <label>Borough (optional)</label>
+                <select class="input" id="bor">
+                  <option value="">—</option>
+                  <option>Manhattan</option>
+                  <option>Brooklyn</option>
+                  <option>Queens</option>
+                  <option>Bronx</option>
+                  <option>Staten Island</option>
+                </select>
+              </div>
+
+              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="addBtn" type="button">Add</button>
+              <div class="tiny" style="margin-top:10px;">
+                After adding, you’ll land on the Address page so you can review the building.
+              </div>
             </div>
           </div>
 
@@ -1190,6 +1547,7 @@ function renderAdd() {
       </div>
     </section>
   `;
+
   renderShell(content);
 
   let picked = null;
@@ -1203,713 +1561,813 @@ function renderAdd() {
       picked = { lat: e.latlng.lat, lng: e.latlng.lng };
       try {
         if (marker) marker.remove();
-        marker = L.marker([picked.lat, picked.lng]).addTo(map);
+        marker = window.L.marker([picked.lat, picked.lng]).addTo(map);
       } catch {}
     });
   }, 0);
 
-  $("#addBtn")?.addEventListener("click", () => {
-    const name = $("#ln")?.value?.trim?.() || "";
-    const entity = $("#le")?.value?.trim?.() || "";
-    const line1 = $("#a1")?.value?.trim?.() || "";
-    const unit = $("#unit")?.value?.trim?.() || "";
-    const city = $("#city")?.value?.trim?.() || "";
-    const state = $("#state")?.value?.trim?.() || "";
+  const addBtn = $("#addBtn");
+  addBtn &&
+    addBtn.addEventListener("click", () => {
+      const name = $("#ln") && $("#ln").value ? $("#ln").value.trim() : "";
+      const entity = $("#le") && $("#le").value ? $("#le").value.trim() : "";
 
-    if (!name || !line1 || !city || !state) {
-      alert("Please fill required fields: Name, Address, City, State.");
-      return;
-    }
+      const line1 = $("#a1") && $("#a1").value ? $("#a1").value.trim() : "";
+      const unit = $("#unit") && $("#unit").value ? $("#unit").value.trim() : "";
+      const city = $("#city") && $("#city").value ? $("#city").value.trim() : "";
+      const state = $("#state") && $("#state").value ? $("#state").value.trim() : "";
+      const borough = $("#bor") ? $("#bor").value : "";
 
-    const id = "l" + Math.random().toString(16).slice(2);
-    const l = {
-      id,
-      name,
-      entity,
-      address: { line1, unit, city, state },
-      borough: "",
-      lat: picked?.lat ?? 40.73,
-      lng: picked?.lng ?? -73.95,
-      verified: false,
-      top: false,
-      createdAt: Date.now()
-    };
+      if (!name || !line1 || !city || !state) {
+        alert("Please fill required fields: Name, Address, City, State.");
+        return;
+      }
 
-    DB.landlords.unshift(l);
+      // reuse landlord if exact match exists
+      const existing = findExactLandlord(name) || null;
+      const landlordId = existing ? existing.id : idRand("l");
 
-    /* auto create a default report object so profile never looks empty */
-    DB.reports = DB.reports || [];
-    DB.reports.push({
-      landlordId: id,
-      updatedAt: Date.now(),
-      violations_12mo: 0,
-      complaints_12mo: 0,
-      bedbug_reports_12mo: 0,
-      hp_actions: 0,
-      permits_open: 0,
-      eviction_filings_12mo: 0,
-      notes: "Demo report. Production: public datasets + sources."
+      if (!existing) {
+        DB.landlords.unshift({
+          id: landlordId,
+          name,
+          entity,
+          verified: false,
+          top: false,
+          createdAt: Date.now(),
+        });
+
+        DB.reports = DB.reports || [];
+        DB.reports.push({
+          landlordId,
+          updatedAt: Date.now(),
+          violations_12mo: 0,
+          complaints_12mo: 0,
+          bedbug_reports_12mo: 0,
+          hp_actions: 0,
+          permits_open: 0,
+          eviction_filings_12mo: 0,
+          notes: "Demo report. Production: public datasets + sources.",
+        });
+      }
+
+      // create property
+      const propertyId = idRand("p");
+      DB.properties.unshift({
+        id: propertyId,
+        landlordId,
+        address: { line1, unit, city, state },
+        borough,
+        lat: picked && typeof picked.lat === "number" ? picked.lat : 40.73,
+        lng: picked && typeof picked.lng === "number" ? picked.lng : -73.95,
+        createdAt: Date.now(),
+      });
+
+      saveDB(DB);
+      location.hash = `#/property/${propertyId}`;
     });
-
-    saveDB(DB);
-
-    location.hash = `#/landlord/${id}`;
-  });
 }
 
 /* -----------------------------
-   HOW + TRUST + PORTAL
+   HOW / TRUST / PORTAL
 ------------------------------ */
 function renderHow() {
   setPageTitle("How it works");
-  const content = `
+  renderShell(`
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">How it works</div>
             <div class="pageTitle">Simple, fast, and public</div>
-            <div class="pageSub">No reviewer accounts. Landlords verify to respond.</div>
+            <div class="pageSub">No reviewer accounts. Landlords verify to respond (coming soon).</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
-
         <div class="hr"></div>
-
         <div class="muted" style="font-weight:700;line-height:1.5">
-          <div><b>Search</b><br/>Find a landlord by name, entity, address, or borough.</div>
+          <div><b>Search</b><br/>Look up a landlord or an address.</div>
           <div style="margin-top:10px"><b>Review</b><br/>Post instantly. (No account required.)</div>
-          <div style="margin-top:10px"><b>Respond</b><br/>Verified landlords can reply inline under reviews (coming soon).</div>
-          <div style="margin-top:10px"><b>Report issues</b><br/>Spam, harassment, and personal info can be reported for moderation.</div>
+          <div style="margin-top:10px"><b>Choose target</b><br/>Rate the <b>landlord</b> or the <b>building</b> separately.</div>
+          <div style="margin-top:10px"><b>Report</b><br/>Spam, harassment, and personal info can be reported for moderation.</div>
         </div>
       </div>
     </section>
-  `;
-  renderShell(content);
+  `);
 }
 
 function renderTrust() {
   setPageTitle("Trust & Safety");
-  const content = `
+  renderShell(`
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Trust & Safety</div>
             <div class="pageTitle">Built for accuracy and accountability</div>
-            <div class="pageSub">Clear rules + verified landlord responses.</div>
+            <div class="pageSub">Clear rules + verified landlord responses (coming soon).</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
-
         <div class="hr"></div>
-
-        <div class="muted" style="font-weight:700;line-height:1.55">
+        <div class="muted" style="font-weight:800;line-height:1.55">
           <div><b>No reviewer accounts</b><br/>Tenants can post without accounts.</div>
-          <div style="margin-top:10px"><b>Verified landlord responses</b><br/>Landlords upload documentation and are reviewed before responding publicly.</div>
           <div style="margin-top:10px"><b>No doxxing</b><br/>Do not post phone numbers, emails, or private details.</div>
-          <div style="margin-top:10px"><b>Reporting</b><br/>Spam, harassment, and inaccurate listings can be reported for moderation.</div>
+          <div style="margin-top:10px"><b>Reporting</b><br/>Spam, harassment, and inaccurate listings can be reported.</div>
         </div>
       </div>
     </section>
-  `;
-  renderShell(content);
+  `);
 }
 
 function renderPortal() {
   setPageTitle("Landlord Portal");
-  const content = `
+  renderShell(`
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Landlord Portal</div>
             <div class="pageTitle">Sign in</div>
-            <div class="pageSub">Landlords verify documents before responding publicly.</div>
+            <div class="pageSub">Demo UI only (plug in real auth later).</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
-
-        <div class="portalGrid">
-          <div class="card" style="box-shadow:none;">
-            <div class="pad">
-              <div class="kicker">Sign in</div>
-
-              <div class="field">
-                <label>Email</label>
-                <input class="input" id="pe" placeholder="you@company.com" />
-              </div>
-              <div class="field">
-                <label>Password</label>
-                <input class="input" id="pp" type="password" placeholder="Password" />
-              </div>
-
-              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="psignin">Sign in</button>
-
-              <div class="tiny" style="text-align:center;margin-top:12px;">or continue with</div>
-
-              <div class="oauth">
-                <button class="oauthBtn" id="oauthGoogle">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23EA4335' d='M24 9.5c3.54 0 6.72 1.22 9.23 3.23l6.9-6.9C35.9 2.33 30.3 0 24 0 14.6 0 6.5 5.38 2.57 13.22l8.02 6.23C12.54 13.04 17.8 9.5 24 9.5z'/><path fill='%234285F4' d='M46.5 24c0-1.57-.14-3.08-.4-4.55H24v9.1h12.7c-.55 2.96-2.2 5.47-4.7 7.16l7.2 5.6C43.6 38.3 46.5 31.7 46.5 24z'/><path fill='%2334A853' d='M10.6 28.45a14.9 14.9 0 0 1 0-8.9l-8.02-6.23A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.57 10.78l8.03-6.33z'/><path fill='%23FBBC05' d='M24 48c6.3 0 11.6-2.08 15.47-5.64l-7.2-5.6c-2 1.35-4.6 2.15-8.27 2.15-6.2 0-11.46-3.54-13.4-8.46l-8.03 6.33C6.5 42.62 14.6 48 24 48z'/></svg>"/>
-                  Continue with Google
-                </button>
-                <button class="oauthBtn" id="oauthApple">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path fill='%23000' d='M16.365 1.43c0 1.14-.414 2.208-1.243 3.105-.997 1.072-2.61 1.9-4.01 1.785-.174-1.156.33-2.326 1.19-3.26.93-1.01 2.55-1.76 4.063-1.63zM20.5 17.38c-.49 1.13-1.08 2.16-1.78 3.09-.95 1.27-1.73 2.15-2.92 2.17-1.14.02-1.51-.75-2.98-.75-1.47 0-1.89.73-2.96.77-1.15.04-2.03-1.05-2.98-2.32C1.9 19.02 0 15.7 0 12.5c0-3.13 1.99-4.8 3.93-4.8 1.23 0 2.25.83 2.98.83.7 0 2.02-1.03 3.4-.88.58.03 2.22.24 3.27 1.8-.08.05-1.95 1.14-1.93 3.4.03 2.7 2.35 3.6 2.38 3.62z'/></svg>"/>
-                  Continue with Apple
-                </button>
-                <button class="oauthBtn" id="oauthMicrosoft">
-                  <img alt="" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 48 48'><path fill='%23F25022' d='M6 6h17v17H6z'/><path fill='%237FBA00' d='M25 6h17v17H25z'/><path fill='%2300A4EF' d='M6 25h17v17H6z'/><path fill='%23FFB900' d='M25 25h17v17H25z'/></svg>"/>
-                  Continue with Microsoft
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="card" style="box-shadow:none;">
-            <div class="pad">
-              <div class="kicker">Create account</div>
-
-              <div class="field">
-                <label>Email</label>
-                <input class="input" id="se" placeholder="you@company.com" />
-              </div>
-              <div class="field">
-                <label>Password</label>
-                <input class="input" id="sp" type="password" placeholder="Create a password" />
-              </div>
-
-              <div class="field">
-                <label>Verification document (demo)</label>
-
-                <div class="fileRow">
-                  <div class="fileName" id="fileName">No file chosen</div>
-                  <label class="filePick" for="doc">Choose file</label>
-                  <input id="doc" type="file" />
-                </div>
-
-                <div class="tiny" style="margin-top:8px;">Deed, property tax bill, management agreement, utility statement, etc.</div>
-              </div>
-
-              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="signup">Create account</button>
-              <div class="tiny" style="margin-top:10px;">Demo mode: accounts are not persisted. (Production: Stripe subscription required to claim/verify.)</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card" style="box-shadow:none;margin-top:14px;">
-          <div class="pad">
-            <div style="font-weight:900">Plans (demo copy)</div>
-            <div class="muted" style="margin-top:4px;font-weight:800">
-              Claimed — $39/mo • Verified — $99/mo • Certified/Pro — $299/mo
-            </div>
-            <div class="tiny" style="margin-top:6px;">Landlords must subscribe to claim or verify.</div>
-          </div>
+        <div class="hr"></div>
+        <div class="muted" style="font-weight:800;line-height:1.55">
+          This page is intentionally minimal to preserve your theme while keeping navigation functional.
         </div>
       </div>
     </section>
-  `;
-  renderShell(content);
-
-  const doc = $("#doc");
-  const fileName = $("#fileName");
-  doc?.addEventListener("change", () => {
-    if (!fileName) return;
-    fileName.textContent = doc.files?.[0]?.name || "No file chosen";
-  });
-
-  const demo = (label) => alert(`${label} (demo)`);
-  ["oauthGoogle","oauthApple","oauthMicrosoft"].forEach(id=>{
-    $("#"+id)?.addEventListener("click", ()=>demo("OAuth sign-in"));
-  });
-  $("#psignin")?.addEventListener("click", ()=>demo("Sign in"));
-  $("#signup")?.addEventListener("click", ()=>demo("Create account"));
+  `);
 }
 
 /* -----------------------------
-   NEW: Tenant Toolkit (market expansion wedge)
+   TENANT TOOLKIT (real + usable)
 ------------------------------ */
 function renderToolkit() {
   setPageTitle("Tenant Toolkit");
+
+  const card = (city, subtitle, rows) => `
+    <div class="toolkitItem">
+      <div class="kicker">${esc(city)}</div>
+      <div style="margin-top:6px;font-weight:950;letter-spacing:-.02em">${esc(subtitle)}</div>
+      <div class="hr" style="margin:12px 0"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${rows
+          .map(
+            (r) => `
+          <a class="btn" href="${esc(r.href)}" target="_blank" rel="noopener noreferrer"
+             style="justify-content:space-between; box-shadow:none; background: rgba(255,255,255,.60);">
+            <span>${esc(r.label)}</span>
+            <span class="muted" style="font-weight:850">↗</span>
+          </a>
+        `
+          )
+          .join("")}
+      </div>
+      <div class="tiny" style="margin-top:12px; line-height:1.45;">
+        These are quick links. (Demo-safe: replace with your preferred city resources anytime.)
+      </div>
+    </div>
+  `;
+
   const content = `
     <section class="pageCard card">
       <div class="pad">
         <div class="topRow">
           <div>
             <div class="kicker">Tenant Toolkit</div>
-            <div class="pageTitle">Resources by city</div>
-            <div class="pageSub">Practical links for renters. This helps CASA expand into new markets.</div>
+            <div class="pageTitle">Tools tenants actually use</div>
+            <div class="pageSub">Four-city starter kit. Keep it simple, fast, and reliable.</div>
           </div>
           <a class="btn" href="#/">Home</a>
         </div>
 
         <div class="hr"></div>
 
-        <div class="muted" style="font-weight:800;line-height:1.55">
-          Choose a city and access essential services: tenant rights, reporting issues, housing court basics.
-        </div>
-
         <div class="toolkitGrid">
-          ${toolkitCityCard("New York City", [
-            ["NYC 311 (complaints & services)", "https://portal.311.nyc.gov/"],
-            ["HPD (housing preservation)", "https://www.nyc.gov/site/hpd/index.page"],
-            ["NYC Housing Court info", "https://ww2.nycourts.gov/courts/nyc/housing/index.shtml"],
+          ${card("NYC", "Repairs, rent, rights", [
+            { label: "311 — Report housing issues", href: "https://portal.311.nyc.gov/" },
+            { label: "NYC HPD — Housing complaints", href: "https://www.nyc.gov/site/hpd/index.page" },
+            { label: "NY Courts — Housing Court basics", href: "https://ww2.nycourts.gov/courts/nyc/housing/index.shtml" },
+            { label: "Rent Guidelines Board (RGB)", href: "https://rentguidelinesboard.cityofnewyork.us/" },
           ])}
-          ${toolkitCityCard("Boston", [
-            ["City of Boston 311", "https://www.boston.gov/departments/boston-311"],
-            ["Boston tenant rights", "https://www.boston.gov/departments/neighborhood-development/tenant-rights"],
-          ])}
-          ${toolkitCityCard("Miami", [
-            ["Miami-Dade 311", "https://www.miamidade.gov/global/service.page?Mduid_service=ser1577816385742078"],
-            ["Florida tenant rights overview", "https://www.myfloridalegal.com/"],
-          ])}
-          ${toolkitCityCard("Chicago", [
-            ["Chicago 311", "https://311.chicago.gov/"],
-            ["Chicago renters rights info", "https://www.chicago.gov/city/en/depts/doh.html"],
-          ])}
-        </div>
 
-        <div class="hr"></div>
+          ${card("MIA", "Miami-Dade starter links", [
+            { label: "Miami-Dade — Service requests", href: "https://www.miamidade.gov/global/home.page" },
+            { label: "Florida AG — Tenant resources", href: "https://www.myfloridalegal.com/" },
+            { label: "Local legal aid (search)", href: "https://www.google.com/search?q=miami+legal+aid+tenant" },
+          ])}
 
-        <div class="smallNote" style="margin-top:0">
-          <b>Expansion strategy:</b> Start with reviews everywhere, then add city datasets per market.
-          The toolkit page gives value even before your “report” data is available in that city.
+          ${card("LA", "Los Angeles basics", [
+            { label: "LAHD — Housing department", href: "https://housing.lacity.org/" },
+            { label: "Rent Stabilization (RSO)", href: "https://housing2.lacity.org/residents/rso-overview" },
+            { label: "Tenant legal help (search)", href: "https://www.google.com/search?q=los+angeles+tenant+legal+aid" },
+          ])}
+
+          ${card("CHI", "Chicago basics", [
+            { label: "Chicago 311", href: "https://311.chicago.gov/" },
+            { label: "Chicago Dept. of Housing", href: "https://www.chicago.gov/city/en/depts/doh.html" },
+            { label: "Tenant rights (search)", href: "https://www.google.com/search?q=chicago+tenant+rights+guide" },
+          ])}
         </div>
       </div>
     </section>
   `;
+
   renderShell(content);
-}
-function toolkitCityCard(name, links) {
-  return `
-    <div class="toolkitItem">
-      <div class="kicker">${esc(name)}</div>
-      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
-        ${links.map(([label,url]) => `
-          <a class="btn miniBtn" target="_blank" rel="noopener noreferrer" href="${esc(url)}">${esc(label)}</a>
-        `).join("")}
-      </div>
-    </div>
-  `;
 }
 
 /* -----------------------------
-   LANDLORD PROFILE
+   Small helpers for pages/actions
+------------------------------ */
+function persist() {
+  saveDB(DB);
+}
+
+function parseId(id) {
+  try {
+    return decodeURIComponent(String(id || ""));
+  } catch {
+    return String(id || "");
+  }
+}
+
+function clampStars(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 5;
+  return Math.max(1, Math.min(5, Math.round(x)));
+}
+
+function renderStarsPicker(idPrefix, defaultVal = 5) {
+  const opts = [5, 4, 3, 2, 1]
+    .map((v) => `<option value="${v}" ${v === defaultVal ? "selected" : ""}>${"★".repeat(v)}${"☆".repeat(5 - v)}</option>`)
+    .join("");
+  return `
+    <select class="input" id="${esc(idPrefix)}Stars" style="max-width:260px;">
+      ${opts}
+    </select>
+  `.trim();
+}
+
+function reviewFormHTML(targetType, targetId) {
+  const formId = `${targetType}_${targetId}`;
+  return `
+    <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+      <div class="pad">
+        <div class="kicker">Leave a review</div>
+
+        <div class="field" style="margin-top:10px;">
+          <label>Rating</label>
+          ${renderStarsPicker(`rev_${formId}`, 5)}
+        </div>
+
+        <div class="field">
+          <label>Review</label>
+          <textarea class="textarea" id="rev_${esc(formId)}Text" placeholder="What was good? What was bad? (No personal info.)"></textarea>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn btn--primary" id="rev_${esc(formId)}Submit" type="button">Post review</button>
+          <button class="btn" id="rev_${esc(formId)}Report" type="button">Report an issue</button>
+        </div>
+
+        <div class="tiny" style="margin-top:10px; line-height:1.45;">
+          Keep it factual. Don’t include phone numbers, emails, or private details.
+        </div>
+      </div>
+    </div>
+  `.trim();
+}
+
+function openReportModal(targetType, targetId) {
+  openModal(`
+    <div class="modalHead">
+      <div class="modalTitle">Report</div>
+      <button class="iconBtn" id="repClose" type="button" aria-label="Close">×</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="field">
+        <label>What’s wrong?</label>
+        <select class="input" id="repReason">
+          <option value="spam">Spam / fake</option>
+          <option value="harassment">Harassment / hate</option>
+          <option value="doxxing">Personal info / doxxing</option>
+          <option value="wrong_target">Wrong landlord/address</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Notes (optional)</label>
+        <textarea class="textarea" id="repNotes" placeholder="Short explanation..."></textarea>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn btn--primary" id="repSubmit" type="button">Submit</button>
+      <button class="btn" id="repCancel" type="button">Cancel</button>
+    </div>
+  `);
+
+  $("#repClose")?.addEventListener("click", closeModal);
+  $("#repCancel")?.addEventListener("click", closeModal);
+
+  $("#repSubmit")?.addEventListener("click", () => {
+    const reason = $("#repReason")?.value || "other";
+    const notes = $("#repNotes")?.value ? String($("#repNotes").value).trim() : "";
+    DB.flags = DB.flags || [];
+    DB.flags.unshift({
+      id: idRand("f"),
+      targetType,
+      targetId,
+      reason,
+      notes,
+      createdAt: Date.now(),
+    });
+    persist();
+    closeModal();
+    alert("Report submitted. Thank you.");
+  });
+}
+
+function repliesForLandlord(landlordId) {
+  return (DB.replies || []).filter((x) => x && x.landlordId === landlordId);
+}
+
+function addReply(landlordId, reviewId, text) {
+  DB.replies = DB.replies || [];
+  DB.replies.unshift({
+    id: idRand("rep"),
+    landlordId,
+    reviewId,
+    text: String(text || "").trim(),
+    createdAt: Date.now(),
+  });
+  persist();
+}
+
+function renderReviewList(targetType, targetId, landlordContextIdForReply) {
+  const rs = reviewsFor(targetType, targetId);
+  if (!rs.length) return `<div class="muted">No reviews yet.</div>`;
+
+  const replyArr = DB.replies || [];
+
+  return rs
+    .map((r) => {
+      const stars = "★".repeat(r.stars) + "☆".repeat(5 - r.stars);
+      const date = fmtDate(r.createdAt);
+
+      const reply = replyArr.find((x) => x && x.reviewId === r.id);
+      const replyHTML = reply
+        ? `
+          <div class="replyBox">
+            <div class="kicker">Landlord response</div>
+            <div class="smallNote" style="margin-top:8px;">${esc(reply.text)}</div>
+            <div class="tiny" style="margin-top:8px;">${esc(fmtDate(reply.createdAt))}</div>
+          </div>
+        `
+        : "";
+
+      // demo “respond” UI exists only for landlord pages (landlordContextIdForReply provided)
+      const canReply = !!landlordContextIdForReply && targetType === "landlord";
+
+      const respondHTML = canReply
+        ? `
+          <div style="margin-top:10px;">
+            <button class="btn miniBtn" type="button" data-reply-open="${esc(r.id)}">Respond (demo)</button>
+          </div>
+          <div class="field" data-reply-box="${esc(r.id)}" style="display:none; margin-top:10px;">
+            <label>Response</label>
+            <textarea class="textarea" data-reply-text="${esc(r.id)}" placeholder="Short, professional response..."></textarea>
+            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+              <button class="btn btn--primary miniBtn" type="button" data-reply-send="${esc(r.id)}">Post response</button>
+              <button class="btn miniBtn" type="button" data-reply-cancel="${esc(r.id)}">Cancel</button>
+            </div>
+          </div>
+        `
+        : "";
+
+      return `
+        <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+          <div class="pad">
+            <div class="lcRow" style="justify-content:space-between;">
+              <div style="display:flex; gap:10px; align-items:center;">
+                <span class="stars">${esc(stars)}</span>
+                <span class="muted" style="font-weight:900;">${esc(date)}</span>
+              </div>
+              <button class="btn miniBtn" type="button" data-flag="${esc(r.id)}">Report</button>
+            </div>
+
+            <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
+            ${replyHTML}
+            ${respondHTML}
+          </div>
+        </div>
+      `.trim();
+    })
+    .join("\n");
+}
+
+function wireReviewListInteractions(container, targetType, targetId, landlordContextIdForReply) {
+  if (!container) return;
+
+  // report individual review
+  container.querySelectorAll("[data-flag]").forEach((btn) => {
+    btn.addEventListener("click", () => openReportModal("review", btn.getAttribute("data-flag") || ""));
+  });
+
+  // open reply box
+  container.querySelectorAll("[data-reply-open]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rid = btn.getAttribute("data-reply-open");
+      const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+      if (box) box.style.display = "block";
+    });
+  });
+
+  // cancel reply box
+  container.querySelectorAll("[data-reply-cancel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rid = btn.getAttribute("data-reply-cancel");
+      const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+      if (box) box.style.display = "none";
+    });
+  });
+
+  // send reply (demo)
+  container.querySelectorAll("[data-reply-send]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rid = btn.getAttribute("data-reply-send");
+      const ta = container.querySelector(`[data-reply-text="${CSS.escape(rid)}"]`);
+      const text = ta && ta.value ? String(ta.value).trim() : "";
+      if (!text) {
+        alert("Write a short response first.");
+        return;
+      }
+      addReply(landlordContextIdForReply, rid, text);
+      route(); // re-render
+    });
+  });
+}
+
+/* -----------------------------
+   LANDLORD PAGE
 ------------------------------ */
 function renderLandlord(id) {
-  const l = DB.landlords.find(x => x.id === id);
-  if (!l) return renderHome();
+  const landlordId = parseId(id);
+  const l = DB.landlords.find((x) => x.id === landlordId);
+  if (!l) {
+    setPageTitle("Not found");
+    renderShell(`
+      <section class="pageCard card">
+        <div class="pad">
+          <div class="topRow">
+            <div>
+              <div class="kicker">Landlord</div>
+              <div class="pageTitle">Not found</div>
+              <div class="pageSub">That landlord doesn’t exist yet.</div>
+            </div>
+            <a class="btn" href="#/search">Search</a>
+          </div>
+        </div>
+      </section>
+    `);
+    return;
+  }
 
   setPageTitle(l.name);
 
-  const st = ratingStats(l.id);
+  const st = ratingStats("landlord", l.id);
+  const tier = cardTier(st.avgRounded ?? 0, st.count);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-  const starVis = st.avgRounded == null ? "☆☆☆☆☆" : (st.avgRounded >= 4 ? "★★★★☆" : st.avgRounded >= 3 ? "★★★☆☆" : st.avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆");
+  const starVis = starVisFromAvg(st.avgRounded);
 
-  const cred = casaCredential(l.id);
-  const badgeRow = badgesHTML(l);
-  const distTotal = st.dist.reduce((a,b)=>a+b,0);
-
+  const props = DB.properties.filter((p) => p.landlordId === l.id);
   const rep = reportFor(l.id);
 
-  const reportHTML = rep ? `
-    <div class="kicker" style="margin-top:18px;">Public report (demo)</div>
-    <div class="muted" style="margin-top:6px;font-weight:800">
-      This is where CASA adds “receipts” (city datasets). Updated: ${fmtDate(rep.updatedAt)}.
-    </div>
-
-    <div class="reportGrid">
-      <div class="reportCard">
-        ${reportRow("Violations (12mo)", rep.violations_12mo)}
-        ${reportRow("Complaints (12mo)", rep.complaints_12mo)}
-        ${reportRow("Bedbug reports (12mo)", rep.bedbug_reports_12mo)}
-      </div>
-      <div class="reportCard">
-        ${reportRow("HP Actions", rep.hp_actions)}
-        ${reportRow("Open permits", rep.permits_open)}
-        ${reportRow("Eviction filings (12mo)", rep.eviction_filings_12mo)}
-      </div>
-    </div>
-
-    <div class="smallNote">
-      ${esc(rep.notes || "Demo report. Production: public datasets + sources.")}
-    </div>
-  ` : `
-    <div class="kicker" style="margin-top:18px;">Public report</div>
-    <div class="muted" style="margin-top:8px;font-weight:800">
-      No report data yet for this landlord.
-    </div>
-  `;
+  const credential = casaCredentialForLandlord(l.id);
 
   const content = `
     <section class="pageCard card">
       <div class="pad">
-        <div class="profileHead">
+        <div class="topRow">
           <div>
             <div class="kicker">Landlord</div>
-            <div class="profileNameRow">
-              <h1 class="profileName">${esc(l.name)}</h1>
-              ${badgeRow}
-            </div>
-
-            <div class="profileStats">
-              <span class="stars">${starVis}</span>
-              <span class="ratingNum">${avgText}</span>
-              <span class="muted">${st.count ? `${st.count} review${st.count===1?"":"s"}` : "No ratings"}</span>
-              <span class="pill">${esc(cred === "CASA Rated" ? "CASA Rated" : (st.count ? "Not yet CASA Rated" : "Unrated"))}</span>
-            </div>
-
-            <div class="addrLine">
-              ${esc(l.address?.line1 || "")}${l.address?.unit ? `, ${esc(l.address.unit)}` : ""} • ${esc(l.address?.city || "")}, ${esc(l.address?.state || "")}
-            </div>
+            <div class="pageTitle">${esc(l.name)} ${badgesHTMLForLandlord(l)}</div>
+            <div class="pageSub">${esc(l.entity || "—")}</div>
           </div>
+          <a class="btn" href="#/search">Back</a>
+        </div>
 
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <a class="btn" href="#/search">Back</a>
+        <div class="hr"></div>
 
-            <!-- More options dropdown -->
-            <div style="position:relative;">
-              <button class="btn" id="moreBtn" type="button" aria-haspopup="true" aria-expanded="false">
-                More options
-              </button>
+        <div class="splitRow" style="margin-top:0;">
+          <div>
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+              <div class="pad">
+                <div class="kicker">Rating</div>
+                <div class="lcRow" style="margin-top:10px;">
+                  <div style="display:flex; gap:12px; align-items:center;">
+                    <span class="stars" style="font-size:16px;">${esc(starVis)}</span>
+                    <span class="ratingNum" style="font-size:16px;">${esc(avgText)}</span>
+                    <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
+                  </div>
+                  <span class="pill ${esc(tier.pillClass || "")}">${esc(st.count ? tier.label : "Unrated")}</span>
+                </div>
 
-              <div id="moreDropdown"
-                   style="
-                     display:none;
-                     position:absolute;
-                     right:0;
-                     top:calc(100% + 8px);
-                     min-width:260px;
-                     background: rgba(255,255,255,.92);
-                     border:1px solid rgba(20,16,12,.14);
-                     border-radius: 14px;
-                     box-shadow: 0 30px 80px rgba(0,0,0,.18);
-                     padding:10px;
-                     z-index:95;
-                   ">
-                <button class="btn" id="embedBtn"
-                        style="width:100%; justify-content:flex-start; border-radius:12px;">
-                  Get <span style="${casaBrandFontInlineCSS()}; margin:0 4px;">casa</span> badge embed
-                </button>
-              <button class="btn" id="embedBtn"
-        style="width:100%; justify-content:flex-start; border-radius:12px;">
-  <span>
-    Get <span style="${casaBrandFontInlineCSS()};">casa</span> badge embed
-  </span>
-</button>
+                <div class="tiny" style="margin-top:10px;">
+                  Status: <b>${esc(credential)}</b>
+                </div>
+
+                <div class="hr" style="margin:14px 0;"></div>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <a class="btn btn--primary" href="#/add">Add address</a>
+
+                  <div style="position:relative;">
+                    <button class="btn" id="moreBtn" type="button" aria-expanded="false">More options</button>
+                    <div class="dropdown" id="moreDropdown" style="display:none;">
+                      <button class="btn btn--block" id="embedBtn" type="button">Get CASA badge</button>
+                      <button class="btn btn--block" id="flagLandlord" type="button">Report</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tiny" style="margin-top:12px;">
+                  Tip: Rate the landlord here, or rate a specific building on its Address page.
+                </div>
               </div>
             </div>
 
-            <button class="btn btn--primary" id="rateBtn">Rate this landlord</button>
+            <div style="margin-top:14px;">
+              ${reviewFormHTML("landlord", l.id)}
+            </div>
+          </div>
+
+          <div>
+            <div class="kicker">Properties</div>
+            <div class="list" style="margin-top:10px;">
+              ${
+                props.length
+                  ? props.map((p) => propertyCardHTML(p)).join("")
+                  : `<div class="muted">No properties listed yet.</div>`
+              }
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="kicker">Quick report (demo)</div>
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+              <div class="pad">
+                <div class="tiny">Updated: ${esc(rep ? fmtDate(rep.updatedAt) : "—")}</div>
+                <div class="twoCol" style="margin-top:12px;">
+                  <div class="stat">
+                    <div class="kicker">Violations (12mo)</div>
+                    <div class="statNum">${esc(rep ? rep.violations_12mo : 0)}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="kicker">Complaints (12mo)</div>
+                    <div class="statNum">${esc(rep ? rep.complaints_12mo : 0)}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="kicker">Bedbug reports</div>
+                    <div class="statNum">${esc(rep ? rep.bedbug_reports_12mo : 0)}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="kicker">Eviction filings</div>
+                    <div class="statNum">${esc(rep ? rep.eviction_filings_12mo : 0)}</div>
+                  </div>
+                </div>
+                <div class="tiny" style="margin-top:12px; line-height:1.45;">
+                  ${esc(rep ? rep.notes : "Demo only. In production, cite sources and timestamps.")}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="hr"></div>
 
-        <div class="twoCol">
-          <div>
-            <div class="kicker">Location</div>
-            <div class="mapBox" style="margin-top:10px;">
-              <div class="map" id="profileMap" style="height:280px;"></div>
-            </div>
-            <button class="btn" style="margin-top:10px;" id="centerProfile">Center on map</button>
-
-            <div class="histo">
-              <div class="kicker" style="margin-top:18px;">Rating distribution</div>
-              ${[5,4,3,2,1].map(star=>{
-                const count = st.dist[star-1] || 0;
-                const pct = distTotal ? Math.round((count/distTotal)*100) : 0;
-                return `
-                  <div class="hRow">
-                    <div class="muted">${star}★</div>
-                    <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-                    <div class="muted">${count}</div>
-                  </div>
-                `;
-              }).join("")}
-            </div>
-
-            ${reportHTML}
-          </div>
-
-          <div>
-            <div class="kicker">Reviews</div>
-            <div class="list" style="margin-top:10px;">
-              ${
-                landlordReviews(l.id).length
-                ? landlordReviews(l.id).map(r => `
-                  <div class="lc" style="background:rgba(255,255,255,.72)">
-                    <div class="lcLeft">
-                      <div class="lcRow">
-                        <span class="stars">${"★".repeat(r.stars)}${"☆".repeat(5-r.stars)}</span>
-                        <span class="ratingNum">${r.stars}/5</span>
-                      </div>
-                      <div class="smallNote" style="margin-top:10px;font-size:14px;font-weight:700;color:rgba(21,17,14,.78)">
-                        ${esc(r.text)}
-                      </div>
-                      <button class="btn miniBtn" style="margin-top:10px;" data-report="${esc(r.id)}">Report</button>
-                    </div>
-                    <div class="muted">${fmtDate(r.createdAt)}</div>
-                  </div>
-                `).join("")
-                : `<div class="muted">No reviews yet. Be the first.</div>`
-              }
-            </div>
-          </div>
+        <div class="kicker">Reviews</div>
+        <div id="landlordReviewList" style="margin-top:10px;">
+          ${renderReviewList("landlord", l.id, l.id)}
         </div>
       </div>
     </section>
   `;
+
   renderShell(content);
 
-  setTimeout(() => {
-    const map = initLeafletMap($("#profileMap"), [l.lat ?? 40.73, l.lng ?? -73.95], 12);
-    if (!map) return;
-
-    let marker = null;
-    if (typeof l.lat === "number" && typeof l.lng === "number") {
-      try { marker = L.marker([l.lat, l.lng]).addTo(map); } catch {}
-    }
-
-    $("#centerProfile")?.addEventListener("click", () => {
-      try {
-        map.setView([l.lat ?? 40.73, l.lng ?? -73.95], 14, { animate: true });
-        marker?.openPopup?.();
-      } catch {}
-    });
-  }, 0);
-
-  document.querySelectorAll("[data-report]").forEach(btn => {
-    btn.addEventListener("click", () => alert("Report submitted (demo)."));
-  });
-
-  $("#rateBtn")?.addEventListener("click", () => openReviewModal(l.id));
+  // more options dropdown
   $("#moreBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
-    e.stopPropagation();
     toggleInlineDropdown();
   });
 
-  $("#embedBtn")?.addEventListener("click", (e) => {
-    e.preventDefault();
+  document.addEventListener(
+    "click",
+    (e) => {
+      const dd = $("#moreDropdown");
+      const btn = $("#moreBtn");
+      if (!dd || !btn) return;
+      if (dd.style.display !== "block") return;
+      const inside = e.target === dd || dd.contains(e.target) || e.target === btn;
+      if (!inside) closeInlineDropdown();
+    },
+    { capture: true }
+  );
+
+  $("#embedBtn")?.addEventListener("click", () => {
     closeInlineDropdown();
     openBadgeEmbedModal(l.id);
   });
 
-  // Remove old global handlers (prevents stacking on route changes)
-  window.__casaMoreOutsideClick?.();
-  window.__casaMoreEsc?.();
+  $("#flagLandlord")?.addEventListener("click", () => {
+    closeInlineDropdown();
+    openReportModal("landlord", l.id);
+  });
 
-  const outsideClick = (e) => {
-    const dd = document.getElementById("moreDropdown");
-    const btn = document.getElementById("moreBtn");
-    if (!dd || !btn) return;
-
-    const within = dd.contains(e.target) || btn.contains(e.target);
-    if (!within) closeInlineDropdown();
-  };
-
-  const onEsc = (e) => {
-    if (e.key === "Escape") closeInlineDropdown();
-  };
-
-  document.addEventListener("click", outsideClick);
-  document.addEventListener("keydown", onEsc);
-
-  // store cleanup fns
-  window.__casaMoreOutsideClick = () => document.removeEventListener("click", outsideClick);
-  window.__casaMoreEsc = () => document.removeEventListener("keydown", onEsc);
-
-
-  /* NEW: CASA embed badge modal */
-  $("#embedBtn")?.addEventListener("click", () => openEmbedModal(l));
-}
-
-function reportRow(k, v) {
-  return `
-    <div class="reportRow">
-      <div class="reportKey">${esc(k)}</div>
-      <div class="reportVal">${esc(String(v ?? "—"))}</div>
-    </div>
-  `;
-}
-
-function openEmbedModal(landlord) {
-  const st = ratingStats(landlord.id);
-  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-
-  const pageUrl = `${location.origin}${location.pathname}#/landlord/${encodeURIComponent(landlord.id)}`;
-  const html = `<a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;border:1px solid rgba(20,16,12,.14);background:rgba(255,255,255,.75);padding:10px 12px;border-radius:999px;color:rgba(21,17,14,.92);font-weight:800;">
-  <img src="${location.origin}${location.pathname}assets/badge-casa.png" alt="CASA" style="width:18px;height:18px;border-radius:5px;"/>
-Rated on <span style="${casaBrandFontInlineCSS()};">casa</span></a>`;
-
-  openModal(`
-    <div class="modalHead">
-      <div class="modalTitle">CASA badge embed</div>
-      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
-    </div>
-
-    <div class="modalBody">
-      <div class="kicker">Landlord credential</div>
-      <div class="muted" style="margin-top:6px;font-weight:800;line-height:1.55">
-        Landlords can embed this on their website or listing pages — like a Trustpilot rating.
-      </div>
-
-      <div class="embedBox">
-        <div class="kicker" style="margin-bottom:8px;">HTML snippet</div>
-        <textarea class="codeField" id="embedCode" rows="5">${esc(html)}</textarea>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-          <button class="btn btn--primary miniBtn" id="copyEmbed">Copy embed</button>
-          <button class="btn miniBtn" id="previewEmbed">Preview</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="modalFoot">
-      <button class="btn" id="mCancel">Close</button>
-    </div>
-  `);
-
-  $("#mClose")?.addEventListener("click", closeModal);
-  $("#mCancel")?.addEventListener("click", closeModal);
-
-  $("#copyEmbed")?.addEventListener("click", async () => {
-    try {
-      const val = $("#embedCode")?.value || "";
-      await navigator.clipboard.writeText(val);
-      alert("Copied.");
-    } catch {
-      alert("Copy failed. Select text and copy manually.");
+  // post review
+  const formId = `landlord_${l.id}`;
+  const submit = $(`#rev_${formId}Submit`);
+  const reportBtn = $(`#rev_${formId}Report`);
+  submit?.addEventListener("click", () => {
+    const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
+    const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
+    if (!text) {
+      alert("Write a short review first.");
+      return;
     }
+    DB.reviews.unshift({
+      id: idRand("r"),
+      targetType: "landlord",
+      targetId: l.id,
+      stars,
+      text,
+      createdAt: Date.now(),
+    });
+    persist();
+    route();
   });
+  reportBtn?.addEventListener("click", () => openReportModal("landlord", l.id));
 
-  $("#previewEmbed")?.addEventListener("click", () => {
-    openModal(`
-      <div class="modalHead">
-        <div class="modalTitle">Preview</div>
-        <button class="iconBtn" id="mClose2" aria-label="Close">×</button>
-      </div>
-      <div class="modalBody">
-        <div class="kicker">Preview</div>
-        <div style="margin-top:12px;">${html}</div>
-      </div>
-      <div class="modalFoot">
-        <button class="btn" id="mCancel2">Close</button>
-      </div>
-    `);
-    $("#mClose2")?.addEventListener("click", closeModal);
-    $("#mCancel2")?.addEventListener("click", closeModal);
-  });
+  // wire review list interactions (reply/report)
+  const list = $("#landlordReviewList");
+  wireReviewListInteractions(list, "landlord", l.id, l.id);
 }
 
 /* -----------------------------
-   Star picker
+   PROPERTY PAGE
 ------------------------------ */
-function starPickerHTML(defaultValue = 5) {
-  const v = Math.max(1, Math.min(5, Number(defaultValue) || 5));
-  return `
-    <div class="starPicker" id="starPicker" role="radiogroup" aria-label="Rating">
-      ${[1,2,3,4,5].map(i => `
-        <button type="button"
-          class="starBtn"
-          data-star="${i}"
-          aria-label="${i} star${i===1?"":"s"}"
-          aria-pressed="false">
-          <span class="starChar" aria-hidden="true">★</span>
-        </button>
-      `).join("")}
-      <span class="starValue" id="starValue">${v}/5</span>
-      <input type="hidden" id="mStars" value="${v}">
-    </div>
-    <div class="tiny" style="margin-top:6px;">Click a star to rate.</div>
+function renderProperty(id) {
+  const propertyId = parseId(id);
+  const p = DB.properties.find((x) => x.id === propertyId);
+
+  if (!p) {
+    setPageTitle("Not found");
+    renderShell(`
+      <section class="pageCard card">
+        <div class="pad">
+          <div class="topRow">
+            <div>
+              <div class="kicker">Address</div>
+              <div class="pageTitle">Not found</div>
+              <div class="pageSub">That address doesn’t exist yet.</div>
+            </div>
+            <a class="btn" href="#/search">Search</a>
+          </div>
+        </div>
+      </section>
+    `);
+    return;
+  }
+
+  const a = p.address || {};
+  const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+  setPageTitle(title);
+
+  const st = ratingStats("property", p.id);
+  const tier = cardTier(st.avgRounded ?? 0, st.count);
+  const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+  const starVis = starVisFromAvg(st.avgRounded);
+
+  const l = DB.landlords.find((x) => x.id === p.landlordId);
+
+  const fullAddr = `${a.line1 || ""}${a.unit ? `, ${a.unit}` : ""} • ${a.city || ""} • ${a.state || ""}${p.borough ? ` • ${p.borough}` : ""}`.replace(
+    /\s•\s$/,
+    ""
+  );
+
+  const content = `
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Address</div>
+            <div class="pageTitle">${esc(title)}</div>
+            <div class="pageSub">${esc(fullAddr)}</div>
+          </div>
+          <a class="btn" href="#/search">Back</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="splitRow" style="margin-top:0;">
+          <div>
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+              <div class="pad">
+                <div class="kicker">Building rating</div>
+                <div class="lcRow" style="margin-top:10px;">
+                  <div style="display:flex; gap:12px; align-items:center;">
+                    <span class="stars" style="font-size:16px;">${esc(starVis)}</span>
+                    <span class="ratingNum" style="font-size:16px;">${esc(avgText)}</span>
+                    <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
+                  </div>
+                  <span class="pill ${esc(tier.pillClass || "")}">${esc(st.count ? tier.label : "Unrated")}</span>
+                </div>
+
+                <div class="tiny" style="margin-top:12px;">
+                  Landlord:
+                  ${
+                    l
+                      ? `<a href="#/landlord/${esc(l.id)}" style="font-weight:950;">${esc(l.name)}</a> ${badgesHTMLForLandlord(l)}`
+                      : `<span class="muted">—</span>`
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px;">
+              ${reviewFormHTML("property", p.id)}
+            </div>
+          </div>
+
+          <div>
+            <div class="kicker">Map</div>
+            <div class="mapBox" style="margin-top:10px;">
+              <div class="map" id="propMap" style="height:320px;"></div>
+            </div>
+
+            <div class="tiny" style="margin-top:10px;">
+              Tip: Map is optional. If Leaflet isn’t loaded, this stays blank safely.
+            </div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="kicker">Reviews</div>
+        <div id="propertyReviewList" style="margin-top:10px;">
+          ${renderReviewList("property", p.id, null)}
+        </div>
+      </div>
+    </section>
   `;
-}
 
-function applyStarPickerVisual(value) {
-  const v = Math.max(1, Math.min(5, Number(value) || 1));
-  const btns = Array.from(document.querySelectorAll("#starPicker .starBtn"));
+  renderShell(content);
 
-  btns.forEach(btn => {
-    const s = Number(btn.dataset.star);
-    const on = s <= v;
-    btn.classList.toggle("isOn", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
-  });
+  // map
+  setTimeout(() => {
+    const mapEl = $("#propMap");
+    if (!mapEl) return;
+    const center = [typeof p.lat === "number" ? p.lat : 40.73, typeof p.lng === "number" ? p.lng : -73.95];
+    const map = initLeafletMap(mapEl, center, 14);
+    if (!map) return;
+    try {
+      window.L.marker(center).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
+    } catch {}
+  }, 0);
 
-  const out = $("#starValue");
-  if (out) out.textContent = `${v}/5`;
+  // post review
+  const formId = `property_${p.id}`;
+  const submit = $(`#rev_${formId}Submit`);
+  const reportBtn = $(`#rev_${formId}Report`);
 
-  const hidden = $("#mStars");
-  if (hidden) hidden.value = String(v);
-}
-
-function bindStarPicker(defaultValue = 5) {
-  let current = Math.max(1, Math.min(5, Number(defaultValue) || 5));
-  applyStarPickerVisual(current);
-
-  document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
-    btn.addEventListener("mouseenter", () => applyStarPickerVisual(btn.dataset.star));
-  });
-  $("#starPicker")?.addEventListener("mouseleave", () => applyStarPickerVisual(current));
-
-  document.querySelectorAll("#starPicker .starBtn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      current = Number(btn.dataset.star);
-      applyStarPickerVisual(current);
-    });
-  });
-}
-
-/* Review modal */
-function openReviewModal(landlordId) {
-  openModal(`
-    <div class="modalHead">
-      <div class="modalTitle">Leave a review</div>
-      <button class="iconBtn" id="mClose" aria-label="Close">×</button>
-    </div>
-
-    <div class="modalBody">
-      <div class="field">
-        <label>Rating</label>
-        ${starPickerHTML(5)}
-      </div>
-
-      <div class="field">
-        <label>What happened?</label>
-        <textarea class="textarea" id="mText" placeholder="Keep it factual and specific."></textarea>
-        <div class="tiny">Please write at least 20 characters. Don’t include phone numbers/emails/private info.</div>
-      </div>
-    </div>
-
-    <div class="modalFoot">
-      <button class="btn" id="mCancel">Cancel</button>
-      <button class="btn btn--primary" id="mSubmit">Submit</button>
-    </div>
-  `);
-
-  $("#mClose")?.addEventListener("click", closeModal);
-  $("#mCancel")?.addEventListener("click", closeModal);
-
-  bindStarPicker(5);
-
-  $("#mSubmit")?.addEventListener("click", () => {
-    const starsInt = Math.max(1, Math.min(5, Number($("#mStars")?.value) || 5));
-    const text = $("#mText")?.value?.trim?.() || "";
-
-    if (!text || text.length < 20) {
-      alert("Please write at least 20 characters.");
+  submit?.addEventListener("click", () => {
+    const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
+    const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
+    if (!text) {
+      alert("Write a short review first.");
       return;
     }
-
-    DB.reviews.push({
-      id: "r" + Math.random().toString(16).slice(2),
-      landlordId,
-      stars: starsInt,
+    DB.reviews.unshift({
+      id: idRand("r"),
+      targetType: "property",
+      targetId: p.id,
+      stars,
       text,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     });
-
-    saveDB(DB);
-    closeModal();
+    persist();
     route();
   });
+
+  reportBtn?.addEventListener("click", () => openReportModal("property", p.id));
+
+  // wire review list interactions (report-only)
+  const list = $("#propertyReviewList");
+  wireReviewListInteractions(list, "property", p.id, null);
 }
