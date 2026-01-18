@@ -413,6 +413,14 @@ function migrateLegacyToV2(legacy) {
 }
 
 let DB = loadDB();
+// iOS/Safari safe: CSS.escape polyfill (prevents crashes in querySelector)
+if (typeof window.CSS === "undefined") window.CSS = {};
+if (typeof window.CSS.escape !== "function") {
+  window.CSS.escape = function (value) {
+    return String(value).replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, (ch) => "\\" + ch);
+  };
+}
+
 
 /* -----------------------------
    Helpers
@@ -868,18 +876,37 @@ function openBadgeEmbedModal(landlordId) {
   if (box) box.value = snippet;
 
   $("#copyEmbed")?.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(snippet);
-      alert("Copied embed HTML!");
-    } catch {
+    const tryExecCommand = () => {
       try {
-        box && box.focus && box.focus();
-        box && box.select && box.select();
-        document.execCommand("copy");
-        alert("Copied embed HTML!");
+        if (box && box.focus) box.focus();
+        if (box && box.select) box.select();
+        const ok = document.execCommand && document.execCommand("copy");
+        return !!ok;
       } catch {
-        alert("Copy failed.");
+        return false;
       }
+    };
+
+    try {
+      // iOS Safari often blocks clipboard API; only attempt if available
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(snippet);
+        alert("Copied embed HTML!");
+        return;
+      }
+    } catch {
+      // fall through to execCommand
+    }
+
+    const ok = tryExecCommand();
+    if (ok) alert("Copied embed HTML!");
+    else {
+      // last-resort: show HTML box so user can long-press copy
+      const wrap = $("#htmlWrap");
+      const toggle = $("#toggleHTML");
+      if (wrap) wrap.style.display = "block";
+      if (toggle) toggle.textContent = "Hide HTML";
+      alert("Tap & hold to copy from the HTML box.");
     }
   });
 
@@ -2412,30 +2439,45 @@ function renderReviewList(targetType, targetId, landlordContextIdForReply) {
 function wireReviewListInteractions(container, landlordContextIdForReply) {
   if (!container) return;
 
+  // iOS/Safari-safe selector escaping
+  const escSel = (v) => {
+    const s = String(v ?? "");
+    if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(s);
+    return s.replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, (ch) => "\\" + ch);
+  };
+
   container.querySelectorAll("[data-flag]").forEach((btn) => {
-    btn.addEventListener("click", () => openReportModal("review", btn.getAttribute("data-flag") || ""));
+    btn.addEventListener("click", () =>
+      openReportModal("review", btn.getAttribute("data-flag") || "")
+    );
   });
 
   container.querySelectorAll("[data-reply-open]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const rid = btn.getAttribute("data-reply-open");
-      const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+      const rid = btn.getAttribute("data-reply-open") || "";
+      const box = container.querySelector(
+        `[data-reply-box="${escSel(rid)}"]`
+      );
       if (box) box.style.display = "block";
     });
   });
 
   container.querySelectorAll("[data-reply-cancel]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const rid = btn.getAttribute("data-reply-cancel");
-      const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+      const rid = btn.getAttribute("data-reply-cancel") || "";
+      const box = container.querySelector(
+        `[data-reply-box="${escSel(rid)}"]`
+      );
       if (box) box.style.display = "none";
     });
   });
 
   container.querySelectorAll("[data-reply-send]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const rid = btn.getAttribute("data-reply-send");
-      const ta = container.querySelector(`[data-reply-text="${CSS.escape(rid)}"]`);
+      const rid = btn.getAttribute("data-reply-send") || "";
+      const ta = container.querySelector(
+        `[data-reply-text="${escSel(rid)}"]`
+      );
       const text = ta && ta.value ? String(ta.value).trim() : "";
       if (!text) return alert("Write a short response first.");
       addReply(landlordContextIdForReply, rid, text);
