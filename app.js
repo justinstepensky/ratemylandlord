@@ -28,10 +28,14 @@ console.error(title, err);
 const el = document.getElementById("app");
 if (!el) return;
 
-const msg = String(
-err && (err.stack || err.message) ? err.stack || err.message : err
-);
-
+let msg = "";
+try {
+if (err && (err.stack || err.message)) msg = String(err.stack || err.message);
+else if (typeof err === "string") msg = err;
+else msg = JSON.stringify(err, Object.getOwnPropertyNames(err), 2);
+} catch {
+msg = String(err);
+}
 el.innerHTML = `
        <section class="pageCard card">
          <div class="pad">
@@ -85,9 +89,33 @@ e && (e.error || e.message) ? e.error || e.message : e
 )
 );
 
-window.addEventListener("unhandledrejection", (e) =>
-showOverlayError("Unhandled promise rejection", e && e.reason ? e.reason : e)
-);
+window.addEventListener("unhandledrejection", (e) => {
+try {
+const r = e && "reason" in e ? e.reason : e;
+
+// iOS Safari often throws benign abort/load-failed rejections during map/tile teardown.
+const name = r && r.name ? String(r.name) : "";
+const msg = r && (r.message || r.stack) ? String(r.message || r.stack) : String(r || "");
+
+const looksBenign =
+name === "AbortError" ||
+/aborted/i.test(msg) ||
+/load failed/i.test(msg) ||
+/The operation was aborted/i.test(msg);
+
+if (looksBenign) {
+console.warn("Ignored benign promise rejection:", r);
+// prevent default logging noise
+try { e && e.preventDefault && e.preventDefault(); } catch {}
+return;
+}
+
+showOverlayError("Unhandled promise rejection", r);
+} catch (err) {
+// If our handler fails, fall back to the overlay
+showOverlayError("Unhandled promise rejection (handler failed)", err);
+}
+});
 })();
 
 /* -----------------------------
@@ -413,6 +441,14 @@ return normalizeDB({ landlords, properties, reviews, reports, flags: [], replies
 }
 
 let DB = loadDB();
+// iOS/Safari safe: CSS.escape polyfill (prevents crashes in querySelector)
+if (typeof window.CSS === "undefined") window.CSS = {};
+if (typeof window.CSS.escape !== "function") {
+window.CSS.escape = function (value) {
+return String(value).replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, (ch) => "\\" + ch);
+};
+}
+
 
 /* -----------------------------
   Helpers
@@ -710,12 +746,60 @@ btn.setAttribute("aria-expanded", "true");
 /* -----------------------------
   Drawer (mobile) — safe if not present
 ------------------------------ */
+function fixDrawerBubbles() {
+const drawer = document.getElementById("drawer");
+if (!drawer) return;
+
+// Find the 3 primary action links/buttons in the drawer:
+// (We match common patterns: data-drawer-link, hrefs, or visible text.)
+const candidates = Array.from(drawer.querySelectorAll("a, button")).filter((el) => {
+const t = (el.textContent || "").trim().toLowerCase();
+const href = (el.getAttribute && el.getAttribute("href")) || "";
+const isActionText =
+t === "search" || t === "review" || t === "rent";
+const isActionHref =
+href.includes("#/search") || href.includes("#/add") || href.includes("#/rent");
+const isDrawerLinkAttr =
+el.hasAttribute && (el.hasAttribute("data-drawer-link") || el.hasAttribute("data-drawerlink"));
+
+return isActionText || isActionHref || isDrawerLinkAttr;
+});
+
+// Keep only first 3 unique (Search/Review/Rent)
+const picked = [];
+const seen = new Set();
+for (const el of candidates) {
+const key = ((el.textContent || "").trim().toLowerCase()) || (el.getAttribute("href") || "");
+if (!key || seen.has(key)) continue;
+seen.add(key);
+picked.push(el);
+if (picked.length >= 3) break;
+}
+
+if (picked.length < 2) return; // nothing to fix
+
+// Create (or reuse) a dedicated row wrapper
+let row = drawer.querySelector(".drawerBubbleRow");
+if (!row) {
+row = document.createElement("div");
+row.className = "drawerBubbleRow";
+// Put it near the top of the drawer content
+drawer.prepend(row);
+} else {
+row.innerHTML = "";
+}
+
+// Move the picked elements into the row
+picked.forEach((el) => row.appendChild(el));
+}
+
 function initDrawer() {
 const btn = $("#menuBtn");
 const drawer = $("#drawer");
 const overlay = $("#drawerOverlay");
 const closeBtn = $("#drawerClose");
 if (!btn || !drawer || !overlay || !closeBtn) return;
+fixDrawerBubbles();
 
 function open() {
 drawer.classList.add("isOpen");
@@ -820,18 +904,37 @@ const box = $("#embedBox");
 if (box) box.value = snippet;
 
 $("#copyEmbed")?.addEventListener("click", async () => {
+const tryExecCommand = () => {
 try {
+if (box && box.focus) box.focus();
+if (box && box.select) box.select();
+const ok = document.execCommand && document.execCommand("copy");
+return !!ok;
+} catch {
+return false;
+}
+};
+
+try {
+// iOS Safari often blocks clipboard API; only attempt if available
+if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
 await navigator.clipboard.writeText(snippet);
 alert("Copied embed HTML!");
-} catch {
-try {
-box && box.focus && box.focus();
-box && box.select && box.select();
-document.execCommand("copy");
-alert("Copied embed HTML!");
-} catch {
-alert("Copy failed.");
+return;
 }
+} catch {
+// fall through to execCommand
+}
+
+const ok = tryExecCommand();
+if (ok) alert("Copied embed HTML!");
+else {
+// last-resort: show HTML box so user can long-press copy
+const wrap = $("#htmlWrap");
+const toggle = $("#toggleHTML");
+if (wrap) wrap.style.display = "block";
+if (toggle) toggle.textContent = "Hide HTML";
+alert("Tap & hold to copy from the HTML box.");
 }
 });
 
@@ -970,7 +1073,8 @@ return null;
 }
 
 /* -----------------------------
-  Router
+   Router
+   Router (Hardened for mobile/iOS)
 ------------------------------ */
 function route() {
 const hash = location.hash || "#/";
@@ -995,10 +1099,60 @@ renderHome();
 }
 
 window.addEventListener("hashchange", route);
+/* Mobile-safe wrapper: NEVER let one crash kill rendering */
+function safeRoute() {
+  try {
+    route();
+  } catch (err) {
+    try {
+      console.error("Route crash:", err);
+
+      // Try fallback render instead of dying
+      try {
+        renderHome();
+        return;
+      } catch (e2) {
+        console.error("Fallback renderHome failed:", e2);
+      }
+
+      // If even fallback fails, show a minimal inline message (no recursion)
+      const app = document.getElementById("app");
+      if (app) {
+        const msg = String(err && (err.stack || err.message) ? err.stack || err.message : err);
+        app.innerHTML = `
+          <section class="pageCard card">
+            <div class="pad">
+              <div class="kicker">CASA</div>
+              <div class="pageTitle" style="margin-top:6px;">Something went wrong</div>
+              <div class="pageSub" style="margin-top:8px;">
+                The app hit an error and stopped rendering.
+              </div>
+              <div class="hr"></div>
+              <div class="smallNote"
+                   style="white-space:pre-wrap;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,'Liberation Mono','Courier New', monospace;">
+Route error
+${msg}
+              </div>
+              <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+                <a class="btn btn--primary" href="#/">Go Home</a>
+                <button class="btn" type="button" onclick="location.reload()">Reload</button>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+    } catch {}
+  }
+}
+
+window.addEventListener("hashchange", safeRoute);
 window.addEventListener("load", () => {
-initDrawer();
-initMobileOnlyMenu(); // ✅ new: hide hamburger/drawer on desktop
-route();
+  initDrawer();
+  initMobileOnlyMenu(); // ✅ new: hide hamburger/drawer on desktop
+  route();
+  try { initDrawer(); } catch (e) { console.error("initDrawer failed:", e); }
+  try { initMobileOnlyMenu(); } catch (e) { console.error("initMobileOnlyMenu failed:", e); }
+  safeRoute();
 });
 
 /* -----------------------------
@@ -1011,16 +1165,21 @@ const overlay = $("#drawerOverlay");
 
 function apply() {
 const isDesktop = window.innerWidth >= 981;
-// Hide hamburger + drawer + overlay on desktop (even if present in HTML)
+    // Hide hamburger + drawer + overlay on desktop (even if present in HTML)
+
+    // Hide hamburger + drawer + overlay on desktop
 if (btn) btn.style.display = isDesktop ? "none" : "";
 if (drawer) drawer.style.display = isDesktop ? "none" : "";
 if (overlay) overlay.style.display = isDesktop ? "none" : "";
 
-// Also ensure drawer isn't open on desktop
+    // Also ensure drawer isn't open on desktop
+    // Ensure drawer isn't open on desktop
 if (isDesktop) {
 try {
 drawer && drawer.classList.remove("isOpen");
 overlay && overlay.classList.remove("isOpen");
+        drawer && drawer.setAttribute("aria-hidden", "true");
+        overlay && overlay.setAttribute("aria-hidden", "true");
 } catch {}
 }
 }
@@ -1473,8 +1632,7 @@ if (document.getElementById("casaRuntimeStyles")) return;
 const style = document.createElement("style");
 style.id = "casaRuntimeStyles";
 style.textContent = `
-     /* Force 50/50 banner split on desktop; stack on mobile */
-    /* Force 50/50 banner split on desktop; stack on mobile */
+   /* Force 50/50 banner split on desktop; stack on mobile */
    .splitRow--banner{
      display:grid !important;
      grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
@@ -1487,7 +1645,6 @@ style.textContent = `
      width: 100% !important;
      max-width: none !important;
    }
-    
 
    .splitRow--banner .homePaneCard{
      min-height: 420px;
@@ -1501,7 +1658,59 @@ style.textContent = `
 
    /* Make carousel slides not overflow */
    #highTrack{ display:flex; transition: transform .35s ease; }
-   .carouselSlide{ min-width: 100%; }
+   /* -----------------------------
+      Home tiles: make horizontal bubble buttons
+      (Search / Review / Rent)
+   ------------------------------ */
+   .tileRow{
+     display:flex !important;
+     flex-direction:row !important;
+     gap:12px !important;
+     flex-wrap:wrap !important;
+     align-items:center !important;
+     justify-content:flex-start !important;
+     margin-top:14px !important;
+   }
+
+   .tileRow .tile{
+     display:inline-flex !important;
+     align-items:center !important;
+     gap:10px !important;
+
+     padding:10px 14px !important;
+     border-radius:999px !important;
+
+     border:1px solid rgba(20,16,12,.14) !important;
+     background: rgba(255,255,255,.55) !important;
+     box-shadow: 0 10px 26px rgba(20,16,12,.06) !important;
+
+     cursor:pointer !important;
+     user-select:none !important;
+
+     /* prevent “full-width blocks” */
+     width:auto !important;
+     flex:0 0 auto !important;
+     margin:0 !important;
+   }
+
+   .tileRow .tile .tile__icon{
+     /* keep your icon vibe, just align it */
+     display:inline-flex !important;
+     width:auto !important;
+     min-width:0 !important;
+     margin:0 !important;
+   }
+
+   .tileRow .tile .tile__label{
+     font-weight:900 !important;
+     line-height:1 !important;
+   }
+
+   /* Disabled tile still looks disabled but stays horizontal */
+   .tileRow .tile.tile--disabled{
+     opacity:.55 !important;
+     cursor:not-allowed !important;
+   }
 
    /* Map sizing guard */
    #homeMap, #searchMap, #propMap, #addMap{
@@ -1511,65 +1720,44 @@ style.textContent = `
      overflow:hidden;
    }
 
-    /* -----------------------------
-       Drawer menu: horizontal bubbles
-       (Search / Review / Rent)
-    ------------------------------ */
+   /* -----------------------------
+      Drawer bubbles: horizontal row (guaranteed)
+   ------------------------------ */
+   #drawer .drawerBubbleRow{
+     display:flex !important;
+     flex-direction:row !important;
+     gap:10px !important;
+     flex-wrap:wrap !important;
+     align-items:center !important;
+     justify-content:flex-start !important;
+     padding:12px !important;
+   }
 
-    /* Make drawer links container horizontal */
-    #drawer nav,
-    .drawer nav,
-    #drawer .drawerLinks,
-    .drawer .drawerLinks,
-    #drawerLinks {
-      display:flex !important;
-      flex-direction:row !important;
-      gap:10px !important;
-      flex-wrap:wrap !important;
-      padding:12px !important;
-      align-items:center !important;
-      justify-content:flex-start !important;
-    }
+   #drawer .drawerBubbleRow a,
+   #drawer .drawerBubbleRow button{
+     display:inline-flex !important;
+     align-items:center !important;
+     justify-content:center !important;
+     padding:10px 14px !important;
+     border-radius:999px !important;
+     border:1px solid rgba(20,16,12,.14) !important;
+     background:rgba(255,255,255,.55) !important;
+     text-decoration:none !important;
+     font-weight:900 !important;
+     font-size:13px !important;
+     line-height:1 !important;
+     color:rgba(21,17,14,.92) !important;
+     box-shadow:0 10px 26px rgba(20,16,12,.06) !important;
+     width:auto !important;
+     margin:0 !important;
+     flex: 0 0 auto !important;
+     cursor:pointer !important;
+   }
 
-    /* Bubble style for each link */
-    #drawer nav a,
-    .drawer nav a,
-    #drawer .drawerLinks a,
-    .drawer .drawerLinks a,
-    #drawerLinks a,
-    #drawer a {
-      display:inline-flex !important;
-      align-items:center !important;
-      justify-content:center !important;
-      padding:10px 14px !important;
-      border-radius:999px !important;
-      border:1px solid rgba(20,16,12,.14) !important;
-      background:rgba(255,255,255,.55) !important;
-      text-decoration:none !important;
-      font-weight:900 !important;
-      font-size:13px !important;
-      line-height:1 !important;
-      color:rgba(21,17,14,.92) !important;
-      box-shadow:0 10px 26px rgba(20,16,12,.06) !important;
-      width:auto !important;
-      margin:0 !important;
-    }
-
-    /* Remove vertical stacking margins */
-    #drawer nav a + a,
-    .drawer nav a + a,
-    #drawer .drawerLinks a + a,
-    .drawer .drawerLinks a + a {
-      margin-top:0 !important;
-    }
-
-    /* Hover */
-    #drawer nav a:hover,
-    .drawer nav a:hover,
-    #drawer .drawerLinks a:hover,
-    .drawer .drawerLinks a:hover {
-      background:rgba(255,255,255,.72) !important;
-    }
+   #drawer .drawerBubbleRow a:hover,
+   #drawer .drawerBubbleRow button:hover{
+     background:rgba(255,255,255,.72) !important;
+   }
  `.trim();
 document.head.appendChild(style);
 }
@@ -2335,30 +2523,45 @@ return `
 function wireReviewListInteractions(container, landlordContextIdForReply) {
 if (!container) return;
 
+// iOS/Safari-safe selector escaping
+const escSel = (v) => {
+const s = String(v ?? "");
+if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(s);
+return s.replace(/[^a-zA-Z0-9_\u00A0-\uFFFF-]/g, (ch) => "\\" + ch);
+};
+
 container.querySelectorAll("[data-flag]").forEach((btn) => {
-btn.addEventListener("click", () => openReportModal("review", btn.getAttribute("data-flag") || ""));
+btn.addEventListener("click", () =>
+openReportModal("review", btn.getAttribute("data-flag") || "")
+);
 });
 
 container.querySelectorAll("[data-reply-open]").forEach((btn) => {
 btn.addEventListener("click", () => {
-const rid = btn.getAttribute("data-reply-open");
-const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+const rid = btn.getAttribute("data-reply-open") || "";
+const box = container.querySelector(
+`[data-reply-box="${escSel(rid)}"]`
+);
 if (box) box.style.display = "block";
 });
 });
 
 container.querySelectorAll("[data-reply-cancel]").forEach((btn) => {
 btn.addEventListener("click", () => {
-const rid = btn.getAttribute("data-reply-cancel");
-const box = container.querySelector(`[data-reply-box="${CSS.escape(rid)}"]`);
+const rid = btn.getAttribute("data-reply-cancel") || "";
+const box = container.querySelector(
+`[data-reply-box="${escSel(rid)}"]`
+);
 if (box) box.style.display = "none";
 });
 });
 
 container.querySelectorAll("[data-reply-send]").forEach((btn) => {
 btn.addEventListener("click", () => {
-const rid = btn.getAttribute("data-reply-send");
-const ta = container.querySelector(`[data-reply-text="${CSS.escape(rid)}"]`);
+const rid = btn.getAttribute("data-reply-send") || "";
+const ta = container.querySelector(
+`[data-reply-text="${escSel(rid)}"]`
+);
 const text = ta && ta.value ? String(ta.value).trim() : "";
 if (!text) return alert("Write a short response first.");
 addReply(landlordContextIdForReply, rid, text);
