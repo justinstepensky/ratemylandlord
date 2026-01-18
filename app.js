@@ -1473,7 +1473,7 @@ function ensureRuntimeStyles() {
   const style = document.createElement("style");
   style.id = "casaRuntimeStyles";
   style.textContent = `
-     /* Force 50/50 banner split on desktop; stack on mobile */
+    /* Force 50/50 banner split on desktop; stack on mobile */
     .splitRow--banner{
       display:grid !important;
       grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
@@ -1486,7 +1486,7 @@ function ensureRuntimeStyles() {
       width: 100% !important;
       max-width: none !important;
     }
-    
+
     .splitRow--banner .homePaneCard{
       min-height: 420px;
     }
@@ -1507,6 +1507,66 @@ function ensureRuntimeStyles() {
       min-height: 320px;
       border-radius: 18px;
       overflow:hidden;
+    }
+
+    /* -----------------------------
+       Drawer menu: horizontal bubbles
+       (Search / Review / Rent)
+    ------------------------------ */
+
+    /* Make drawer links container horizontal */
+    #drawer nav,
+    .drawer nav,
+    #drawer .drawerLinks,
+    .drawer .drawerLinks,
+    #drawerLinks {
+      display:flex !important;
+      flex-direction:row !important;
+      gap:10px !important;
+      flex-wrap:wrap !important;
+      padding:12px !important;
+      align-items:center !important;
+      justify-content:flex-start !important;
+    }
+
+    /* Bubble style for each link */
+    #drawer nav a,
+    .drawer nav a,
+    #drawer .drawerLinks a,
+    .drawer .drawerLinks a,
+    #drawerLinks a,
+    #drawer a {
+      display:inline-flex !important;
+      align-items:center !important;
+      justify-content:center !important;
+      padding:10px 14px !important;
+      border-radius:999px !important;
+      border:1px solid rgba(20,16,12,.14) !important;
+      background:rgba(255,255,255,.55) !important;
+      text-decoration:none !important;
+      font-weight:900 !important;
+      font-size:13px !important;
+      line-height:1 !important;
+      color:rgba(21,17,14,.92) !important;
+      box-shadow:0 10px 26px rgba(20,16,12,.06) !important;
+      width:auto !important;
+      margin:0 !important;
+    }
+
+    /* Remove vertical stacking margins */
+    #drawer nav a + a,
+    .drawer nav a + a,
+    #drawer .drawerLinks a + a,
+    .drawer .drawerLinks a + a {
+      margin-top:0 !important;
+    }
+
+    /* Hover */
+    #drawer nav a:hover,
+    .drawer nav a:hover,
+    #drawer .drawerLinks a:hover,
+    .drawer .drawerLinks a:hover {
+      background:rgba(255,255,255,.72) !important;
     }
   `.trim();
   document.head.appendChild(style);
