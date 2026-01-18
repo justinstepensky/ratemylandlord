@@ -28,10 +28,14 @@
       const el = document.getElementById("app");
       if (!el) return;
 
-      const msg = String(
-        err && (err.stack || err.message) ? err.stack || err.message : err
-      );
-
+     let msg = "";
+try {
+  if (err && (err.stack || err.message)) msg = String(err.stack || err.message);
+  else if (typeof err === "string") msg = err;
+  else msg = JSON.stringify(err, Object.getOwnPropertyNames(err), 2);
+} catch {
+  msg = String(err);
+}
       el.innerHTML = `
         <section class="pageCard card">
           <div class="pad">
@@ -85,9 +89,33 @@ ${msg}
     )
   );
 
-  window.addEventListener("unhandledrejection", (e) =>
-    showOverlayError("Unhandled promise rejection", e && e.reason ? e.reason : e)
-  );
+window.addEventListener("unhandledrejection", (e) => {
+  try {
+    const r = e && "reason" in e ? e.reason : e;
+
+    // iOS Safari often throws benign abort/load-failed rejections during map/tile teardown.
+    const name = r && r.name ? String(r.name) : "";
+    const msg = r && (r.message || r.stack) ? String(r.message || r.stack) : String(r || "");
+
+    const looksBenign =
+      name === "AbortError" ||
+      /aborted/i.test(msg) ||
+      /load failed/i.test(msg) ||
+      /The operation was aborted/i.test(msg);
+
+    if (looksBenign) {
+      console.warn("Ignored benign promise rejection:", r);
+      // prevent default logging noise
+      try { e && e.preventDefault && e.preventDefault(); } catch {}
+      return;
+    }
+
+    showOverlayError("Unhandled promise rejection", r);
+  } catch (err) {
+    // If our handler fails, fall back to the overlay
+    showOverlayError("Unhandled promise rejection (handler failed)", err);
+  }
+});
 })();
 
 /* -----------------------------
