@@ -320,15 +320,10 @@ function casaLogoSVGInline(size = 18) {
 function casaEmbedSnippetForLandlord(l) {
   const st = ratingStats(l.id);
   const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
-  const count = st.count || 0;
 
-  // IMPORTANT: use absolute URL so the embed works anywhere.
-  // If you ever change repo name, update this one line.
   const siteBase = "https://justinstepensky.github.io/ratemylandlord/";
   const profileURL = `${siteBase}#/landlord/${encodeURIComponent(l.id)}`;
 
-  // Self-contained: inline SVG + inline styles (no missing badge images).
-  // Uses same casa font styling as your header.
   return `
 <a href="${profileURL}" target="_blank" rel="noopener noreferrer"
    style="
@@ -354,10 +349,7 @@ function casaEmbedSnippetForLandlord(l) {
     ${casaLogoSVGInline(18).replace(/\n/g, "")}
   </span>
 
-  <span style="
-    ${casaBrandFontInlineCSS()};
-    font-size:14px;
-  ">
+  <span style="${casaBrandFontInlineCSS()}; font-size:14px;">
     Rated on <span style="${casaBrandFontInlineCSS()};">casa</span>
   </span>
 
@@ -368,16 +360,7 @@ function casaEmbedSnippetForLandlord(l) {
      color: rgba(21,17,14,.72);
    ">
     • ${avgText}/5
-   </span>
-
-   <span style="
-     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-     font-weight: 700;
-     font-size:12px;
-     color: rgba(21,17,14,.55);
-   ">
-    (${count} review${count===1?"":"s"})
-   </span>
+  </span>
 </a>`.trim();
 }
 
@@ -524,7 +507,7 @@ console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
     if (!wrap || !prev) return;
     wrap.style.display = "block";
     // Render the HTML snippet safely in our own page context
-    prev.innerHTML = $("#embedBox")?.value || snippet;
+prev.innerHTML = snippet;
   });
 }
 
@@ -1607,8 +1590,7 @@ function openEmbedModal(landlord) {
   const pageUrl = `${location.origin}${location.pathname}#/landlord/${encodeURIComponent(landlord.id)}`;
   const html = `<a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;border:1px solid rgba(20,16,12,.14);background:rgba(255,255,255,.75);padding:10px 12px;border-radius:999px;color:rgba(21,17,14,.92);font-weight:800;">
   <img src="${location.origin}${location.pathname}assets/badge-casa.png" alt="CASA" style="width:18px;height:18px;border-radius:5px;"/>
-  Rated on CASA • ${avgText}/5
-</a>`;
+Rated on <span style="${casaBrandFontInlineCSS()};">casa</span></a>`;
 
   openModal(`
     <div class="modalHead">
