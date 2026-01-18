@@ -458,6 +458,12 @@ function openModal(innerHTML) {
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 
+  // HARDEN: remove any <img> tags inside modal content (prevents broken badge icons)
+  try {
+    overlay.querySelectorAll("img").forEach(img => img.remove());
+  } catch {}
+
+  // One-time click handler
   const handler = (e) => {
     if (e.target === overlay) closeModal();
   };
@@ -536,6 +542,7 @@ console.log("EMBED SNIPPET START:", snippet.slice(0, 200));
     wrap.style.display = "block";
     // Render the HTML snippet safely in our own page context
 prev.innerHTML = snippet;
+ prev.querySelectorAll("img").forEach(img => img.remove());    
   });
 }
 
