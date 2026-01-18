@@ -1073,7 +1073,7 @@ function initLeafletMap(el, center, zoom = 12) {
 }
 
 /* -----------------------------
-   Router
+   Router (Hardened for mobile/iOS)
 ------------------------------ */
 function route() {
   const hash = location.hash || "#/";
@@ -1097,11 +1097,57 @@ function route() {
   renderHome();
 }
 
-window.addEventListener("hashchange", route);
+/* Mobile-safe wrapper: NEVER let one crash kill rendering */
+function safeRoute() {
+  try {
+    route();
+  } catch (err) {
+    try {
+      console.error("Route crash:", err);
+
+      // Try fallback render instead of dying
+      try {
+        renderHome();
+        return;
+      } catch (e2) {
+        console.error("Fallback renderHome failed:", e2);
+      }
+
+      // If even fallback fails, show a minimal inline message (no recursion)
+      const app = document.getElementById("app");
+      if (app) {
+        const msg = String(err && (err.stack || err.message) ? err.stack || err.message : err);
+        app.innerHTML = `
+          <section class="pageCard card">
+            <div class="pad">
+              <div class="kicker">CASA</div>
+              <div class="pageTitle" style="margin-top:6px;">Something went wrong</div>
+              <div class="pageSub" style="margin-top:8px;">
+                The app hit an error and stopped rendering.
+              </div>
+              <div class="hr"></div>
+              <div class="smallNote"
+                   style="white-space:pre-wrap;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,'Liberation Mono','Courier New', monospace;">
+Route error
+${msg}
+              </div>
+              <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+                <a class="btn btn--primary" href="#/">Go Home</a>
+                <button class="btn" type="button" onclick="location.reload()">Reload</button>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+    } catch {}
+  }
+}
+
+window.addEventListener("hashchange", safeRoute);
 window.addEventListener("load", () => {
-  initDrawer();
-  initMobileOnlyMenu(); // ✅ new: hide hamburger/drawer on desktop
-  route();
+  try { initDrawer(); } catch (e) { console.error("initDrawer failed:", e); }
+  try { initMobileOnlyMenu(); } catch (e) { console.error("initMobileOnlyMenu failed:", e); }
+  safeRoute();
 });
 
 /* -----------------------------
@@ -1114,16 +1160,19 @@ function initMobileOnlyMenu() {
 
   function apply() {
     const isDesktop = window.innerWidth >= 981;
-    // Hide hamburger + drawer + overlay on desktop (even if present in HTML)
+
+    // Hide hamburger + drawer + overlay on desktop
     if (btn) btn.style.display = isDesktop ? "none" : "";
     if (drawer) drawer.style.display = isDesktop ? "none" : "";
     if (overlay) overlay.style.display = isDesktop ? "none" : "";
 
-    // Also ensure drawer isn't open on desktop
+    // Ensure drawer isn't open on desktop
     if (isDesktop) {
       try {
         drawer && drawer.classList.remove("isOpen");
         overlay && overlay.classList.remove("isOpen");
+        drawer && drawer.setAttribute("aria-hidden", "true");
+        overlay && overlay.setAttribute("aria-hidden", "true");
       } catch {}
     }
   }
