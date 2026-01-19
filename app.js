@@ -124,6 +124,7 @@ showOverlayError("Unhandled promise rejection (handler failed)", err);
 const LS_KEY = "casa_demo_v2";
 const LEGACY_LS_KEY = "casa_demo_v1";
 const BADGE_VER = "1";
+const ASSET_BASE = location.pathname.includes("/ratemylandlord") ? "/ratemylandlord/" : "/";
 
 function safeParseJSON(raw) {
 try {
@@ -880,8 +881,9 @@ return "CASA Rated";
 const badgeWarned = new Set();
 
 function badgeImg(src, alt, title, fallbackText, landlordId, kind) {
-const srcWithVer = `${src}?v=${BADGE_VER}`;
-const altSrcWithVer = `./${src}?v=${BADGE_VER}`;
+const clean = String(src || "").replace(/^\//, "");
+const srcWithVer = `${ASSET_BASE}${clean}?v=${BADGE_VER}`;
+const altSrcWithVer = `./${clean}?v=${BADGE_VER}`;
 return `
    <img
      class="badgeIcon"
@@ -2163,7 +2165,7 @@ const content = `
          <div>
            <div class="kicker">Search</div>
            <div class="pageTitle">Find a landlord or address</div>
-           <div class="pageSub">Results are split: Landlords (left) and Addresses (right).</div>
+           <div class="pageSub"></div>
          </div>
          <a class="btn" href="#/">Home</a>
        </div>
@@ -2297,8 +2299,9 @@ refreshSearchRegionUI();
 }
 
 const regionKey = getRegionKey();
-const landlords = DB.landlords.filter((l) => matchesLandlord(l, query));
 const props = filterPropertiesByRegion(DB.properties, regionKey).filter((p) => matchesProperty(p, query));
+const landlordIdsInRegion = new Set(props.map((p) => p.landlordId));
+const landlords = DB.landlords.filter((l) => matchesLandlord(l, query) && landlordIdsInRegion.has(l.id));
 
 if (lResEl) lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
 if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
@@ -2608,34 +2611,36 @@ const content = `
 
              <div class="hr"></div>
 
-             <div class="field">
-               <label>Email</label>
-               <input class="input" id="lpEmail" placeholder="you@company.com" />
-             </div>
+             <form id="lpForm">
+               <div class="field">
+                 <label>Email</label>
+                 <input class="input" id="lpEmail" placeholder="you@company.com" />
+               </div>
 
-             <div class="field">
-               <label>Password</label>
-               <input class="input" id="lpPass" type="password" placeholder="••••••••" />
-             </div>
+               <div class="field">
+                 <label>Password</label>
+                 <input class="input" id="lpPass" type="password" placeholder="••••••••" />
+               </div>
 
-             ${
-               landlordMode === "signup"
-                 ? `
-                   <div class="field">
-                     <label>Company / Landlord name</label>
-                     <input class="input" id="lpCompany" placeholder="Exact name as shown on CASA" />
-                   </div>
-                   <div class="field">
-                     <label>Verification document (demo)</label>
-                     <input class="input" id="lpDoc" type="file" />
-                   </div>
-                 `
-                 : ""
-             }
+               ${
+                 landlordMode === "signup"
+                   ? `
+                     <div class="field">
+                       <label>Company / Landlord name</label>
+                       <input class="input" id="lpCompany" placeholder="Exact name as shown on CASA" />
+                     </div>
+                     <div class="field">
+                       <label>Verification document (demo)</label>
+                       <input class="input" id="lpDoc" type="file" />
+                     </div>
+                   `
+                   : ""
+               }
 
-             <button class="btn btn--primary btn--block" id="lpSubmit" type="button" style="margin-top:12px;">
-               ${landlordMode === "signup" ? "Create account" : "Sign in"}
-             </button>
+               <button class="btn btn--primary btn--block" id="lpSubmit" type="submit" style="margin-top:12px;">
+                 ${landlordMode === "signup" ? "Create account" : "Sign in"}
+               </button>
+             </form>
 
              <div class="tiny" style="margin-top:10px; line-height:1.45;">
                ${
@@ -2668,19 +2673,21 @@ const content = `
 
              <div class="hr"></div>
 
-             <div class="field">
-               <label>Email</label>
-               <input class="input" id="userEmail" placeholder="you@email.com" />
-             </div>
+             <form id="userForm">
+               <div class="field">
+                 <label>Email</label>
+                 <input class="input" id="userEmail" placeholder="you@email.com" />
+               </div>
 
-             <div class="field">
-               <label>Password</label>
-               <input class="input" id="userPass" type="password" placeholder="••••••••" />
-             </div>
+               <div class="field">
+                 <label>Password</label>
+                 <input class="input" id="userPass" type="password" placeholder="••••••••" />
+               </div>
 
-             <button class="btn btn--primary btn--block" id="userSubmit" type="button" style="margin-top:12px;">
-               ${userMode === "signup" ? "Create account" : "Sign in"}
-             </button>
+               <button class="btn btn--primary btn--block" id="userSubmit" type="submit" style="margin-top:12px;">
+                 ${userMode === "signup" ? "Create account" : "Sign in"}
+               </button>
+             </form>
 
              <div class="tiny" style="margin-top:10px; line-height:1.45;">
                ${userMode === "signup" ? "Sign up to post ratings and reviews." : "Welcome back. Continue to rate."}
@@ -2710,7 +2717,8 @@ alert(`Demo: ${btn.getAttribute("data-user-sso")} SSO would start here.`);
 });
 
 // demo submit
-$("#lpSubmit")?.addEventListener("click", () => {
+$("#lpForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
 const email = $("#lpEmail")?.value ? $("#lpEmail").value.trim() : "";
 const pass = $("#lpPass")?.value ? $("#lpPass").value.trim() : "";
 if (!email || !pass) {
@@ -2753,7 +2761,8 @@ location.hash = "#/";
 });
 
 // demo submit (user)
-$("#userSubmit")?.addEventListener("click", () => {
+$("#userForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
 const email = $("#userEmail")?.value ? $("#userEmail").value.trim() : "";
 const pass = $("#userPass")?.value ? $("#userPass").value.trim() : "";
 if (!email || !pass) {
@@ -3212,6 +3221,7 @@ const st = ratingStats("landlord", l.id);
 const tier = cardTier(st.avgRounded ?? 0, st.count);
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
+const landlordScoreText = st.count ? st.avgRounded.toFixed(1) : "—";
 const landlordCats = categoryAveragesForLandlord(l.id);
 
 const props = DB.properties.filter((p) => p.landlordId === l.id);
