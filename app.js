@@ -2178,6 +2178,7 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
+initStarPickers();
 
 // Region selector wiring for Search page (wired only through refresh to avoid stacking)
 // (do nothing here)
@@ -2846,14 +2847,38 @@ ensureRuntimeStyles();
   REVIEW UI helpers (forms/lists)
 ------------------------------ */
 function renderStarsPicker(idPrefix, defaultVal = 5) {
-const opts = [5, 4, 3, 2, 1]
-.map((v) => `<option value="${v}" ${v === defaultVal ? "selected" : ""}>${"★".repeat(v)}${"☆".repeat(5 - v)}</option>`)
+const stars = [1, 2, 3, 4, 5]
+.map((v) => {
+const isOn = v <= defaultVal;
+return `<button type="button" data-star="${v}" class="starBtn" style="background:none;border:0;padding:2px 4px;font-size:18px;cursor:pointer;color:${isOn ? "rgba(21,17,14,.92)" : "rgba(21,17,14,.35)"}">★</button>`;
+})
 .join("");
 return `
-   <select class="input" id="${esc(idPrefix)}Stars" style="max-width:260px;">
-     ${opts}
-   </select>
+   <div data-stars-picker="1" data-stars-input="${esc(idPrefix)}Stars" style="display:flex; gap:2px; align-items:center;">
+     <input type="hidden" id="${esc(idPrefix)}Stars" value="${esc(defaultVal)}" />
+     ${stars}
+   </div>
  `.trim();
+}
+
+function initStarPickers(root = document) {
+const pickers = root.querySelectorAll("[data-stars-picker]");
+pickers.forEach((picker) => {
+if (picker.dataset.bound === "1") return;
+picker.dataset.bound = "1";
+picker.addEventListener("click", (e) => {
+const btn = e.target && e.target.closest ? e.target.closest("[data-star]") : null;
+if (!btn) return;
+const val = Number(btn.getAttribute("data-star") || 0);
+const inputId = picker.getAttribute("data-stars-input") || "";
+const input = inputId ? document.getElementById(inputId) : null;
+if (input) input.value = String(val);
+picker.querySelectorAll("[data-star]").forEach((el) => {
+const v = Number(el.getAttribute("data-star") || 0);
+el.style.color = v <= val ? "rgba(21,17,14,.92)" : "rgba(21,17,14,.35)";
+});
+});
+});
 }
 
 function renderCategoryPicker(id, label) {
@@ -3506,6 +3531,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initPropertyMediaEmbed();
+initStarPickers();
 
 // Reviews
 const listEl = $("#propertyReviews");
