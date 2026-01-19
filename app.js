@@ -346,6 +346,7 @@ replies: [],
 landlordUsers: [],
 users: [],
 currentUserId: "",
+currentLandlordUserId: "",
 };
 saveDB(db);
 return db;
@@ -362,6 +363,8 @@ replies: Array.isArray(db.replies) ? db.replies : [],
 landlordUsers: Array.isArray(db.landlordUsers) ? db.landlordUsers : [],
 users: Array.isArray(db.users) ? db.users : [],
 currentUserId: typeof db.currentUserId === "string" ? db.currentUserId : "",
+currentLandlordUserId:
+  typeof db.currentLandlordUserId === "string" ? db.currentLandlordUserId : "",
 };
 
 // ensure every review has targetType/targetId
@@ -417,6 +420,12 @@ createdAt: Number(u && u.createdAt ? u.createdAt : Date.now()),
 
 if (out.currentUserId && !out.users.find((u) => u.id === out.currentUserId)) {
 out.currentUserId = "";
+}
+if (
+out.currentLandlordUserId &&
+!out.landlordUsers.find((u) => u.id === out.currentLandlordUserId)
+) {
+out.currentLandlordUserId = "";
 }
 
 return out;
@@ -520,6 +529,24 @@ function norm(s) {
 return String(s || "").trim().toLowerCase();
 }
 
+function landlordForCompany(company) {
+const c = norm(company);
+if (!c) return null;
+return (
+DB.landlords.find((l) => l && (norm(l.name) === c || norm(l.entity) === c)) || null
+);
+}
+
+function canLandlordRespond(landlordId) {
+if (!landlordId) return false;
+const user = currentLandlordUser();
+if (!user || !user.verified) return false;
+const l = DB.landlords.find((x) => x && x.id === landlordId);
+if (!l) return false;
+const match = landlordForCompany(user.company);
+return !!(match && match.id === l.id);
+}
+
 function idRand(prefix) {
 return prefix + Math.random().toString(16).slice(2);
 }
@@ -536,6 +563,16 @@ return (DB.users || []).find((u) => u && u.id === id) || null;
 
 function isUserSignedIn() {
 return !!currentUser();
+}
+
+function currentLandlordUser() {
+const id = DB.currentLandlordUserId || "";
+if (!id) return null;
+return (DB.landlordUsers || []).find((u) => u && u.id === id) || null;
+}
+
+function isLandlordSignedIn() {
+return !!currentLandlordUser();
 }
 
 function parseId(id) {
@@ -615,155 +652,114 @@ return { count, avg, avgRounded, dist };
 }
 
 /* -----------------------------
-  Geocoding (Property media)
+  Property media (Google Maps embed)
 ------------------------------ */
-function normalizeAddressForGeo(p) {
-if (!p) return "";
-const parts = [];
-if (typeof p.address === "string") parts.push(String(p.address));
-if (p.address && typeof p.address === "object") {
-const line1 = p.address.line1 ? String(p.address.line1) : "";
-const unit = p.address.unit ? String(p.address.unit) : "";
-const line = line1 && unit ? `${line1}, ${unit}` : line1 || unit;
-if (line) parts.push(line);
-if (p.address.city) parts.push(String(p.address.city));
-if (p.address.state) parts.push(String(p.address.state));
-if (p.address.zip) parts.push(String(p.address.zip));
-}
-if (p.city) parts.push(String(p.city));
-if (p.state) parts.push(String(p.state));
-if (p.zip) parts.push(String(p.zip));
-return parts.join(", ").trim();
-}
+function buildFullAddress(p) {
+const line =
+p?.addressLine ||
+(typeof p?.address === "string" ? p.address : "") ||
+p?.street ||
+p?.line1 ||
+p?.propertyAddress ||
+"";
 
-function geoCacheKey(addr) {
-return "CASA_GEO_" + String(addr || "").toLowerCase().trim();
-}
+const addrObj = p && typeof p.address === "object" ? p.address : null;
+const addrLine1 = addrObj && addrObj.line1 ? String(addrObj.line1) : "";
+const addrUnit = addrObj && addrObj.unit ? String(addrObj.unit) : "";
+const addrLine = addrLine1 && addrUnit ? `${addrLine1}, ${addrUnit}` : addrLine1 || "";
 
-function getGeoCache(addr) {
-try {
-const raw = localStorage.getItem(geoCacheKey(addr));
-if (!raw) return null;
-const obj = JSON.parse(raw);
-const maxAge = 30 * 24 * 60 * 60 * 1000;
-if (obj && obj.ts && Date.now() - obj.ts > maxAge) return null;
-if (Number.isFinite(obj && obj.lat) && Number.isFinite(obj && obj.lng)) return obj;
-} catch {}
-return null;
+const city = p?.city || (addrObj && addrObj.city) || "";
+const state = p?.state || p?.st || (addrObj && addrObj.state) || "";
+const zip = p?.zip || p?.postal || p?.postalCode || (addrObj && addrObj.zip) || "";
+
+const parts = [addrLine || line, city, state, zip]
+.map((v) => String(v || "").trim())
+.filter(Boolean);
+
+return parts.join(", ");
 }
 
-function setGeoCache(addr, lat, lng) {
-try {
-localStorage.setItem(
-geoCacheKey(addr),
-JSON.stringify({ lat: Number(lat), lng: Number(lng), ts: Date.now() })
-);
-} catch {}
+function googleMapsEmbedSrc(address) {
+const q = encodeURIComponent(String(address || "").trim());
+return `https://www.google.com/maps?q=${q}&output=embed`;
 }
 
-let __geoQueue = Promise.resolve();
-let __geoLastCall = 0;
-
-function geocodeAddress(addr) {
-const a = String(addr || "").trim();
-if (!a) return Promise.resolve(null);
-
-const cached = getGeoCache(a);
-if (cached) return Promise.resolve({ lat: cached.lat, lng: cached.lng });
-
-__geoQueue = __geoQueue.then(async () => {
-const wait = Math.max(0, 1200 - (Date.now() - __geoLastCall));
-if (wait) await new Promise((r) => setTimeout(r, wait));
-__geoLastCall = Date.now();
-
-try {
-const url =
-"https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
-encodeURIComponent(a);
-const res = await fetch(url, { method: "GET" });
-if (!res.ok) return null;
-const data = await res.json();
-const hit = data && data[0];
-const lat = Number(hit && hit.lat);
-const lng = Number(hit && hit.lon);
-if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-setGeoCache(a, lat, lng);
-return { lat, lng };
-} catch {
-return null;
-}
-});
-
-return __geoQueue;
-}
-
-function osmStaticUrl(lat, lng, zoom = 16, w = 740, h = 420) {
-const la = Number(lat);
-const ln = Number(lng);
-if (!Number.isFinite(la) || !Number.isFinite(ln)) return "";
-const z = Math.max(1, Math.min(19, zoom | 0));
-const width = Math.max(200, Math.min(1280, w | 0));
-const height = Math.max(200, Math.min(900, h | 0));
-const center = `${la},${ln}`;
-return (
-"https://staticmap.openstreetmap.de/staticmap.php?center=" +
-encodeURIComponent(center) +
-`&zoom=${z}&size=${width}x${height}&markers=${encodeURIComponent(center)},red-pushpin`
-);
+function googleMapsLink(address) {
+const q = encodeURIComponent(String(address || "").trim());
+return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
 function renderPropertyMediaCard(p) {
-const addr = normalizeAddressForGeo(p);
+const addr = buildFullAddress(p);
+if (!addr) {
+return `
+       <section class="pageCard card">
+         <div class="pad">
+           <div class="sectionLabel">PROPERTY LOCATION</div>
+           <div class="muted">No address available for map preview.</div>
+         </div>
+       </section>
+     `.trim();
+}
+
+const src = googleMapsEmbedSrc(addr);
+const link = googleMapsLink(addr);
+
 return `
      <section class="pageCard card">
        <div class="pad">
-         <div class="sectionLabel">PROPERTY MEDIA</div>
-         <div class="mediaWrap" id="mediaWrap">
-           <div class="mediaPlaceholder" id="mediaPlaceholder">
-             <div class="muted">Loading map preview…</div>
-           </div>
-           <img class="mediaImg" id="mediaImg" style="display:none;" alt="Map preview" loading="lazy" />
+         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+           <div class="sectionLabel">PROPERTY LOCATION</div>
+           <a class="btn miniBtn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">
+             Open in Google Maps
+           </a>
          </div>
-         <div class="muted mini" style="margin-top:8px;">Area view (OpenStreetMap)</div>
+
+         <div class="mapEmbedWrap" style="margin-top:12px;">
+           <div class="mediaPlaceholder" id="mapEmbedFallback" style="display:none;">
+             <div class="muted">Map preview unavailable.</div>
+           </div>
+           <iframe
+             class="mapEmbedFrame"
+             id="mapEmbedFrame"
+             src="${esc(src)}"
+             loading="lazy"
+             referrerpolicy="no-referrer-when-downgrade"
+             style="border:0; width:100%; height:420px; border-radius:16px;"
+             allowfullscreen
+           ></iframe>
+         </div>
+
+         <div class="muted mini" style="margin-top:8px;">Map preview (Google Maps)</div>
        </div>
      </section>
    `.trim();
 }
 
-function initPropertyMediaFromAddress(p) {
-const addr = normalizeAddressForGeo(p);
-const imgEl = document.getElementById("mediaImg");
-const phEl = document.getElementById("mediaPlaceholder");
-if (!imgEl || !phEl) return;
+function initPropertyMediaEmbed() {
+const frame = document.getElementById("mapEmbedFrame");
+const fallback = document.getElementById("mapEmbedFallback");
+if (!frame || !fallback) return;
 
-if (!addr) {
-phEl.innerHTML = `<div class="muted">No address available for preview.</div>`;
-return;
-}
-
-geocodeAddress(addr).then((coords) => {
-if (!coords) {
-phEl.innerHTML = `<div class="muted">Map preview unavailable. View location on map above.</div>`;
-return;
-}
-
-const url = osmStaticUrl(coords.lat, coords.lng, 16, 740, 420);
-if (!url) {
-phEl.innerHTML = `<div class="muted">Couldn’t load map preview.</div>`;
-return;
-}
-
-imgEl.onerror = () => {
-imgEl.style.display = "none";
-phEl.style.display = "block";
-phEl.innerHTML = `<div class="muted">Preview failed to load.</div>`;
+const showFallback = () => {
+fallback.style.display = "flex";
+frame.style.display = "none";
 };
 
-imgEl.src = url;
-imgEl.onload = () => {
-phEl.style.display = "none";
-imgEl.style.display = "block";
-};
+let loaded = false;
+const timer = setTimeout(() => {
+if (!loaded) showFallback();
+}, 5000);
+
+frame.addEventListener("error", () => {
+clearTimeout(timer);
+showFallback();
+});
+frame.addEventListener("load", () => {
+loaded = true;
+clearTimeout(timer);
+fallback.style.display = "none";
+frame.style.display = "block";
 });
 }
 
@@ -2002,12 +1998,6 @@ style.textContent = `
      color: rgba(21,17,14,.60);
      text-transform: uppercase;
    }
-   .mediaImg{
-     width:100%;
-     height:auto;
-     border-radius:16px;
-     display:block;
-   }
    .mediaPlaceholder{
      border:1px solid rgba(0,0,0,0.06);
      border-radius:16px;
@@ -2649,6 +2639,17 @@ persist();
 alert("Demo: account created. Verification pending.");
 location.hash = "#/";
 } else {
+const match = DB.landlordUsers.find((u) => u && u.email && norm(u.email) === norm(email));
+if (!match) {
+alert("No landlord account found for that email. Create one first.");
+return;
+}
+const linked = landlordForCompany(match.company);
+if (linked && linked.isVerified) {
+match.verified = true;
+}
+DB.currentLandlordUserId = match.id;
+persist();
 alert("Demo: signed in (no real auth wired).");
 location.hash = "#/";
 }
@@ -2920,7 +2921,10 @@ const replyHTML = reply
        `
 : "";
 
-const canReply = !!landlordContextIdForReply && targetType === "landlord";
+const canReply =
+!!landlordContextIdForReply &&
+targetType === "landlord" &&
+canLandlordRespond(landlordContextIdForReply);
 
 const respondHTML = canReply
 ? `
@@ -2998,6 +3002,10 @@ if (box) box.style.display = "none";
 container.querySelectorAll("[data-reply-send]").forEach((btn) => {
 btn.addEventListener("click", () => {
 const rid = btn.getAttribute("data-reply-send") || "";
+if (!canLandlordRespond(landlordContextIdForReply)) {
+alert("Only verified landlords can respond.");
+return;
+}
 const ta = container.querySelector(
 `[data-reply-text="${escSel(rid)}"]`
 );
@@ -3336,7 +3344,7 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
-initPropertyMediaFromAddress(p);
+initPropertyMediaEmbed();
 
 // Reviews
 const listEl = $("#propertyReviews");
