@@ -3332,6 +3332,7 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
+initStarPickers();
 
 // Wire dropdown
 $("#moreBtn")?.addEventListener("click", (e) => {
