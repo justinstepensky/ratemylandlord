@@ -689,17 +689,15 @@ return `${st.avgRounded.toFixed(1)} / 5 • ${st.count} review${st.count === 1 ?
 function categoryAveragesForProperty(propertyId) {
 const rs = reviewsFor("property", propertyId).filter((r) => r && r.categories);
 if (!rs.length) return null;
-const sums = { noise: 0, pests: 0, maintenance: 0, safety: 0, fairness: 0, deposit: 0 };
+const sums = { noise: 0, amenities: 0, safety: 0, building: 0 };
 let n = 0;
 rs.forEach((r) => {
 const c = r.categories || {};
 const vals = {
 noise: Number(c.noise),
-pests: Number(c.pests),
-maintenance: Number(c.maintenance),
+amenities: Number(c.amenities),
 safety: Number(c.safety),
-fairness: Number(c.fairness),
-deposit: Number(c.deposit),
+building: Number(c.building),
 };
 Object.keys(sums).forEach((k) => {
 if (Number.isFinite(vals[k])) sums[k] += vals[k];
@@ -2929,11 +2927,9 @@ return `
              <div class="hr" style="margin:12px 0;"></div>
              <div class="kicker">Category ratings</div>
              ${renderCategoryPicker(`rev_${formId}_noise`, "Noise")}
-             ${renderCategoryPicker(`rev_${formId}_pests`, "Pests/Cleanliness")}
-             ${renderCategoryPicker(`rev_${formId}_maintenance`, "Maintenance response")}
+             ${renderCategoryPicker(`rev_${formId}_amenities`, "Amenities")}
              ${renderCategoryPicker(`rev_${formId}_safety`, "Safety")}
-             ${renderCategoryPicker(`rev_${formId}_fairness`, "Management fairness")}
-             ${renderCategoryPicker(`rev_${formId}_deposit`, "Deposit return")}
+             ${renderCategoryPicker(`rev_${formId}_building`, "Building Management")}
            `
            : ""
        }
@@ -3248,23 +3244,16 @@ const content = `
 
               <div class="hr" style="margin:14px 0;"></div>
 
-              <div class="kicker">Report card (demo)</div>
-               ${
-                 rep
-                   ? `
-                     <div class="smallNote" style="margin-top:10px; line-height:1.6;">
-                       <div><b>${esc(String(rep.violations_12mo))}</b> violations (12 mo)</div>
-                       <div><b>${esc(String(rep.complaints_12mo))}</b> complaints (12 mo)</div>
-                       <div><b>${esc(String(rep.bedbug_reports_12mo))}</b> bedbug reports (12 mo)</div>
-                       <div><b>${esc(String(rep.permits_open))}</b> open permits</div>
-                       <div><b>${esc(String(rep.eviction_filings_12mo))}</b> eviction filings (12 mo)</div>
-                     </div>
-                     <div class="tiny" style="margin-top:10px;">${esc(rep.notes || "")}</div>
-                   `
-                   : `<div class="muted" style="margin-top:10px;">No report data.</div>`
-               }
-             </div>
-           </div>
+              <div class="kicker">Report card</div>
+              <div class="smallNote" style="margin-top:10px; line-height:1.6;">
+                <div>Responsiveness &amp; Communication</div>
+                <div>Maintenance &amp; Repairs</div>
+                <div>Respect &amp; Professionalism</div>
+                <div>Fairness &amp; Transparency</div>
+                <div>Deposit Return</div>
+              </div>
+            </div>
+          </div>
 
            <div style="margin-top:14px;">
              ${reviewFormHTML("landlord", l.id)}
@@ -3423,6 +3412,7 @@ const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
 setPageTitle(title);
 
 const l = DB.landlords.find((x) => x.id === p.landlordId);
+const rep = l ? reportFor(l.id) : null;
 const st = ratingStats("property", p.id);
 const landlordStats = l ? ratingStats("landlord", l.id) : null;
 const tier = cardTier(st.avgRounded ?? 0, st.count);
@@ -3480,15 +3470,33 @@ const content = `
                      <div class="hr" style="margin:14px 0;"></div>
                      <div class="kicker">Category averages</div>
                      <div class="lcRow" style="margin-top:8px;"><div class="muted">Noise</div><div>${esc(String(propertyCats.noise))}</div></div>
-                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Pests/Cleanliness</div><div>${esc(String(propertyCats.pests))}</div></div>
-                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Maintenance</div><div>${esc(String(propertyCats.maintenance))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Amenities</div><div>${esc(String(propertyCats.amenities))}</div></div>
                      <div class="lcRow" style="margin-top:6px;"><div class="muted">Safety</div><div>${esc(String(propertyCats.safety))}</div></div>
-                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Fairness</div><div>${esc(String(propertyCats.fairness))}</div></div>
-                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Deposit return</div><div>${esc(String(propertyCats.deposit))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Building Management</div><div>${esc(String(propertyCats.building))}</div></div>
                    `
                    : ""
                }
 
+             </div>
+           </div>
+
+           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60); margin-top:14px;">
+             <div class="pad">
+               <div class="kicker">Report card (demo)</div>
+               ${
+                 rep
+                   ? `
+                     <div class="smallNote" style="margin-top:10px; line-height:1.6;">
+                       <div><b>${esc(String(rep.violations_12mo))}</b> violations (12 mo)</div>
+                       <div><b>${esc(String(rep.complaints_12mo))}</b> complaints (12 mo)</div>
+                       <div><b>${esc(String(rep.bedbug_reports_12mo))}</b> bedbug reports (12 mo)</div>
+                       <div><b>${esc(String(rep.permits_open))}</b> open permits</div>
+                       <div><b>${esc(String(rep.eviction_filings_12mo))}</b> eviction filings (12 mo)</div>
+                     </div>
+                     <div class="tiny" style="margin-top:10px;">${esc(rep.notes || "")}</div>
+                   `
+                   : `<div class="muted" style="margin-top:10px;">No report data.</div>`
+               }
              </div>
            </div>
 
@@ -3555,11 +3563,9 @@ if (!text) return alert("Write a review first.");
 
 const categories = {
 noise: Number($(`#rev_${formId}_noise`)?.value || 5),
-pests: Number($(`#rev_${formId}_pests`)?.value || 5),
-maintenance: Number($(`#rev_${formId}_maintenance`)?.value || 5),
+amenities: Number($(`#rev_${formId}_amenities`)?.value || 5),
 safety: Number($(`#rev_${formId}_safety`)?.value || 5),
-fairness: Number($(`#rev_${formId}_fairness`)?.value || 5),
-deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
+building: Number($(`#rev_${formId}_building`)?.value || 5),
 };
 
 DB.reviews.unshift({
