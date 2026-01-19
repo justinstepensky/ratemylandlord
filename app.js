@@ -11,7 +11,7 @@
   ✅ Tenant Toolkit is real + usable (NYC, MIA, LA, CHI cards)
   ✅ All columns fit and collapse cleanly on mobile (via your existing layout classes)
   ✅ Map safe-init (Leaflet optional)
-  ✅ Keeps badges (assets/badge-verified.png + assets/badge-top.png)
+  ✅ Keeps badges (inline SVG check + CASA mark)
   ✅ Landlord page “More options” dropdown + CASA embed modal w/ fractional stars
   ✅ Sign in: landlord + user login UI with Apple/Google/Microsoft options (demo-safe)
   ✅ Menu ONLY on mobile (desktop hides hamburger + drawer)
@@ -629,18 +629,36 @@ return "CASA Rated";
 /* -----------------------------
   Badges
 ------------------------------ */
-function badgeChipImg(src, alt, title) {
+function badgeChip(kind, alt, title) {
+const icon =
+kind === "verified"
+? `
+       <svg class="badgeIcon badgeIcon--verified" viewBox="0 0 24 24" aria-hidden="true">
+         <circle cx="12" cy="12" r="10" />
+         <path d="M9.2 12.6l-2.1-2.1-1.4 1.4 3.5 3.5 7.1-7.1-1.4-1.4z" />
+       </svg>
+     `
+: `
+       <svg class="badgeIcon badgeIcon--casa" viewBox="0 0 24 24" aria-hidden="true">
+         <rect x="2.5" y="3" width="19" height="18" rx="6" />
+         <text x="12" y="15.2" text-anchor="middle">casa</text>
+       </svg>
+     `;
+
 return `
-   <span class="badgeChip" title="${esc(title)}" aria-label="${esc(alt)}">
-     <img src="${esc(src)}" alt="${esc(alt)}" style="width:14px;height:14px;display:block;opacity:.95" />
+   <span class="badgeChip badgeChip--${esc(kind)}" title="${esc(title)}" aria-label="${esc(alt)}">
+     ${icon}
    </span>
  `.trim();
 }
 
 function badgesHTMLForLandlord(l) {
 const parts = [];
-if (l.verified) parts.push(badgeChipImg("assets/badge-verified.png", "Verified", "Verified Landlord (ownership verified)"));
-if (l.top) parts.push(badgeChipImg("assets/badge-top.png", "Top", "Top Landlord (high rating + consistent performance)"));
+if (l.verified) parts.push(badgeChip("verified", "Verified", "Verified landlord"));
+const st = ratingStats("landlord", l.id);
+if (st.count && st.avgRounded != null && st.avgRounded >= 4.0) {
+parts.push(badgeChip("casa", "CASA top rated", "CASA badge (4.0+ rating)"));
+}
 if (!parts.length) return "";
 return `<span class="badges">${parts.join("")}</span>`;
 }
