@@ -960,10 +960,11 @@ return typeof window.L !== "undefined" && typeof window.L.map === "function";
 const REGION_KEY = "casa_region_v1";
 
 const REGIONS = {
-NYC: { label: "New York", center: [40.73, -73.95], zoom: 11, states: ["NY"] },
+NYC: { label: "NYC", center: [40.73, -73.95], zoom: 11, states: ["NY"] },
 MIA: { label: "Miami", center: [25.7617, -80.1918], zoom: 11, states: ["FL"] },
 LA:  { label: "Los Angeles",  center: [34.0522, -118.2437], zoom: 10, states: ["CA"] },
 CHI: { label: "Chicago", center: [41.8781, -87.6298], zoom: 11, states: ["IL"] },
+BOS: { label: "Boston", center: [42.3601, -71.0589], zoom: 11, states: ["MA"] },
 };
 
 function getRegionKey() {
@@ -1832,7 +1833,7 @@ let lastAutoRegion = getRegionKey();
 
 qEl?.addEventListener("input", () => {
   const query = qEl ? String(qEl.value || "") : "";
-  const hit = query.toUpperCase().match(/\b(NY|FL|CA|IL)\b/);
+  const hit = query.toUpperCase().match(/\b(NY|FL|CA|IL|MA)\b/);
   if (!hit) return;
 
   const rk = regionFromState(hit[1]);
@@ -1896,9 +1897,9 @@ const exactProps = !nq
 : DB.properties.filter((p) => normalizeName((p.address && p.address.line1) || "") === nq);
 if (exactProps.length === 1) return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
 
-// Auto-switch region if user typed a recognized state code (NY/FL/CA/IL)
+// Auto-switch region if user typed a recognized state code (NY/FL/CA/IL/MA)
 const typed = String(query || "").toUpperCase();
-const stateHit = typed.match(/\b(NY|FL|CA|IL)\b/);
+const stateHit = typed.match(/\b(NY|FL|CA|IL|MA)\b/);
 if (stateHit) {
 const rk = regionFromState(stateHit[1]);
 if (rk) {
