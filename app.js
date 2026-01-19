@@ -13,7 +13,7 @@
   ✅ Map safe-init (Leaflet optional)
   ✅ Keeps badges (assets/badge-verified.png + assets/badge-top.png)
   ✅ Landlord page “More options” dropdown + CASA embed modal w/ fractional stars
-  ✅ Landlord Portal: real login UI + Sign up, with Apple/Google/Microsoft options (demo-safe)
+  ✅ Sign in: landlord + user login UI with Apple/Google/Microsoft options (demo-safe)
   ✅ Menu ONLY on mobile (desktop hides hamburger + drawer)
 */
 
@@ -329,7 +329,17 @@ notes: "Data is demo only. Production: pull from city datasets + add sources.",
 },
 ];
 
-const db = { landlords, properties, reviews, reports, flags: [], replies: [], landlordUsers: [] };
+const db = {
+landlords,
+properties,
+reviews,
+reports,
+flags: [],
+replies: [],
+landlordUsers: [],
+users: [],
+currentUserId: "",
+};
 saveDB(db);
 return db;
 }
@@ -343,6 +353,8 @@ reports: Array.isArray(db.reports) ? db.reports : [],
 flags: Array.isArray(db.flags) ? db.flags : [],
 replies: Array.isArray(db.replies) ? db.replies : [],
 landlordUsers: Array.isArray(db.landlordUsers) ? db.landlordUsers : [],
+users: Array.isArray(db.users) ? db.users : [],
+currentUserId: typeof db.currentUserId === "string" ? db.currentUserId : "",
 };
 
 // ensure every review has targetType/targetId
@@ -384,6 +396,19 @@ lng: typeof (p && p.lng) === "number" ? p.lng : null,
 createdAt: Number(p && p.createdAt ? p.createdAt : Date.now()),
 }))
 .filter((p) => p.id && p.address && p.address.line1);
+
+// ensure every user has core fields
+out.users = out.users
+.map((u) => ({
+id: String(u && u.id ? u.id : ""),
+email: String(u && u.email ? u.email : ""),
+createdAt: Number(u && u.createdAt ? u.createdAt : Date.now()),
+}))
+.filter((u) => u.id && u.email);
+
+if (out.currentUserId && !out.users.find((u) => u.id === out.currentUserId)) {
+out.currentUserId = "";
+}
 
 return out;
 }
@@ -437,7 +462,17 @@ createdAt: Number(r && r.createdAt ? r.createdAt : now),
 .filter((r) => r.targetId);
 
 const reports = Array.isArray(legacy.reports) ? legacy.reports : [];
-return normalizeDB({ landlords, properties, reviews, reports, flags: [], replies: [], landlordUsers: [] });
+return normalizeDB({
+landlords,
+properties,
+reviews,
+reports,
+flags: [],
+replies: [],
+landlordUsers: [],
+users: [],
+currentUserId: "",
+});
 }
 
 let DB = loadDB();
@@ -480,6 +515,16 @@ return prefix + Math.random().toString(16).slice(2);
 
 function persist() {
 saveDB(DB);
+}
+
+function currentUser() {
+const id = DB.currentUserId || "";
+if (!id) return null;
+return (DB.users || []).find((u) => u && u.id === id) || null;
+}
+
+function isUserSignedIn() {
+return !!currentUser();
 }
 
 function parseId(id) {
@@ -1451,7 +1496,7 @@ app.innerHTML = `
        <a href="#/how">How it works</a>
        <a href="#/toolkit">Tenant Toolkit</a>
        <a href="#/search">Search</a>
-       <a href="#/portal">Landlord Portal</a>
+       <a href="#/portal">Sign in</a>
      </div>
    </div>
  `;
@@ -1488,7 +1533,7 @@ const content = `
        </div>
 
        <div class="muted" style="text-align:center;margin-top:10px;font-size:13px;">
-         No account required to review. Verified landlords can respond.
+         Create an account to rate. Verified landlords can respond.
        </div>
 
        <div class="tileRow">
@@ -1568,7 +1613,7 @@ if (k === "search") {
 location.hash = "#/search";
 return;
 }
-if (k === "review") tilePanel.textContent = "Leave a public star rating (no account required).";
+if (k === "review") tilePanel.textContent = "Sign in to leave a public star rating.";
 });
 });
 
@@ -2133,14 +2178,14 @@ renderShell(`
          <div>
            <div class="kicker">How it works</div>
            <div class="pageTitle">Simple, fast, and public</div>
-           <div class="pageSub">No reviewer accounts. Landlords verify to respond (coming soon).</div>
+           <div class="pageSub">Reviews require accounts. Landlords verify to respond (coming soon).</div>
          </div>
          <a class="btn" href="#/">Home</a>
        </div>
        <div class="hr"></div>
        <div class="muted" style="font-weight:700;line-height:1.5">
          <div><b>Search</b><br/>Look up a landlord or an address.</div>
-         <div style="margin-top:10px"><b>Review</b><br/>Post instantly. (No account required.)</div>
+         <div style="margin-top:10px"><b>Review</b><br/>Post after creating a quick account.</div>
          <div style="margin-top:10px"><b>Choose target</b><br/>Rate the <b>landlord</b> or the <b>building</b> separately.</div>
          <div style="margin-top:10px"><b>Report</b><br/>Spam, harassment, and personal info can be reported for moderation.</div>
        </div>
@@ -2164,7 +2209,7 @@ renderShell(`
        </div>
        <div class="hr"></div>
        <div class="muted" style="font-weight:800;line-height:1.55">
-         <div><b>No reviewer accounts</b><br/>Tenants can post without accounts.</div>
+         <div><b>Reviewer accounts</b><br/>Tenants sign in to post ratings.</div>
          <div style="margin-top:10px"><b>No doxxing</b><br/>Do not post phone numbers, emails, or private details.</div>
          <div style="margin-top:10px"><b>Reporting</b><br/>Spam, harassment, and inaccurate listings can be reported.</div>
        </div>
@@ -2174,20 +2219,21 @@ renderShell(`
 }
 
 /* -----------------------------
-  LANDLORD PORTAL (✅ login + signup + SSO buttons)
+  SIGN IN (✅ login + signup + SSO buttons)
 ------------------------------ */
 function renderPortal() {
-setPageTitle("Landlord Portal");
+setPageTitle("Sign in");
 
-const mode = getQueryParam("mode") === "signup" ? "signup" : "login";
+const landlordMode = getQueryParam("mode") === "signup" ? "signup" : "login";
+const userMode = getQueryParam("umode") === "login" ? "login" : "signup";
 
 const content = `
    <section class="pageCard card">
      <div class="pad">
        <div class="topRow">
          <div>
-           <div class="kicker">Landlord Portal</div>
-           <div class="pageTitle">${mode === "signup" ? "Create your account" : "Sign in"}</div>
+           <div class="kicker">Sign in</div>
+           <div class="pageTitle">Sign in to rate or respond</div>
            <div class="pageSub">Demo-safe UI. Plug in real auth later.</div>
          </div>
          <a class="btn" href="#/">Home</a>
@@ -2198,9 +2244,12 @@ const content = `
        <div class="twoCol">
          <div class="card" style="box-shadow:none;">
            <div class="pad">
+             <div class="kicker">Landlord access</div>
+             <div class="tiny" style="margin-top:6px;">Verify to respond to reviews.</div>
+             <div class="hr" style="margin:12px 0;"></div>
              <div style="display:flex; gap:10px; flex-wrap:wrap;">
-               <a class="btn ${mode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login">Login</a>
-               <a class="btn ${mode === "signup" ? "btn--primary" : ""}" href="#/portal?mode=signup">Sign up</a>
+               <a class="btn ${landlordMode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login&umode=${userMode}">Login</a>
+               <a class="btn ${landlordMode === "signup" ? "btn--primary" : ""}" href="#/portal?mode=signup&umode=${userMode}">Sign up</a>
              </div>
 
              <div class="hr"></div>
@@ -2225,7 +2274,7 @@ const content = `
              </div>
 
              ${
-               mode === "signup"
+               landlordMode === "signup"
                  ? `
                    <div class="field">
                      <label>Company / Landlord name</label>
@@ -2240,25 +2289,56 @@ const content = `
              }
 
              <button class="btn btn--primary btn--block" id="lpSubmit" type="button" style="margin-top:12px;">
-               ${mode === "signup" ? "Create account" : "Sign in"}
+               ${landlordMode === "signup" ? "Create account" : "Sign in"}
              </button>
 
              <div class="tiny" style="margin-top:10px; line-height:1.45;">
-               ${mode === "signup" ? "After sign up, you’ll be verified before responding to reviews." : "Landlords can respond to reviews after verification."}
+               ${
+                 landlordMode === "signup"
+                   ? "After sign up, you’ll be verified before responding to reviews."
+                   : "Landlords can respond to reviews after verification."
+               }
              </div>
            </div>
          </div>
 
-         <div>
-           <div class="kicker">Why verify?</div>
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
-             <div class="pad">
-               <div class="muted" style="font-weight:800; line-height:1.55;">
-                 Verification prevents fake landlord accounts and keeps responses accountable.
-               </div>
-               <div class="hr" style="margin:14px 0;"></div>
-               <div class="tiny">
-               </div>
+         <div class="card" style="box-shadow:none;">
+           <div class="pad">
+             <div class="kicker">User access</div>
+             <div class="tiny" style="margin-top:6px;">Create an account to rate landlords or buildings.</div>
+             <div class="hr" style="margin:12px 0;"></div>
+             <div style="display:flex; gap:10px; flex-wrap:wrap;">
+               <a class="btn ${userMode === "login" ? "btn--primary" : ""}" href="#/portal?mode=${landlordMode}&umode=login">Login</a>
+               <a class="btn ${userMode === "signup" ? "btn--primary" : ""}" href="#/portal?mode=${landlordMode}&umode=signup">Sign up</a>
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Continue with</div>
+             <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+               <button class="btn" type="button" data-user-sso="apple">Continue with Apple</button>
+               <button class="btn" type="button" data-user-sso="google">Continue with Google</button>
+               <button class="btn" type="button" data-user-sso="microsoft">Continue with Microsoft</button>
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="field">
+               <label>Email</label>
+               <input class="input" id="userEmail" placeholder="you@email.com" />
+             </div>
+
+             <div class="field">
+               <label>Password</label>
+               <input class="input" id="userPass" type="password" placeholder="••••••••" />
+             </div>
+
+             <button class="btn btn--primary btn--block" id="userSubmit" type="button" style="margin-top:12px;">
+               ${userMode === "signup" ? "Create account" : "Sign in"}
+             </button>
+
+             <div class="tiny" style="margin-top:10px; line-height:1.45;">
+               ${userMode === "signup" ? "Sign up to post ratings and reviews." : "Welcome back. Continue to rate."}
              </div>
            </div>
          </div>
@@ -2278,6 +2358,12 @@ alert(`Demo: ${btn.getAttribute("data-sso")} SSO would start here.`);
 });
 });
 
+document.querySelectorAll("[data-user-sso]").forEach((btn) => {
+btn.addEventListener("click", () => {
+alert(`Demo: ${btn.getAttribute("data-user-sso")} SSO would start here.`);
+});
+});
+
 // demo submit
 $("#lpSubmit")?.addEventListener("click", () => {
 const email = $("#lpEmail")?.value ? $("#lpEmail").value.trim() : "";
@@ -2287,7 +2373,7 @@ alert("Enter email + password.");
 return;
 }
 
-if (mode === "signup") {
+if (landlordMode === "signup") {
 const company = $("#lpCompany")?.value ? $("#lpCompany").value.trim() : "";
 if (!company) {
 alert("Enter your company/landlord name.");
@@ -2308,6 +2394,46 @@ location.hash = "#/";
 alert("Demo: signed in (no real auth wired).");
 location.hash = "#/";
 }
+});
+
+// demo submit (user)
+$("#userSubmit")?.addEventListener("click", () => {
+const email = $("#userEmail")?.value ? $("#userEmail").value.trim() : "";
+const pass = $("#userPass")?.value ? $("#userPass").value.trim() : "";
+if (!email || !pass) {
+alert("Enter email + password.");
+return;
+}
+
+DB.users = DB.users || [];
+
+if (userMode === "signup") {
+const existing = DB.users.find((u) => u && u.email && norm(u.email) === norm(email));
+if (existing) {
+DB.currentUserId = existing.id;
+persist();
+alert("Demo: account already exists. Signed you in.");
+location.hash = "#/";
+return;
+}
+const user = { id: idRand("u"), email, createdAt: Date.now() };
+DB.users.push(user);
+DB.currentUserId = user.id;
+persist();
+alert("Demo: account created. You can now rate.");
+location.hash = "#/";
+return;
+}
+
+const match = DB.users.find((u) => u && u.email && norm(u.email) === norm(email));
+if (!match) {
+alert("No account found for that email. Create one first.");
+return;
+}
+DB.currentUserId = match.id;
+persist();
+alert("Demo: signed in (no real auth wired).");
+location.hash = "#/";
 });
 }
 
@@ -2402,6 +2528,23 @@ return `
 
 function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
+if (!isUserSignedIn()) {
+return `
+   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+     <div class="pad">
+       <div class="kicker">Leave a review</div>
+       <div class="muted" style="margin-top:8px; font-weight:800;">
+         Sign in to post a rating and review.
+       </div>
+       <div class="hr" style="margin:12px 0;"></div>
+       <div style="display:flex; gap:10px; flex-wrap:wrap;">
+         <a class="btn btn--primary" href="#/portal?umode=signup">Create account</a>
+         <a class="btn" href="#/portal?umode=login">Sign in</a>
+       </div>
+     </div>
+   </div>
+ `.trim();
+}
 return `
    <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
      <div class="pad">
@@ -2746,15 +2889,15 @@ const content = `
 
            <div class="hr"></div>
 
-           <div class="kicker">Landlord Portal</div>
+           <div class="kicker">Sign in</div>
            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
              <div class="pad">
                <div class="muted" style="font-weight:900; line-height:1.55;">
-                 Verified landlords can respond to reviews.
+                 Landlords can verify to respond to reviews.
                </div>
                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-                 <a class="btn btn--primary" href="#/portal?mode=login">Sign in</a>
-                 <a class="btn" href="#/portal?mode=signup">Create account</a>
+                 <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Landlord sign in</a>
+                 <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
                </div>
              </div>
            </div>
@@ -2800,6 +2943,11 @@ wireReviewListInteractions(listEl, l.id);
 // Review form wiring
 const formId = `landlord_${l.id}`;
 $(`#rev_${formId}Submit`)?.addEventListener("click", () => {
+if (!isUserSignedIn()) {
+alert("Sign in to post a review.");
+location.hash = "#/portal?umode=signup";
+return;
+}
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
@@ -2808,6 +2956,7 @@ DB.reviews.unshift({
 id: idRand("r"),
 targetType: "landlord",
 targetId: l.id,
+userId: DB.currentUserId || "",
 stars,
 text,
 createdAt: Date.now(),
@@ -2959,6 +3108,11 @@ wireReviewListInteractions(listEl, null);
 // Review form
 const formId = `property_${p.id}`;
 $(`#rev_${formId}Submit`)?.addEventListener("click", () => {
+if (!isUserSignedIn()) {
+alert("Sign in to post a review.");
+location.hash = "#/portal?umode=signup";
+return;
+}
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
@@ -2967,6 +3121,7 @@ DB.reviews.unshift({
 id: idRand("r"),
 targetType: "property",
 targetId: p.id,
+userId: DB.currentUserId || "",
 stars,
 text,
 createdAt: Date.now(),
