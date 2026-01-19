@@ -2024,19 +2024,40 @@ renderShell(content);
 ensureRuntimeStyles();
 
 let picked = null;
+let addMap = null;
+let addMarker = null;
+
+const stateEl = $("#state");
+const syncAddMapToState = () => {
+const raw = stateEl && stateEl.value ? String(stateEl.value).trim() : "";
+if (!raw) return;
+const hit = raw.toUpperCase().match(/\b(NY|FL|CA|IL|MA)\b/);
+if (!hit) return;
+const rk = regionFromState(hit[1]);
+if (!rk) return;
+setRegionKey(rk);
+const cfg = REGIONS[rk] || REGIONS.NYC;
+if (addMap && typeof addMap.setView === "function") {
+try {
+addMap.setView(cfg.center, cfg.zoom);
+} catch {}
+}
+};
+
+stateEl?.addEventListener("input", syncAddMapToState);
+stateEl?.addEventListener("change", syncAddMapToState);
 
 setTimeout(() => {
 const rk = getRegionKey();
 const cfg = REGIONS[rk] || REGIONS.NYC;
-const map = initLeafletMap($("#addMap"), cfg.center, cfg.zoom);
-if (!map) return;
+addMap = initLeafletMap($("#addMap"), cfg.center, cfg.zoom);
+if (!addMap) return;
 
-let marker = null;
-map.on("click", (e) => {
+addMap.on("click", (e) => {
 picked = { lat: e.latlng.lat, lng: e.latlng.lng };
 try {
-if (marker) marker.remove();
-marker = window.L.marker([picked.lat, picked.lng]).addTo(map);
+if (addMarker) addMarker.remove();
+addMarker = window.L.marker([picked.lat, picked.lng]).addTo(addMap);
 } catch {}
 });
 }, 0);
