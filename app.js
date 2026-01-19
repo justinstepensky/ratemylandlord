@@ -712,6 +712,33 @@ avg[k] = Math.round((sums[k] / n) * 10) / 10;
 return avg;
 }
 
+function categoryAveragesForLandlord(landlordId) {
+const rs = reviewsFor("landlord", landlordId).filter((r) => r && r.categories);
+if (!rs.length) return null;
+const sums = { resp: 0, maint: 0, respect: 0, fairness: 0, deposit: 0 };
+let n = 0;
+rs.forEach((r) => {
+const c = r.categories || {};
+const vals = {
+resp: Number(c.resp),
+maint: Number(c.maint),
+respect: Number(c.respect),
+fairness: Number(c.fairness),
+deposit: Number(c.deposit),
+};
+Object.keys(sums).forEach((k) => {
+if (Number.isFinite(vals[k])) sums[k] += vals[k];
+});
+n += 1;
+});
+if (!n) return null;
+const avg = {};
+Object.keys(sums).forEach((k) => {
+avg[k] = Math.round((sums[k] / n) * 10) / 10;
+});
+return avg;
+}
+
 /* -----------------------------
   Property media (Google Maps embed)
 ------------------------------ */
@@ -2893,6 +2920,10 @@ return `
  `.trim();
 }
 
+function renderLandlordCategoryPicker(id, label) {
+return renderCategoryPicker(id, label);
+}
+
 function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
 if (!isUserSignedIn()) {
@@ -2921,6 +2952,19 @@ return `
          <label>Rating</label>
          ${renderStarsPicker(`rev_${formId}`, 5)}
        </div>
+       ${
+         targetType === "landlord"
+           ? `
+             <div class="hr" style="margin:12px 0;"></div>
+             <div class="kicker">Report card ratings</div>
+             ${renderLandlordCategoryPicker(`rev_${formId}_resp`, "Responsiveness & Communication")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_maint`, "Maintenance & Repairs")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_respect`, "Respect & Professionalism")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_fairness`, "Fairness & Transparency")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_deposit`, "Deposit Return")}
+           `
+           : ""
+       }
        ${
          targetType === "property"
            ? `
@@ -3168,6 +3212,7 @@ const st = ratingStats("landlord", l.id);
 const tier = cardTier(st.avgRounded ?? 0, st.count);
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
+const landlordCats = categoryAveragesForLandlord(l.id);
 
 const props = DB.properties.filter((p) => p.landlordId === l.id);
 const rep = reportFor(l.id);
@@ -3245,13 +3290,17 @@ const content = `
               <div class="hr" style="margin:14px 0;"></div>
 
               <div class="kicker">Report card</div>
-              <div class="smallNote" style="margin-top:10px; line-height:1.6;">
-                <div>Responsiveness &amp; Communication</div>
-                <div>Maintenance &amp; Repairs</div>
-                <div>Respect &amp; Professionalism</div>
-                <div>Fairness &amp; Transparency</div>
-                <div>Deposit Return</div>
-              </div>
+              ${
+                landlordCats
+                  ? `
+                    <div class="lcRow" style="margin-top:8px;"><div class="muted">Responsiveness &amp; Communication</div><div>${esc(String(landlordCats.resp))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">Maintenance &amp; Repairs</div><div>${esc(String(landlordCats.maint))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">Respect &amp; Professionalism</div><div>${esc(String(landlordCats.respect))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">Fairness &amp; Transparency</div><div>${esc(String(landlordCats.fairness))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">Deposit Return</div><div>${esc(String(landlordCats.deposit))}</div></div>
+                  `
+                  : `<div class="muted" style="margin-top:10px;">No report card ratings yet.</div>`
+              }
             </div>
           </div>
 
@@ -3363,12 +3412,21 @@ const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 
+const categories = {
+resp: Number($(`#rev_${formId}_resp`)?.value || 5),
+maint: Number($(`#rev_${formId}_maint`)?.value || 5),
+respect: Number($(`#rev_${formId}_respect`)?.value || 5),
+fairness: Number($(`#rev_${formId}_fairness`)?.value || 5),
+deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
+};
+
 DB.reviews.unshift({
 id: idRand("r"),
 targetType: "landlord",
 targetId: l.id,
 userId: DB.currentUserId || "",
 stars,
+categories,
 text,
 createdAt: Date.now(),
 });
