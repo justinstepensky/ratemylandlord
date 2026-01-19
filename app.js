@@ -3221,13 +3221,12 @@ const st = ratingStats("landlord", l.id);
 const tier = cardTier(st.avgRounded ?? 0, st.count);
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
-const landlordScoreText = st.count ? st.avgRounded.toFixed(1) : "—";
+const landlordScoreText = computeLandlordScoreText(l.id);
 const landlordCats = categoryAveragesForLandlord(l.id);
 
 const props = DB.properties.filter((p) => p.landlordId === l.id);
 const rep = reportFor(l.id);
 const credential = casaCredentialForLandlord(l.id);
-const landlordScoreText = computeLandlordScoreText(l.id);
 
 const content = `
    <section class="pageCard card">
