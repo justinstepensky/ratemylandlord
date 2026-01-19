@@ -2896,7 +2896,7 @@ const content = `
                  Landlords can verify to respond to reviews.
                </div>
                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-                 <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Landlord sign in</a>
+                 <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Login</a>
                  <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
                </div>
              </div>
