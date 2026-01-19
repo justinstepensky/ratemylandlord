@@ -1086,7 +1086,7 @@ const base = parts[0] || "";
 const param = parts[1] || "";
 
 if (!base) return renderHome();
-if (base === "search") return ;
+if (base === "search") return renderSearch();
 if (base === "add") return renderAdd();
 if (base === "how") return renderHow();
 if (base === "trust") return renderTrust();
@@ -1098,7 +1098,6 @@ if (base === "property" && param) return renderProperty(param);
 renderHome();
 }
 
-window.addEventListener("hashchange", route);
 /* Mobile-safe wrapper: NEVER let one crash kill rendering */
 function safeRoute() {
   try {
@@ -1149,9 +1148,6 @@ window.addEventListener("hashchange", safeRoute);
 window.addEventListener("load", () => {
   initDrawer();
   initMobileOnlyMenu(); // ✅ new: hide hamburger/drawer on desktop
-  route();
-  try { initDrawer(); } catch (e) { console.error("initDrawer failed:", e); }
-  try { initMobileOnlyMenu(); } catch (e) { console.error("initMobileOnlyMenu failed:", e); }
   safeRoute();
 });
 
@@ -1567,7 +1563,10 @@ el.addEventListener("click", () => {
 const k = el.dataset.homeTile;
 if (!tilePanel) return;
 tilePanel.style.display = "block";
-if (k === "search") tilePanel.textContent = "Search by landlord name, entity, or address — then pick Landlord or Address.";
+if (k === "search") {
+location.hash = "#/search";
+return;
+}
 if (k === "review") tilePanel.textContent = "Leave a public star rating (no account required).";
 });
 });
