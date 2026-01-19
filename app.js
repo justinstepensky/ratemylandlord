@@ -555,6 +555,20 @@ function persist() {
 saveDB(DB);
 }
 
+function ensureHashLinkRouting() {
+if (window.__casaHashLinksBound) return;
+window.__casaHashLinksBound = true;
+document.addEventListener("click", (e) => {
+const a = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : null;
+if (!a) return;
+const href = a.getAttribute("href");
+if (!href) return;
+e.preventDefault();
+if (location.hash === href) return;
+location.hash = href;
+});
+}
+
 function currentUser() {
 const id = DB.currentUserId || "";
 if (!id) return null;
@@ -1540,7 +1554,7 @@ return `
 
      <div class="lcRight">
        ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
-       ${showView ? `<a class="btn btn--primary miniBtn" href="#/landlord/${esc(l.id)}">View</a>` : ``}
+       ${showView ? `<a class="btn btn--primary miniBtn" href="#/landlord/${encodeURIComponent(l.id)}">View</a>` : ``}
      </div>
    </div>
  `.trim();
@@ -1593,7 +1607,7 @@ return `
 
      <div class="lcRight">
        ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
-       ${showView ? `<a class="btn btn--primary miniBtn" href="#/property/${esc(p.id)}">View</a>` : ``}
+       ${showView ? `<a class="btn btn--primary miniBtn" href="#/property/${encodeURIComponent(p.id)}">View</a>` : ``}
      </div>
    </div>
  `.trim();
@@ -1617,7 +1631,7 @@ return l
 r,
 kind: "landlord",
 title: l.name,
-href: `#/landlord/${l.id}`,
+      href: `#/landlord/${encodeURIComponent(l.id)}`,
 badgeHTML: renderBadges(l),
 }
 : null;
@@ -1627,7 +1641,7 @@ const p = DB.properties.find((x) => x.id === r.targetId);
 if (!p) return null;
 const a = p.address || {};
 const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
-return { r, kind: "property", title, href: `#/property/${p.id}`, badgeHTML: "" };
+return { r, kind: "property", title, href: `#/property/${encodeURIComponent(p.id)}`, badgeHTML: "" };
 }
 return null;
 })
@@ -1754,6 +1768,7 @@ app.innerHTML = `
      </div>
    </div>
  `;
+ensureHashLinkRouting();
 }
 
 /* -----------------------------
