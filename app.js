@@ -651,6 +651,34 @@ for (const r of rs) dist[r.stars - 1] += 1;
 return { count, avg, avgRounded, dist };
 }
 
+function categoryAveragesForProperty(propertyId) {
+const rs = reviewsFor("property", propertyId).filter((r) => r && r.categories);
+if (!rs.length) return null;
+const sums = { noise: 0, pests: 0, maintenance: 0, safety: 0, fairness: 0, deposit: 0 };
+let n = 0;
+rs.forEach((r) => {
+const c = r.categories || {};
+const vals = {
+noise: Number(c.noise),
+pests: Number(c.pests),
+maintenance: Number(c.maintenance),
+safety: Number(c.safety),
+fairness: Number(c.fairness),
+deposit: Number(c.deposit),
+};
+Object.keys(sums).forEach((k) => {
+if (Number.isFinite(vals[k])) sums[k] += vals[k];
+});
+n += 1;
+});
+if (!n) return null;
+const avg = {};
+Object.keys(sums).forEach((k) => {
+avg[k] = Math.round((sums[k] / n) * 10) / 10;
+});
+return avg;
+}
+
 /* -----------------------------
   Property media (Google Maps embed)
 ------------------------------ */
@@ -1490,6 +1518,7 @@ const avgText = avg == null ? "—" : avg.toFixed(1);
 const stars = starVisFromAvg(avg);
 
 const props = DB.properties.filter((p) => p.landlordId === l.id);
+const landlordScoreText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const propNote = props.length ? `${props.length} propert${props.length === 1 ? "y" : "ies"}` : "No properties yet";
 
 return `
@@ -2785,6 +2814,20 @@ return `
  `.trim();
 }
 
+function renderCategoryPicker(id, label) {
+const opts = [5, 4, 3, 2, 1]
+.map((v) => `<option value="${v}">${v}</option>`)
+.join("");
+return `
+   <div class="field">
+     <label>${esc(label)}</label>
+     <select class="input" id="${esc(id)}" style="max-width:220px;">
+       ${opts}
+     </select>
+   </div>
+ `.trim();
+}
+
 function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
 if (!isUserSignedIn()) {
@@ -2813,6 +2856,20 @@ return `
          <label>Rating</label>
          ${renderStarsPicker(`rev_${formId}`, 5)}
        </div>
+       ${
+         targetType === "property"
+           ? `
+             <div class="hr" style="margin:12px 0;"></div>
+             <div class="kicker">Category ratings</div>
+             ${renderCategoryPicker(`rev_${formId}_noise`, "Noise")}
+             ${renderCategoryPicker(`rev_${formId}_pests`, "Pests/Cleanliness")}
+             ${renderCategoryPicker(`rev_${formId}_maintenance`, "Maintenance response")}
+             ${renderCategoryPicker(`rev_${formId}_safety`, "Safety")}
+             ${renderCategoryPicker(`rev_${formId}_fairness`, "Management fairness")}
+             ${renderCategoryPicker(`rev_${formId}_deposit`, "Deposit return")}
+           `
+           : ""
+       }
 
        <div class="field">
          <label>Review</label>
@@ -3110,12 +3167,20 @@ const content = `
 
                <div class="hr" style="margin:14px 0;"></div>
 
-               <div class="kicker">CASA rating status</div>
-               <div class="muted" style="margin-top:6px; font-weight:900;">${esc(credential)}</div>
+              <div class="kicker">CASA rating status</div>
+              <div class="muted" style="margin-top:6px; font-weight:900;">${esc(credential)}</div>
 
-               <div class="hr" style="margin:14px 0;"></div>
+              <div class="hr" style="margin:14px 0;"></div>
 
-               <div class="kicker">Report card (demo)</div>
+              <div class="kicker">Landlord Score</div>
+              <div class="lcRow" style="margin-top:8px;">
+                <div class="muted" style="font-weight:900;">Overall</div>
+                <div class="ratingNum" style="font-weight:950;">${esc(landlordScoreText)}</div>
+              </div>
+
+              <div class="hr" style="margin:14px 0;"></div>
+
+              <div class="kicker">Report card (demo)</div>
                ${
                  rep
                    ? `
@@ -3148,7 +3213,29 @@ const content = `
            <div class="list" style="margin-top:10px;">
              ${
                props.length
-                 ? props.map((p) => propertyCardHTML(p)).join("")
+                 ? props
+                     .map((p) => {
+                       const stP = ratingStats("property", p.id);
+                       const avgP = stP.avgRounded == null ? "—" : stP.avgRounded.toFixed(1);
+                       return `
+                         <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                           <div class="pad">
+                             <div class="lcRow" style="justify-content:space-between;">
+                               <div>
+                                 <div style="font-weight:900;">
+                                   <a href="#/property/${esc(p.id)}">${esc(p.address?.line1 || "Address")}</a>
+                                 </div>
+                                 <div class="tiny" style="margin-top:6px;">
+                                   Property Score: ${esc(avgP)}
+                                 </div>
+                               </div>
+                               <a class="btn miniBtn" href="#/property/${esc(p.id)}">View</a>
+                             </div>
+                           </div>
+                         </div>
+                       `.trim();
+                     })
+                     .join("")
                  : `<div class="muted">No addresses listed yet.</div>`
              }
            </div>
@@ -3268,9 +3355,13 @@ setPageTitle(title);
 
 const l = DB.landlords.find((x) => x.id === p.landlordId);
 const st = ratingStats("property", p.id);
+const landlordStats = l ? ratingStats("landlord", l.id) : null;
 const tier = cardTier(st.avgRounded ?? 0, st.count);
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
+const landlordAvgText =
+  landlordStats && landlordStats.avgRounded != null ? landlordStats.avgRounded.toFixed(1) : "—";
+const propertyCats = categoryAveragesForProperty(p.id);
 
 const content = `
    <section class="pageCard card">
@@ -3301,6 +3392,33 @@ const content = `
                  </div>
                  ${st.count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
                </div>
+
+               <div class="hr" style="margin:14px 0;"></div>
+
+               <div class="kicker">Scores</div>
+               <div class="lcRow" style="margin-top:8px;">
+                 <div class="muted" style="font-weight:900;">Property Score</div>
+                 <div class="ratingNum" style="font-weight:950;">${esc(avgText)}</div>
+               </div>
+               <div class="lcRow" style="margin-top:6px;">
+                 <div class="muted" style="font-weight:900;">Landlord Score</div>
+                 <div class="ratingNum" style="font-weight:950;">${esc(landlordAvgText)}</div>
+               </div>
+
+               ${
+                 propertyCats
+                   ? `
+                     <div class="hr" style="margin:14px 0;"></div>
+                     <div class="kicker">Category averages</div>
+                     <div class="lcRow" style="margin-top:8px;"><div class="muted">Noise</div><div>${esc(String(propertyCats.noise))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Pests/Cleanliness</div><div>${esc(String(propertyCats.pests))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Maintenance</div><div>${esc(String(propertyCats.maintenance))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Safety</div><div>${esc(String(propertyCats.safety))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Fairness</div><div>${esc(String(propertyCats.fairness))}</div></div>
+                     <div class="lcRow" style="margin-top:6px;"><div class="muted">Deposit return</div><div>${esc(String(propertyCats.deposit))}</div></div>
+                   `
+                   : ""
+               }
 
              </div>
            </div>
@@ -3365,12 +3483,22 @@ const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 
+const categories = {
+noise: Number($(`#rev_${formId}_noise`)?.value || 5),
+pests: Number($(`#rev_${formId}_pests`)?.value || 5),
+maintenance: Number($(`#rev_${formId}_maintenance`)?.value || 5),
+safety: Number($(`#rev_${formId}_safety`)?.value || 5),
+fairness: Number($(`#rev_${formId}_fairness`)?.value || 5),
+deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
+};
+
 DB.reviews.unshift({
 id: idRand("r"),
 targetType: "property",
 targetId: p.id,
 userId: DB.currentUserId || "",
 stars,
+categories,
 text,
 createdAt: Date.now(),
 });
