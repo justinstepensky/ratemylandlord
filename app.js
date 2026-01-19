@@ -2248,7 +2248,7 @@ const content = `
              <div class="tiny" style="margin-top:6px;">Verify to respond to reviews.</div>
              <div class="hr" style="margin:12px 0;"></div>
              <div style="display:flex; gap:10px; flex-wrap:wrap;">
-               <a class="btn ${landlordMode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login&umode=${userMode}">Login</a>
+               <a class="btn ${landlordMode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login&umode=${userMode}">Sign in</a>
                <a class="btn ${landlordMode === "signup" ? "btn--primary" : ""}" href="#/portal?mode=signup&umode=${userMode}">Sign up</a>
              </div>
 
