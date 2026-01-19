@@ -11,7 +11,7 @@
   ✅ Tenant Toolkit is real + usable (NYC, MIA, LA, CHI cards)
   ✅ All columns fit and collapse cleanly on mobile (via your existing layout classes)
   ✅ Map safe-init (Leaflet optional)
-  ✅ Keeps badges (inline SVG check + CASA mark)
+  ✅ Keeps badges (image-based check + CASA mark)
   ✅ Landlord page “More options” dropdown + CASA embed modal w/ fractional stars
   ✅ Sign in: landlord + user login UI with Apple/Google/Microsoft options (demo-safe)
   ✅ Menu ONLY on mobile (desktop hides hamburger + drawer)
@@ -123,6 +123,7 @@ showOverlayError("Unhandled promise rejection (handler failed)", err);
 ------------------------------ */
 const LS_KEY = "casa_demo_v2";
 const LEGACY_LS_KEY = "casa_demo_v1";
+const BADGE_VER = "1";
 
 function safeParseJSON(raw) {
 try {
@@ -167,6 +168,8 @@ const landlords = [
 id: "l1",
 name: "Northside Properties",
 entity: "",
+isVerified: true,
+isTop: false,
 verified: true,
 top: false,
 createdAt: now - 1000 * 60 * 60 * 24 * 16,
@@ -175,6 +178,8 @@ createdAt: now - 1000 * 60 * 60 * 24 * 16,
 id: "l2",
 name: "Park Ave Management",
 entity: "Park Ave Management LLC",
+isVerified: false,
+isTop: false,
 verified: false,
 top: false,
 createdAt: now - 1000 * 60 * 60 * 24 * 28,
@@ -183,6 +188,8 @@ createdAt: now - 1000 * 60 * 60 * 24 * 28,
 id: "l3",
 name: "Elmhurst Holdings",
 entity: "",
+isVerified: true,
+isTop: true,
 verified: true,
 top: true,
 createdAt: now - 1000 * 60 * 60 * 24 * 35,
@@ -373,8 +380,10 @@ out.landlords = out.landlords
 id: String(l && l.id ? l.id : ""),
 name: String(l && l.name ? l.name : ""),
 entity: String(l && l.entity ? l.entity : ""),
-verified: !!(l && l.verified),
-top: !!(l && l.top),
+isVerified: !!(l && (l.isVerified || l.verified)),
+isTop: !!(l && (l.isTop || l.top)),
+verified: !!(l && (l.isVerified || l.verified)),
+top: !!(l && (l.isTop || l.top)),
 createdAt: Number(l && l.createdAt ? l.createdAt : Date.now()),
 }))
 .filter((l) => l.id && l.name);
@@ -421,8 +430,10 @@ const landlords = (legacy.landlords || [])
 id: String(l && l.id ? l.id : "l" + Math.random().toString(16).slice(2)),
 name: String(l && l.name ? l.name : ""),
 entity: String(l && l.entity ? l.entity : ""),
-verified: !!(l && l.verified),
-top: !!(l && l.top),
+isVerified: !!(l && (l.isVerified || l.verified)),
+isTop: !!(l && (l.isTop || l.top)),
+verified: !!(l && (l.isVerified || l.verified)),
+top: !!(l && (l.isTop || l.top)),
 createdAt: Number(l && l.createdAt ? l.createdAt : now),
 }))
 .filter((l) => l.id && l.name);
@@ -629,39 +640,85 @@ return "CASA Rated";
 /* -----------------------------
   Badges
 ------------------------------ */
-function badgeChip(kind, alt, title) {
-const icon =
-kind === "verified"
-? `
-       <svg class="badgeIcon badgeIcon--verified" viewBox="0 0 24 24" aria-hidden="true">
-         <path class="badgeSeal" d="M12 2.2l1.5 1.2 1.9-.4.9 1.7 1.9.4-.1 1.9 1.4 1.1-.9 1.7.9 1.7-1.4 1.1.1 1.9-1.9.4-.9 1.7-1.9-.4L12 21.8l-1.5-1.2-1.9.4-.9-1.7-1.9-.4.1-1.9-1.4-1.1.9-1.7-.9-1.7 1.4-1.1-.1-1.9 1.9-.4.9-1.7 1.9.4z" />
-         <path class="badgeCheck" d="M9.6 12.6l-2-2-1.3 1.3 3.3 3.3 6.7-6.7-1.3-1.3z" />
-       </svg>
-     `
-: `
-       <svg class="badgeIcon badgeIcon--casa" viewBox="0 0 24 24" aria-hidden="true">
-         <path class="badgeWave" d="M6.4 8.4c1.9-1.9 5.3-1.9 7.2 0" />
-         <path class="badgeWave" d="M5 11.4c2.8-2.8 7.2-2.8 10 0" />
-         <path class="badgeWave" d="M3.8 14.3c3.6-3.6 9.6-3.6 13.2 0" />
-       </svg>
-     `;
+const badgeWarned = new Set();
 
+function badgeImg(src, alt, title, fallbackText, landlordId, kind) {
+const srcWithVer = `${src}?v=${BADGE_VER}`;
+const altSrcWithVer = `./${src}?v=${BADGE_VER}`;
 return `
-   <span class="badgeChip badgeChip--${esc(kind)}" title="${esc(title)}" aria-label="${esc(alt)}">
-     ${icon}
-   </span>
+   <img
+     class="badgeIcon"
+     src="${esc(srcWithVer)}"
+     alt="${esc(alt)}"
+     title="${esc(title)}"
+     data-badge-step="0"
+     data-badge-alt-src="${esc(altSrcWithVer)}"
+     data-badge-fallback="${esc(fallbackText)}"
+     data-badge-kind="${esc(kind)}"
+     data-badge-landlord="${esc(landlordId)}"
+     onerror="handleBadgeImgError(this)"
+   />
+   <span class="badgeFallback" style="display:none;">${esc(fallbackText)}</span>
  `.trim();
 }
 
-function badgesHTMLForLandlord(l) {
+function handleBadgeImgError(img) {
+try {
+if (!img) return;
+const step = img.getAttribute("data-badge-step") || "0";
+if (step === "0") {
+img.setAttribute("data-badge-step", "1");
+const altSrc = img.getAttribute("data-badge-alt-src");
+if (altSrc) img.src = altSrc;
+return;
+}
+
+img.style.display = "none";
+const fallback = img.nextElementSibling;
+if (fallback && fallback.classList.contains("badgeFallback")) {
+fallback.style.display = "inline-flex";
+}
+
+const landlordId = img.getAttribute("data-badge-landlord") || "unknown";
+const kind = img.getAttribute("data-badge-kind") || "unknown";
+const warnKey = `${landlordId}:${kind}`;
+if (!badgeWarned.has(warnKey)) {
+badgeWarned.add(warnKey);
+console.warn(`[badge] failed to load for landlord ${landlordId}: ${kind}`);
+}
+} catch {}
+}
+
+function renderBadges(landlord) {
+if (!landlord) return "";
 const parts = [];
-if (l.verified) parts.push(badgeChip("verified", "Verified", "Verified landlord"));
-const st = ratingStats("landlord", l.id);
-if (st.count && st.avgRounded != null && st.avgRounded >= 4.0) {
-parts.push(badgeChip("casa", "CASA top rated", "CASA badge (4.0+ rating)"));
+const landlordId = landlord.id || "";
+if (landlord.isVerified) {
+parts.push(
+badgeImg(
+"assets/badge-verified.png",
+"Verified",
+"Verified landlord",
+"Verified",
+landlordId,
+"verified"
+)
+);
+}
+if (landlord.isTop) {
+parts.push(
+badgeImg(
+"assets/badge-top.png",
+"Top landlord",
+"Top landlord",
+"Top",
+landlordId,
+"top"
+)
+);
 }
 if (!parts.length) return "";
-return `<span class="badges">${parts.join("")}</span>`;
+return `<span class="badgeRow">${parts.join("")}</span>`;
 }
 
 /* Brand font (matches header) */
@@ -1291,7 +1348,7 @@ return `
      <div class="lcLeft">
        <div class="lcName">
          <span>${esc(l.name)}</span>
-         ${badgesHTMLForLandlord(l)}
+         ${renderBadges(l)}
        </div>
 
        <div class="lcMeta">${esc(l.entity || propNote)}</div>
@@ -1383,7 +1440,7 @@ r,
 kind: "landlord",
 title: l.name,
 href: `#/landlord/${l.id}`,
-badgeHTML: badgesHTMLForLandlord(l),
+badgeHTML: renderBadges(l),
 }
 : null;
 }
@@ -2150,6 +2207,8 @@ DB.landlords.unshift({
 id: landlordId,
 name,
 entity,
+isVerified: false,
+isTop: false,
 verified: false,
 top: false,
 createdAt: Date.now(),
@@ -2812,7 +2871,7 @@ const content = `
        <div class="topRow">
          <div>
            <div class="kicker">Landlord</div>
-           <div class="pageTitle">${esc(l.name)} ${badgesHTMLForLandlord(l)}</div>
+           <div class="pageTitle">${esc(l.name)} ${renderBadges(l)}</div>
            <div class="pageSub">${esc(l.entity || "—")}</div>
          </div>
          <a class="btn" href="#/search">Back</a>
