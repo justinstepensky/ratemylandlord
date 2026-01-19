@@ -1086,7 +1086,7 @@ const base = parts[0] || "";
 const param = parts[1] || "";
 
 if (!base) return renderHome();
-if (base === "search") return renderSearch();
+if (base === "search") return ;
 if (base === "add") return renderAdd();
 if (base === "how") return renderHow();
 if (base === "trust") return renderTrust();
@@ -1826,6 +1826,28 @@ const doBtn = $("#doSearch");
 
 qEl?.addEventListener("keydown", (e) => {
 if (e.key === "Enter") doBtn?.click();
+});
+
+  // ✅ NEW: live region auto-switch while typing (e.g., "FL" -> Miami)
+let lastAutoRegion = getRegionKey();
+
+qEl?.addEventListener("input", () => {
+  const query = qEl ? String(qEl.value || "") : "";
+  const hit = query.toUpperCase().match(/\b(NY|FL|CA|IL)\b/);
+  if (!hit) return;
+
+  const rk = regionFromState(hit[1]);
+  if (!rk) return;
+
+  // Avoid re-render loops while user keeps typing
+  if (rk === lastAutoRegion) return;
+
+  lastAutoRegion = rk;
+  setRegionKey(rk);
+
+  // Update buttons + rerun map/results immediately
+  refreshSearchRegionUI();
+  runSearchAndRender();
 });
 
 function matchesLandlord(l, query) {
