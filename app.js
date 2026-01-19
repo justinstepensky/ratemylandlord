@@ -2013,7 +2013,7 @@ const content = `
            <div class="mapBox" style="margin-top:10px;">
              <div class="map" id="addMap" style="height:320px;"></div>
            </div>
-           <div class="tiny" style="margin-top:10px;">Tip: If you don’t pick a pin, we’ll place it near NYC.</div>
+           <div class="tiny" style="margin-top:10px;"></div>
          </div>
        </div>
      </div>
