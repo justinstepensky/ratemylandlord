@@ -2850,7 +2850,7 @@ function renderStarsPicker(idPrefix, defaultVal = 5) {
 const stars = [1, 2, 3, 4, 5]
 .map((v) => {
 const isOn = v <= defaultVal;
-return `<button type="button" data-star="${v}" class="starBtn" style="background:none;border:0;padding:2px 4px;font-size:18px;cursor:pointer;color:${isOn ? "rgba(21,17,14,.92)" : "rgba(21,17,14,.35)"}">★</button>`;
+return `<button type="button" data-star="${v}" class="starBtn ${isOn ? "isOn" : ""}" style="background:none;border:0;padding:2px 4px;font-size:18px;cursor:pointer;">★</button>`;
 })
 .join("");
 return `
@@ -2875,7 +2875,7 @@ const input = inputId ? document.getElementById(inputId) : null;
 if (input) input.value = String(val);
 picker.querySelectorAll("[data-star]").forEach((el) => {
 const v = Number(el.getAttribute("data-star") || 0);
-el.style.color = v <= val ? "rgba(21,17,14,.92)" : "rgba(21,17,14,.35)";
+el.classList.toggle("isOn", v <= val);
 });
 });
 });

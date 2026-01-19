@@ -109,6 +109,10 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 }
 .starBtn{
   transition: transform .12s ease, color .12s ease;
+  color: rgba(21,17,14,.35);
+}
+.starBtn.isOn{
+  color: rgba(21,17,14,.92);
 }
 
 /* Cards/layout */
