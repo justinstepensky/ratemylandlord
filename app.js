@@ -634,14 +634,16 @@ const icon =
 kind === "verified"
 ? `
        <svg class="badgeIcon badgeIcon--verified" viewBox="0 0 24 24" aria-hidden="true">
-         <circle cx="12" cy="12" r="10" />
-         <path d="M9.2 12.6l-2.1-2.1-1.4 1.4 3.5 3.5 7.1-7.1-1.4-1.4z" />
+         <path class="badgeSeal" d="M12 1.6l1.7 1.2 2.1-.4 1 1.9 2.1.4-.1 2.1 1.6 1.3-1 1.9 1 1.9-1.6 1.3.1 2.1-2.1.4-1 1.9-2.1-.4L12 22.4l-1.7-1.2-2.1.4-1-1.9-2.1-.4.1-2.1-1.6-1.3 1-1.9-1-1.9 1.6-1.3-.1-2.1 2.1-.4 1-1.9 2.1.4z" />
+         <path class="badgeCheck" d="M9.4 12.8l-2.2-2.2-1.5 1.5 3.7 3.7 7.4-7.4-1.5-1.5z" />
        </svg>
      `
 : `
        <svg class="badgeIcon badgeIcon--casa" viewBox="0 0 24 24" aria-hidden="true">
-         <rect x="2.5" y="3" width="19" height="18" rx="6" />
-         <text x="12" y="15.2" text-anchor="middle">casa</text>
+         <circle class="badgeRing" cx="12" cy="12" r="9.2" />
+         <path class="badgeWave" d="M6.6 9.2c1.8-1.8 4.9-1.8 6.7 0" />
+         <path class="badgeWave" d="M5.2 12c2.6-2.6 7-2.6 9.6 0" />
+         <path class="badgeWave" d="M3.9 14.7c3.4-3.4 9-3.4 12.4 0" />
        </svg>
      `;
 

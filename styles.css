@@ -201,25 +201,26 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border-radius:8px;
-  border:1px solid rgba(20,16,12,.12);
-  background: rgba(255,255,255,.55);
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 .badgeIcon{
-  width:16px;height:16px;
+  width:22px;height:22px;
   display:block;
 }
-.badgeIcon--verified circle{fill:#1d6fe2}
-.badgeIcon--verified path{fill:#fff}
-.badgeIcon--casa rect{fill:#fff;stroke:#1d6fe2;stroke-width:1.2}
-.badgeIcon--casa text{
-  fill:#1d6fe2;
-  font-size:9px;
-  font-style:italic;
-  font-weight:700;
-  font-family: Georgia, "Times New Roman", Times, serif;
-  text-transform: lowercase;
-  letter-spacing:-0.02em;
+.badgeIcon--verified .badgeSeal{fill:#1496e5}
+.badgeIcon--verified .badgeCheck{fill:#fff}
+.badgeIcon--casa .badgeRing{
+  fill: transparent;
+  stroke:#cfc6bb;
+  stroke-width:1.4;
+}
+.badgeIcon--casa .badgeWave{
+  fill: none;
+  stroke:#2b2722;
+  stroke-width:2.2;
+  stroke-linecap:round;
 }
 
 /* Carousel */
