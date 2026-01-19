@@ -614,6 +614,159 @@ for (const r of rs) dist[r.stars - 1] += 1;
 return { count, avg, avgRounded, dist };
 }
 
+/* -----------------------------
+  Geocoding (Property media)
+------------------------------ */
+function normalizeAddressForGeo(p) {
+if (!p) return "";
+const parts = [];
+if (typeof p.address === "string") parts.push(String(p.address));
+if (p.address && typeof p.address === "object") {
+const line1 = p.address.line1 ? String(p.address.line1) : "";
+const unit = p.address.unit ? String(p.address.unit) : "";
+const line = line1 && unit ? `${line1}, ${unit}` : line1 || unit;
+if (line) parts.push(line);
+if (p.address.city) parts.push(String(p.address.city));
+if (p.address.state) parts.push(String(p.address.state));
+if (p.address.zip) parts.push(String(p.address.zip));
+}
+if (p.city) parts.push(String(p.city));
+if (p.state) parts.push(String(p.state));
+if (p.zip) parts.push(String(p.zip));
+return parts.join(", ").trim();
+}
+
+function geoCacheKey(addr) {
+return "CASA_GEO_" + String(addr || "").toLowerCase().trim();
+}
+
+function getGeoCache(addr) {
+try {
+const raw = localStorage.getItem(geoCacheKey(addr));
+if (!raw) return null;
+const obj = JSON.parse(raw);
+const maxAge = 30 * 24 * 60 * 60 * 1000;
+if (obj && obj.ts && Date.now() - obj.ts > maxAge) return null;
+if (Number.isFinite(obj && obj.lat) && Number.isFinite(obj && obj.lng)) return obj;
+} catch {}
+return null;
+}
+
+function setGeoCache(addr, lat, lng) {
+try {
+localStorage.setItem(
+geoCacheKey(addr),
+JSON.stringify({ lat: Number(lat), lng: Number(lng), ts: Date.now() })
+);
+} catch {}
+}
+
+let __geoQueue = Promise.resolve();
+let __geoLastCall = 0;
+
+function geocodeAddress(addr) {
+const a = String(addr || "").trim();
+if (!a) return Promise.resolve(null);
+
+const cached = getGeoCache(a);
+if (cached) return Promise.resolve({ lat: cached.lat, lng: cached.lng });
+
+__geoQueue = __geoQueue.then(async () => {
+const wait = Math.max(0, 1200 - (Date.now() - __geoLastCall));
+if (wait) await new Promise((r) => setTimeout(r, wait));
+__geoLastCall = Date.now();
+
+try {
+const url =
+"https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+encodeURIComponent(a);
+const res = await fetch(url, { method: "GET" });
+if (!res.ok) return null;
+const data = await res.json();
+const hit = data && data[0];
+const lat = Number(hit && hit.lat);
+const lng = Number(hit && hit.lon);
+if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+setGeoCache(a, lat, lng);
+return { lat, lng };
+} catch {
+return null;
+}
+});
+
+return __geoQueue;
+}
+
+function osmStaticUrl(lat, lng, zoom = 16, w = 740, h = 420) {
+const la = Number(lat);
+const ln = Number(lng);
+if (!Number.isFinite(la) || !Number.isFinite(ln)) return "";
+const z = Math.max(1, Math.min(19, zoom | 0));
+const width = Math.max(200, Math.min(1280, w | 0));
+const height = Math.max(200, Math.min(900, h | 0));
+const center = `${la},${ln}`;
+return (
+"https://staticmap.openstreetmap.de/staticmap.php?center=" +
+encodeURIComponent(center) +
+`&zoom=${z}&size=${width}x${height}&markers=${encodeURIComponent(center)},red-pushpin`
+);
+}
+
+function renderPropertyMediaCard(p) {
+const addr = normalizeAddressForGeo(p);
+return `
+     <section class="pageCard card">
+       <div class="pad">
+         <div class="sectionLabel">PROPERTY MEDIA</div>
+         <div class="mediaWrap" id="mediaWrap">
+           <div class="mediaPlaceholder" id="mediaPlaceholder">
+             <div class="muted">Loading map preview…</div>
+           </div>
+           <img class="mediaImg" id="mediaImg" style="display:none;" alt="Map preview" loading="lazy" />
+         </div>
+         <div class="muted mini" style="margin-top:8px;">Area view (OpenStreetMap)</div>
+       </div>
+     </section>
+   `.trim();
+}
+
+function initPropertyMediaFromAddress(p) {
+const addr = normalizeAddressForGeo(p);
+const imgEl = document.getElementById("mediaImg");
+const phEl = document.getElementById("mediaPlaceholder");
+if (!imgEl || !phEl) return;
+
+if (!addr) {
+phEl.innerHTML = `<div class="muted">No address available for preview.</div>`;
+return;
+}
+
+geocodeAddress(addr).then((coords) => {
+if (!coords) {
+phEl.innerHTML = `<div class="muted">Map preview unavailable. View location on map above.</div>`;
+return;
+}
+
+const url = osmStaticUrl(coords.lat, coords.lng, 16, 740, 420);
+if (!url) {
+phEl.innerHTML = `<div class="muted">Couldn’t load map preview.</div>`;
+return;
+}
+
+imgEl.onerror = () => {
+imgEl.style.display = "none";
+phEl.style.display = "block";
+phEl.innerHTML = `<div class="muted">Preview failed to load.</div>`;
+};
+
+imgEl.src = url;
+imgEl.onload = () => {
+phEl.style.display = "none";
+imgEl.style.display = "block";
+};
+});
+}
+
 function cardTier(avgRounded, reviewCount) {
 if (!reviewCount) return { tier: "none", label: "Unrated", pillClass: "" };
 const r = avgRounded;
@@ -1840,6 +1993,33 @@ style.textContent = `
      border-radius: 18px;
      overflow:hidden;
    }
+
+   /* Property media */
+   .sectionLabel{
+     font-weight: 950;
+     letter-spacing: .14em;
+     font-size: 11px;
+     color: rgba(21,17,14,.60);
+     text-transform: uppercase;
+   }
+   .mediaImg{
+     width:100%;
+     height:auto;
+     border-radius:16px;
+     display:block;
+   }
+   .mediaPlaceholder{
+     border:1px solid rgba(0,0,0,0.06);
+     border-radius:16px;
+     padding:18px;
+     background:rgba(0,0,0,0.02);
+     min-height:220px;
+     display:flex;
+     align-items:center;
+     justify-content:center;
+     text-align:center;
+   }
+   .mini{ font-size:12px; opacity:0.8; }
 
    /* -----------------------------
       Drawer bubbles: horizontal row (guaranteed)
@@ -3114,13 +3294,6 @@ const content = `
                  ${st.count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
                </div>
 
-               <div class="hr" style="margin:14px 0;"></div>
-
-               <div class="kicker">Location</div>
-               <div class="mapBox" style="margin-top:10px;">
-                 <div class="map" id="propMap" style="height:320px;"></div>
-               </div>
-
              </div>
            </div>
 
@@ -3135,6 +3308,10 @@ const content = `
          </div>
 
          <div>
+           ${renderPropertyMediaCard(p)}
+
+           <div class="hr"></div>
+
            <div class="kicker">Landlord</div>
            <div class="list" style="margin-top:10px;">
              ${l ? landlordCardHTML(l) : `<div class="muted">No landlord listed.</div>`}
@@ -3159,22 +3336,7 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
-
-// Map
-setTimeout(() => {
-const regionKey = getRegionKey();
-const cfg = REGIONS[regionKey] || REGIONS.NYC;
-const center = [
-typeof p.lat === "number" ? p.lat : cfg.center[0],
-typeof p.lng === "number" ? p.lng : cfg.center[1],
-];
-const map = initLeafletMap($("#propMap"), center, 14);
-if (!map) return;
-
-try {
-window.L.marker(center).addTo(map).bindPopup(`<b>${esc(title)}</b>`);
-} catch {}
-}, 0);
+initPropertyMediaFromAddress(p);
 
 // Reviews
 const listEl = $("#propertyReviews");
