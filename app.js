@@ -1538,7 +1538,7 @@ const content = `
            <div>
              <div class="kicker">Map</div>
              <h2 class="sectionTitle">Browse by location</h2>
-             <div class="sectionDesc">Pins reflect address ratings.</div>
+             <div class="sectionDesc"></div>
            </div>
            <a class="btn miniBtn" href="#/search">Open search</a>
          </div>
@@ -1958,7 +1958,7 @@ const content = `
          <div>
            <div class="kicker">Add</div>
            <div class="pageTitle">Add a landlord + address</div>
-           <div class="pageSub">Add the landlord once, then add one address (you can add more later).</div>
+           <div class="pageSub"></div>
          </div>
          <a class="btn" href="#/">Home</a>
        </div>
@@ -2234,11 +2234,9 @@ const content = `
              <div class="pad">
                <div class="muted" style="font-weight:800; line-height:1.55;">
                  Verification prevents fake landlord accounts and keeps responses accountable.
-                 Upload a simple ownership/management document (demo field here).
                </div>
                <div class="hr" style="margin:14px 0;"></div>
                <div class="tiny">
-                 This is a UI placeholder — wire it to real auth + storage when you go live.
                </div>
              </div>
            </div>
@@ -2347,19 +2345,16 @@ const content = `
          ${card("MIA", "Miami-Dade starter links", [
            { label: "Miami-Dade — Service requests", href: "https://www.miamidade.gov/global/home.page" },
            { label: "Florida AG — Tenant resources", href: "https://www.myfloridalegal.com/" },
-           { label: "Local legal aid (search)", href: "https://www.google.com/search?q=miami+legal+aid+tenant" },
          ])}
 
          ${card("LA", "Los Angeles basics", [
            { label: "LAHD — Housing department", href: "https://housing.lacity.org/" },
            { label: "Rent Stabilization (RSO)", href: "https://housing2.lacity.org/residents/rso-overview" },
-           { label: "Tenant legal help (search)", href: "https://www.google.com/search?q=los+angeles+tenant+legal+aid" },
          ])}
 
          ${card("CHI", "Chicago basics", [
            { label: "Chicago 311", href: "https://311.chicago.gov/" },
            { label: "Chicago Dept. of Housing", href: "https://www.chicago.gov/city/en/depts/doh.html" },
-           { label: "Tenant rights (search)", href: "https://www.google.com/search?q=chicago+tenant+rights+guide" },
          ])}
        </div>
      </div>
