@@ -211,15 +211,10 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 }
 .badgeIcon--verified .badgeSeal{fill:#1496e5}
 .badgeIcon--verified .badgeCheck{fill:#fff}
-.badgeIcon--casa .badgeRing{
-  fill: transparent;
-  stroke:#cfc6bb;
-  stroke-width:1.4;
-}
 .badgeIcon--casa .badgeWave{
   fill: none;
   stroke:#2b2722;
-  stroke-width:2.2;
+  stroke-width:2.4;
   stroke-linecap:round;
 }
 
