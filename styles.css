@@ -210,8 +210,9 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .badgeRow{
   display:inline-flex;
   align-items:center;
-  gap:8px;
-  margin-left:10px;
+  gap:6px;
+  margin-left:6px;
+  flex-wrap:wrap;
   transform:translateY(2px);
 }
 .badgeIcon{

@@ -1492,6 +1492,7 @@ if (base === "how") return renderHow();
 if (base === "trust") return renderTrust();
 if (base === "portal") return renderPortal();
 if (base === "toolkit") return renderToolkit();
+if (base === "admin") return renderAdmin();
 if (base === "landlord" && param) return renderLandlord(param);
 if (base === "property" && param) return renderProperty(param);
 
@@ -1847,16 +1848,17 @@ if (!app) return;
 
 app.innerHTML = `
    ${content}
-   <div class="footer">
-     <div>© ${new Date().getFullYear()} casa</div>
-     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-       <a href="#/trust">Trust &amp; Safety</a>
-       <a href="#/how">How it works</a>
-       <a href="#/toolkit">Tenant Toolkit</a>
-       <a href="#/search">Search</a>
-       <a href="#/portal">Sign in</a>
-     </div>
-   </div>
+       <div class="footer">
+         <div>© ${new Date().getFullYear()} casa</div>
+         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+           <a href="#/trust">Trust &amp; Safety</a>
+           <a href="#/how">How it works</a>
+           <a href="#/toolkit">Tenant Toolkit</a>
+           <a href="#/search">Search</a>
+           <a href="#/portal">Sign in</a>
+           <a href="#/admin">Admin</a>
+         </div>
+       </div>
  `;
 ensureHashLinkRouting();
 }
@@ -2615,7 +2617,6 @@ const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) :
 const landlordProps = landlordRecord
   ? DB.properties.filter((p) => p.landlordId === landlordRecord.id)
   : [];
-const adminMode = !!DB.adminMode;
 
 const content = `
    <section class="pageCard card">
@@ -2696,22 +2697,25 @@ const content = `
 
              <div class="kicker">Verification</div>
              <div class="tiny" style="margin-top:6px;">Upload ownership documents (demo).</div>
+
              <div class="field" style="margin-top:10px;">
-               <label>Landlord verification docs</label>
-               <input class="input" id="lvDocs" type="file" multiple />
-             </div>
-             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-               <button class="btn" id="lvSubmit" type="button">Submit for verification</button>
-               <span class="tiny" id="lvStatus">Status: ${esc(landlordRecord ? landlordRecord.verificationStatus : "none")}</span>
+               <label>Document types (select at least one)</label>
+               <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                 <label class="tiny"><input type="checkbox" id="docDeed" /> Property Deed or Title</label>
+                 <label class="tiny"><input type="checkbox" id="docTax" /> Property Tax Bill</label>
+                 <label class="tiny"><input type="checkbox" id="docMortgage" /> Mortgage Statement</label>
+                 <label class="tiny"><input type="checkbox" id="docOther" /> Other Ownership Proof</label>
+               </div>
              </div>
 
-             <div class="hr"></div>
+             <div class="field">
+               <label>Upload documents</label>
+               <input class="input" id="verifyDocs" type="file" multiple />
+             </div>
 
-             <div class="kicker">Verified Building</div>
-             <div class="tiny" style="margin-top:6px;">Address proof / lease / public records.</div>
-             <div class="field" style="margin-top:10px;">
-               <label>Select building</label>
-               <select class="input" id="bvProperty">
+             <div class="field">
+               <label>Apply to building (optional)</label>
+               <select class="input" id="verifyProperty">
                  ${
                    landlordProps.length
                      ? landlordProps
@@ -2726,27 +2730,10 @@ const content = `
                  }
                </select>
              </div>
-             <div class="field">
-               <label>Building verification docs</label>
-               <input class="input" id="bvDocs" type="file" multiple />
-             </div>
+
              <div style="display:flex; gap:10px; flex-wrap:wrap;">
-               <button class="btn" id="bvSubmit" type="button">Submit building verification</button>
-               <span class="tiny" id="bvStatus">Status: ${esc(landlordProps[0]?.buildingVerificationStatus || "none")}</span>
-             </div>
-
-             <div class="hr"></div>
-
-             <div class="kicker">Admin</div>
-             <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-               <input type="checkbox" id="adminToggle" ${adminMode ? "checked" : ""} />
-               Admin mode (demo)
-             </label>
-             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-               <button class="btn" id="lvApprove" type="button">Approve landlord</button>
-               <button class="btn" id="lvReject" type="button">Reject landlord</button>
-               <button class="btn" id="bvApprove" type="button">Approve building</button>
-               <button class="btn" id="bvReject" type="button">Reject building</button>
+               <button class="btn" id="verifySubmit" type="button">Submit for verification</button>
+               <span class="tiny" id="verifyStatus">Status: ${esc(landlordRecord ? landlordRecord.verificationStatus : "none")}</span>
              </div>
            </div>
          </div>
@@ -2840,86 +2827,49 @@ verified: false,
 createdAt: Date.now(),
 });
 
-$("#lvSubmit")?.addEventListener("click", () => {
+$("#verifySubmit")?.addEventListener("click", () => {
 const user = currentLandlordUser();
 if (!user) return alert("Sign in as a landlord first.");
 const landlord = landlordForCompany(user.company);
 if (!landlord) return alert("No matching landlord profile found.");
-const files = Array.from($("#lvDocs")?.files || []);
-const docs = files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }));
+
+const hasType =
+  $("#docDeed")?.checked ||
+  $("#docTax")?.checked ||
+  $("#docMortgage")?.checked ||
+  $("#docOther")?.checked;
+if (!hasType) return alert("Select at least one document type.");
+
+const files = Array.from($("#verifyDocs")?.files || []);
+if (!files.length) return alert("Upload at least one document.");
+
+const types = [];
+if ($("#docDeed")?.checked) types.push("deed");
+if ($("#docTax")?.checked) types.push("tax");
+if ($("#docMortgage")?.checked) types.push("mortgage");
+if ($("#docOther")?.checked) types.push("other");
+
+const docs = files.map((f) => ({
+name: f.name,
+size: f.size,
+uploadedAt: Date.now(),
+types,
+}));
 landlord.verificationDocs = (landlord.verificationDocs || []).concat(docs);
 landlord.verificationStatus = "pending";
 landlord.isVerified = false;
-persist();
-$("#lvStatus") && ($("#lvStatus").textContent = "Status: pending");
-alert("Verification submitted (demo).");
-});
 
-$("#bvSubmit")?.addEventListener("click", () => {
-const user = currentLandlordUser();
-if (!user) return alert("Sign in as a landlord first.");
-const landlord = landlordForCompany(user.company);
-if (!landlord) return alert("No matching landlord profile found.");
-const propId = $("#bvProperty")?.value || "";
-const prop = DB.properties.find((p) => p.id === propId);
-if (!prop) return alert("Select a property to verify.");
-const files = Array.from($("#bvDocs")?.files || []);
-const docs = files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }));
+const propId = $("#verifyProperty")?.value || "";
+const prop = propId ? DB.properties.find((p) => p.id === propId) : null;
+if (prop) {
 prop.buildingVerificationDocs = (prop.buildingVerificationDocs || []).concat(docs);
 prop.buildingVerificationStatus = "pending";
 prop.isVerifiedBuilding = false;
-persist();
-$("#bvStatus") && ($("#bvStatus").textContent = "Status: pending");
-alert("Building verification submitted (demo).");
-});
+}
 
-$("#adminToggle")?.addEventListener("change", (e) => {
-DB.adminMode = !!e.target.checked;
 persist();
-});
-
-$("#lvApprove")?.addEventListener("click", () => {
-if (!DB.adminMode) return alert("Enable admin mode to approve.");
-const user = currentLandlordUser();
-const landlord = user ? landlordForCompany(user.company) : null;
-if (!landlord) return alert("No matching landlord profile found.");
-landlord.verificationStatus = "verified";
-landlord.isVerified = true;
-persist();
-$("#lvStatus") && ($("#lvStatus").textContent = "Status: verified");
-});
-
-$("#lvReject")?.addEventListener("click", () => {
-if (!DB.adminMode) return alert("Enable admin mode to reject.");
-const user = currentLandlordUser();
-const landlord = user ? landlordForCompany(user.company) : null;
-if (!landlord) return alert("No matching landlord profile found.");
-landlord.verificationStatus = "rejected";
-landlord.isVerified = false;
-persist();
-$("#lvStatus") && ($("#lvStatus").textContent = "Status: rejected");
-});
-
-$("#bvApprove")?.addEventListener("click", () => {
-if (!DB.adminMode) return alert("Enable admin mode to approve.");
-const propId = $("#bvProperty")?.value || "";
-const prop = DB.properties.find((p) => p.id === propId);
-if (!prop) return alert("Select a property to approve.");
-prop.buildingVerificationStatus = "verified";
-prop.isVerifiedBuilding = true;
-persist();
-$("#bvStatus") && ($("#bvStatus").textContent = "Status: verified");
-});
-
-$("#bvReject")?.addEventListener("click", () => {
-if (!DB.adminMode) return alert("Enable admin mode to reject.");
-const propId = $("#bvProperty")?.value || "";
-const prop = DB.properties.find((p) => p.id === propId);
-if (!prop) return alert("Select a property to reject.");
-prop.buildingVerificationStatus = "rejected";
-prop.isVerifiedBuilding = false;
-persist();
-$("#bvStatus") && ($("#bvStatus").textContent = "Status: rejected");
+$("#verifyStatus") && ($("#verifyStatus").textContent = "Status: pending");
+alert("Verification submitted (demo).");
 });
 persist();
 alert("Demo: account created. Verification pending.");
@@ -3056,6 +3006,157 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
+}
+
+/* -----------------------------
+  Admin (verification approvals)
+------------------------------ */
+function renderAdmin() {
+setPageTitle("Admin");
+const pendingLandlords = DB.landlords.filter((l) => l.verificationStatus === "pending");
+const pendingBuildings = DB.properties.filter((p) => p.buildingVerificationStatus === "pending");
+
+const content = `
+   <section class="pageCard card">
+     <div class="pad">
+       <div class="topRow">
+         <div>
+           <div class="kicker">Admin</div>
+           <div class="pageTitle">Verification approvals</div>
+           <div class="pageSub">Demo-only tools.</div>
+         </div>
+         <a class="btn" href="#/">Home</a>
+       </div>
+
+       <div class="hr"></div>
+
+       ${
+         DB.adminMode
+           ? `
+             <div class="kicker">Pending landlords</div>
+             <div class="list" style="margin-top:10px;">
+               ${
+                 pendingLandlords.length
+                   ? pendingLandlords
+                       .map(
+                         (l) => `
+                           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                             <div class="pad">
+                               <div style="font-weight:900;">${esc(l.name)}</div>
+                               <div class="tiny" style="margin-top:6px;">Docs: ${esc(String(l.verificationDocs?.length || 0))}</div>
+                               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                 <button class="btn" data-admin-approve-landlord="${esc(l.id)}">Approve</button>
+                                 <button class="btn" data-admin-reject-landlord="${esc(l.id)}">Reject</button>
+                               </div>
+                             </div>
+                           </div>
+                         `
+                       )
+                       .join("")
+                   : `<div class="muted">No pending landlords.</div>`
+               }
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Pending buildings</div>
+             <div class="list" style="margin-top:10px;">
+               ${
+                 pendingBuildings.length
+                   ? pendingBuildings
+                       .map(
+                         (p) => `
+                           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                             <div class="pad">
+                               <div style="font-weight:900;">${esc(p.address?.line1 || "Address")}</div>
+                               <div class="tiny" style="margin-top:6px;">Docs: ${esc(
+                                 String(p.buildingVerificationDocs?.length || 0)
+                               )}</div>
+                               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                 <button class="btn" data-admin-approve-building="${esc(p.id)}">Approve</button>
+                                 <button class="btn" data-admin-reject-building="${esc(p.id)}">Reject</button>
+                               </div>
+                             </div>
+                           </div>
+                         `
+                       )
+                       .join("")
+                   : `<div class="muted">No pending buildings.</div>`
+               }
+             </div>
+           `
+           : `
+             <div class="card" style="box-shadow:none;">
+               <div class="pad">
+                 <div class="kicker">Admin login</div>
+                 <div class="field" style="margin-top:10px;">
+                   <label>Password</label>
+                   <input class="input" id="adminPass" type="password" placeholder="Enter admin password" />
+                 </div>
+                 <button class="btn btn--primary" id="adminLogin" type="button" style="margin-top:10px;">Log in</button>
+               </div>
+             </div>
+           `
+       }
+     </div>
+   </section>
+ `;
+
+renderShell(content);
+ensureRuntimeStyles();
+
+$("#adminLogin")?.addEventListener("click", () => {
+const pass = $("#adminPass")?.value ? String($("#adminPass").value).trim() : "";
+if (pass !== "casa-admin") return alert("Invalid password.");
+DB.adminMode = true;
+persist();
+route();
+});
+
+document.querySelectorAll("[data-admin-approve-landlord]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-approve-landlord") || "";
+const l = DB.landlords.find((x) => x.id === id);
+if (!l) return;
+l.verificationStatus = "verified";
+l.isVerified = true;
+persist();
+route();
+});
+});
+document.querySelectorAll("[data-admin-reject-landlord]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-reject-landlord") || "";
+const l = DB.landlords.find((x) => x.id === id);
+if (!l) return;
+l.verificationStatus = "rejected";
+l.isVerified = false;
+persist();
+route();
+});
+});
+document.querySelectorAll("[data-admin-approve-building]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-approve-building") || "";
+const p = DB.properties.find((x) => x.id === id);
+if (!p) return;
+p.buildingVerificationStatus = "verified";
+p.isVerifiedBuilding = true;
+persist();
+route();
+});
+});
+document.querySelectorAll("[data-admin-reject-building]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-reject-building") || "";
+const p = DB.properties.find((x) => x.id === id);
+if (!p) return;
+p.buildingVerificationStatus = "rejected";
+p.isVerifiedBuilding = false;
+persist();
+route();
+});
+});
 }
 
 /* -----------------------------
