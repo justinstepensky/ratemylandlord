@@ -555,6 +555,22 @@ function persist() {
 saveDB(DB);
 }
 
+function extractId(hash) {
+return String(hash || "")
+.split("?")[0]
+.split("#/landlord/")[1]
+?.split("/")[0] || "";
+}
+
+function navigateTo(hash) {
+const target = String(hash || "#/").trim();
+if (location.hash === target) {
+safeRoute();
+return;
+}
+location.hash = target;
+}
+
 function ensureHashLinkRouting() {
 if (window.__casaHashLinksBound) return;
 window.__casaHashLinksBound = true;
@@ -564,8 +580,7 @@ if (!a) return;
 const href = a.getAttribute("href");
 if (!href) return;
 e.preventDefault();
-if (location.hash === href) return;
-location.hash = href;
+navigateTo(href);
 });
 }
 
@@ -663,6 +678,12 @@ const dist = [0, 0, 0, 0, 0];
 for (const r of rs) dist[r.stars - 1] += 1;
 
 return { count, avg, avgRounded, dist };
+}
+
+function computeLandlordScoreText(landlordId) {
+const st = ratingStats("landlord", landlordId);
+if (!st.count) return "No reviews yet";
+return `${st.avgRounded.toFixed(1)} / 5 • ${st.count} review${st.count === 1 ? "" : "s"}`;
 }
 
 function categoryAveragesForProperty(propertyId) {
@@ -1391,6 +1412,10 @@ return null;
 ------------------------------ */
 function route() {
 const hash = location.hash || "#/";
+if (/^#\/landlord\/[^\/?#]+/.test(hash)) {
+const lid = extractId(hash);
+if (lid) return renderLandlord(lid);
+}
 const path = hash.replace("#", "");
 const cleanPath = path.split("?")[0];
 const parts = cleanPath.split("/").filter(Boolean);
@@ -1414,6 +1439,8 @@ renderHome();
 /* Mobile-safe wrapper: NEVER let one crash kill rendering */
 function safeRoute() {
   try {
+    const app = document.getElementById("app");
+    if (app) app.innerHTML = "";
     route();
   } catch (err) {
     try {
@@ -3124,6 +3151,7 @@ const starVis = starVisFromAvg(st.avgRounded);
 const props = DB.properties.filter((p) => p.landlordId === l.id);
 const rep = reportFor(l.id);
 const credential = casaCredentialForLandlord(l.id);
+const landlordScoreText = computeLandlordScoreText(l.id);
 
 const content = `
    <section class="pageCard card">
