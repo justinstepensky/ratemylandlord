@@ -173,6 +173,8 @@ isVerified: true,
 isTop: false,
 verified: true,
 top: false,
+verificationStatus: "verified",
+verificationDocs: [],
 createdAt: now - 1000 * 60 * 60 * 24 * 16,
 },
 {
@@ -183,6 +185,8 @@ isVerified: false,
 isTop: false,
 verified: false,
 top: false,
+verificationStatus: "none",
+verificationDocs: [],
 createdAt: now - 1000 * 60 * 60 * 24 * 28,
 },
 {
@@ -193,6 +197,8 @@ isVerified: true,
 isTop: true,
 verified: true,
 top: true,
+verificationStatus: "verified",
+verificationDocs: [],
 createdAt: now - 1000 * 60 * 60 * 24 * 35,
 },
 ];
@@ -202,6 +208,9 @@ const properties = [
 id: "p1",
 landlordId: "l1",
 address: { line1: "123 Main St", unit: "", city: "Brooklyn", state: "NY" },
+isVerifiedBuilding: true,
+buildingVerificationStatus: "verified",
+buildingVerificationDocs: [],
 borough: "Brooklyn",
 lat: 40.7081,
 lng: -73.9571,
@@ -211,6 +220,9 @@ createdAt: now - 1000 * 60 * 60 * 24 * 16,
 id: "p2",
 landlordId: "l2",
 address: { line1: "22 Park Ave", unit: "", city: "New York", state: "NY" },
+isVerifiedBuilding: false,
+buildingVerificationStatus: "none",
+buildingVerificationDocs: [],
 borough: "Manhattan",
 lat: 40.7433,
 lng: -73.9822,
@@ -230,6 +242,9 @@ createdAt: now - 1000 * 60 * 60 * 24 * 35,
 id: "p4",
 landlordId: "l3",
 address: { line1: "41-12 75th St", unit: "", city: "Queens", state: "NY" },
+isVerifiedBuilding: true,
+buildingVerificationStatus: "verified",
+buildingVerificationDocs: [],
 borough: "Queens",
 lat: 40.7462,
 lng: -73.8892,
@@ -348,6 +363,7 @@ landlordUsers: [],
 users: [],
 currentUserId: "",
 currentLandlordUserId: "",
+adminMode: false,
 };
 saveDB(db);
 return db;
@@ -366,6 +382,7 @@ users: Array.isArray(db.users) ? db.users : [],
 currentUserId: typeof db.currentUserId === "string" ? db.currentUserId : "",
 currentLandlordUserId:
   typeof db.currentLandlordUserId === "string" ? db.currentLandlordUserId : "",
+adminMode: !!db.adminMode,
 };
 
 // ensure every review has targetType/targetId
@@ -388,6 +405,8 @@ isVerified: !!(l && (l.isVerified || l.verified)),
 isTop: !!(l && (l.isTop || l.top)),
 verified: !!(l && (l.isVerified || l.verified)),
 top: !!(l && (l.isTop || l.top)),
+verificationStatus: String(l && l.verificationStatus ? l.verificationStatus : l && (l.isVerified || l.verified) ? "verified" : "none"),
+verificationDocs: Array.isArray(l && l.verificationDocs) ? l.verificationDocs : [],
 createdAt: Number(l && l.createdAt ? l.createdAt : Date.now()),
 }))
 .filter((l) => l.id && l.name);
@@ -402,7 +421,11 @@ line1: String(p && p.address && p.address.line1 ? p.address.line1 : ""),
 unit: String(p && p.address && p.address.unit ? p.address.unit : ""),
 city: String(p && p.address && p.address.city ? p.address.city : ""),
 state: String(p && p.address && p.address.state ? p.address.state : ""),
+zip: String(p && p.address && p.address.zip ? p.address.zip : ""),
 },
+isVerifiedBuilding: !!(p && p.isVerifiedBuilding),
+buildingVerificationStatus: String(p && p.buildingVerificationStatus ? p.buildingVerificationStatus : "none"),
+buildingVerificationDocs: Array.isArray(p && p.buildingVerificationDocs) ? p.buildingVerificationDocs : [],
 borough: String(p && p.borough ? p.borough : ""),
 lat: typeof (p && p.lat) === "number" ? p.lat : null,
 lng: typeof (p && p.lng) === "number" ? p.lng : null,
@@ -888,8 +911,8 @@ return `
    <img
      class="badgeIcon"
      src="${esc(srcWithVer)}"
-     alt="${esc(alt)}"
-     title="${esc(title)}"
+       alt="${esc(alt)}"
+       title="${esc(title)}"
      data-badge-step="0"
      data-badge-alt-src="${esc(altSrcWithVer)}"
      data-badge-fallback="${esc(fallbackText)}"
@@ -928,6 +951,18 @@ console.warn(`[badge] failed to load for landlord ${landlordId}: ${kind}`);
 } catch {}
 }
 
+function renderPropertyBadges(p) {
+if (!p || !p.isVerifiedBuilding) return "";
+return badgeImg(
+  "assets/badge-verified.png",
+  "Verified Building",
+  "Verified building (address proof approved)",
+  "Verified Building",
+  p.id,
+  "building"
+);
+}
+
 function renderBadges(landlord) {
 if (!landlord) return "";
 const parts = [];
@@ -936,8 +971,8 @@ if (landlord.isVerified) {
 parts.push(
 badgeImg(
 "assets/badge-verified.png",
-"Verified",
-"Verified landlord",
+"Verified Landlord",
+"Verified landlord (ownership docs approved)",
 "Verified",
 landlordId,
 "verified"
@@ -1644,6 +1679,7 @@ return `
      <div class="lcLeft">
        <div class="lcName">
          <span>${esc(a.line1 || "Address")}${a.unit ? `, ${esc(a.unit)}` : ""}</span>
+         ${renderPropertyBadges(p)}
        </div>
 
        <div class="lcMeta">${esc(addr)}</div>
@@ -2574,6 +2610,12 @@ setPageTitle("Sign in");
 
 const landlordMode = getQueryParam("mode") === "signup" ? "signup" : "login";
 const userMode = getQueryParam("umode") === "login" ? "login" : "signup";
+const landlordUser = currentLandlordUser();
+const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) : null;
+const landlordProps = landlordRecord
+  ? DB.properties.filter((p) => p.landlordId === landlordRecord.id)
+  : [];
+const adminMode = !!DB.adminMode;
 
 const content = `
    <section class="pageCard card">
@@ -2648,6 +2690,63 @@ const content = `
                    ? "After sign up, you’ll be verified before responding to reviews."
                    : "Landlords can respond to reviews after verification."
                }
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Verification</div>
+             <div class="tiny" style="margin-top:6px;">Upload ownership documents (demo).</div>
+             <div class="field" style="margin-top:10px;">
+               <label>Landlord verification docs</label>
+               <input class="input" id="lvDocs" type="file" multiple />
+             </div>
+             <div style="display:flex; gap:10px; flex-wrap:wrap;">
+               <button class="btn" id="lvSubmit" type="button">Submit for verification</button>
+               <span class="tiny" id="lvStatus">Status: ${esc(landlordRecord ? landlordRecord.verificationStatus : "none")}</span>
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Verified Building</div>
+             <div class="tiny" style="margin-top:6px;">Address proof / lease / public records.</div>
+             <div class="field" style="margin-top:10px;">
+               <label>Select building</label>
+               <select class="input" id="bvProperty">
+                 ${
+                   landlordProps.length
+                     ? landlordProps
+                         .map(
+                           (p) =>
+                             `<option value="${esc(p.id)}">${esc(
+                               `${p.address?.line1 || "Address"}${p.address?.unit ? `, ${p.address.unit}` : ""}`
+                             )}</option>`
+                         )
+                         .join("")
+                     : `<option value="">No properties linked</option>`
+                 }
+               </select>
+             </div>
+             <div class="field">
+               <label>Building verification docs</label>
+               <input class="input" id="bvDocs" type="file" multiple />
+             </div>
+             <div style="display:flex; gap:10px; flex-wrap:wrap;">
+               <button class="btn" id="bvSubmit" type="button">Submit building verification</button>
+               <span class="tiny" id="bvStatus">Status: ${esc(landlordProps[0]?.buildingVerificationStatus || "none")}</span>
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Admin</div>
+             <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+               <input type="checkbox" id="adminToggle" ${adminMode ? "checked" : ""} />
+               Admin mode (demo)
+             </label>
+             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+               <button class="btn" id="lvApprove" type="button">Approve landlord</button>
+               <button class="btn" id="lvReject" type="button">Reject landlord</button>
+               <button class="btn" id="bvApprove" type="button">Approve building</button>
+               <button class="btn" id="bvReject" type="button">Reject building</button>
              </div>
            </div>
          </div>
@@ -2739,6 +2838,88 @@ email,
 company,
 verified: false,
 createdAt: Date.now(),
+});
+
+$("#lvSubmit")?.addEventListener("click", () => {
+const user = currentLandlordUser();
+if (!user) return alert("Sign in as a landlord first.");
+const landlord = landlordForCompany(user.company);
+if (!landlord) return alert("No matching landlord profile found.");
+const files = Array.from($("#lvDocs")?.files || []);
+const docs = files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }));
+landlord.verificationDocs = (landlord.verificationDocs || []).concat(docs);
+landlord.verificationStatus = "pending";
+landlord.isVerified = false;
+persist();
+$("#lvStatus") && ($("#lvStatus").textContent = "Status: pending");
+alert("Verification submitted (demo).");
+});
+
+$("#bvSubmit")?.addEventListener("click", () => {
+const user = currentLandlordUser();
+if (!user) return alert("Sign in as a landlord first.");
+const landlord = landlordForCompany(user.company);
+if (!landlord) return alert("No matching landlord profile found.");
+const propId = $("#bvProperty")?.value || "";
+const prop = DB.properties.find((p) => p.id === propId);
+if (!prop) return alert("Select a property to verify.");
+const files = Array.from($("#bvDocs")?.files || []);
+const docs = files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }));
+prop.buildingVerificationDocs = (prop.buildingVerificationDocs || []).concat(docs);
+prop.buildingVerificationStatus = "pending";
+prop.isVerifiedBuilding = false;
+persist();
+$("#bvStatus") && ($("#bvStatus").textContent = "Status: pending");
+alert("Building verification submitted (demo).");
+});
+
+$("#adminToggle")?.addEventListener("change", (e) => {
+DB.adminMode = !!e.target.checked;
+persist();
+});
+
+$("#lvApprove")?.addEventListener("click", () => {
+if (!DB.adminMode) return alert("Enable admin mode to approve.");
+const user = currentLandlordUser();
+const landlord = user ? landlordForCompany(user.company) : null;
+if (!landlord) return alert("No matching landlord profile found.");
+landlord.verificationStatus = "verified";
+landlord.isVerified = true;
+persist();
+$("#lvStatus") && ($("#lvStatus").textContent = "Status: verified");
+});
+
+$("#lvReject")?.addEventListener("click", () => {
+if (!DB.adminMode) return alert("Enable admin mode to reject.");
+const user = currentLandlordUser();
+const landlord = user ? landlordForCompany(user.company) : null;
+if (!landlord) return alert("No matching landlord profile found.");
+landlord.verificationStatus = "rejected";
+landlord.isVerified = false;
+persist();
+$("#lvStatus") && ($("#lvStatus").textContent = "Status: rejected");
+});
+
+$("#bvApprove")?.addEventListener("click", () => {
+if (!DB.adminMode) return alert("Enable admin mode to approve.");
+const propId = $("#bvProperty")?.value || "";
+const prop = DB.properties.find((p) => p.id === propId);
+if (!prop) return alert("Select a property to approve.");
+prop.buildingVerificationStatus = "verified";
+prop.isVerifiedBuilding = true;
+persist();
+$("#bvStatus") && ($("#bvStatus").textContent = "Status: verified");
+});
+
+$("#bvReject")?.addEventListener("click", () => {
+if (!DB.adminMode) return alert("Enable admin mode to reject.");
+const propId = $("#bvProperty")?.value || "";
+const prop = DB.properties.find((p) => p.id === propId);
+if (!prop) return alert("Select a property to reject.");
+prop.buildingVerificationStatus = "rejected";
+prop.isVerifiedBuilding = false;
+persist();
+$("#bvStatus") && ($("#bvStatus").textContent = "Status: rejected");
 });
 persist();
 alert("Demo: account created. Verification pending.");
@@ -3495,7 +3676,7 @@ const content = `
        <div class="topRow">
          <div>
            <div class="kicker">Address</div>
-           <div class="pageTitle">${esc(title)}</div>
+           <div class="pageTitle">${esc(title)} ${renderPropertyBadges(p)}</div>
            <div class="pageSub">
              ${esc(`${a.city || ""} • ${a.state || ""}`)} ${l ? `• Landlord: <a href="#/landlord/${esc(l.id)}">${esc(l.name)}</a>` : ""}
            </div>
