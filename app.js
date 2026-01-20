@@ -235,6 +235,19 @@ address: { line1: "86-12 Broadway", unit: "", city: "Queens", state: "NY" },
 borough: "Queens",
 lat: 40.7404,
 lng: -73.8794,
+reportCard: {
+rentStabilized: true,
+goodCauseEviction: true,
+evictionsCount: 3,
+litigationHistory: true,
+bedbug1yr: false,
+petFriendly: false,
+sources: {
+rentStabilized: "official",
+goodCauseEviction: "policy",
+bedbug1yr: "official",
+},
+},
 createdAt: now - 1000 * 60 * 60 * 24 * 35,
 },
 // demonstrate multiple properties for one landlord:
@@ -435,6 +448,7 @@ city: String(p && p.address && p.address.city ? p.address.city : ""),
 state: String(p && p.address && p.address.state ? p.address.state : ""),
 zip: String(p && p.address && p.address.zip ? p.address.zip : ""),
 },
+reportCard: p && p.reportCard ? p.reportCard : null,
 isVerifiedBuilding: !!(p && p.isVerifiedBuilding),
 buildingVerificationStatus: String(p && p.buildingVerificationStatus ? p.buildingVerificationStatus : "none"),
 buildingVerificationDocs: Array.isArray(p && p.buildingVerificationDocs) ? p.buildingVerificationDocs : [],
@@ -1254,6 +1268,226 @@ return `
 ------------------------------ */
 function reportFor(landlordId) {
 return (DB.reports || []).find((r) => r.landlordId === landlordId) || null;
+}
+
+function isNYProperty(p) {
+const st = p && p.address ? String(p.address.state || "") : "";
+return norm(st) === "ny";
+}
+
+function getReportValueText(key, value) {
+if (key === "evictionsCount") {
+if (value == null || value === "") return "Unknown";
+const num = Number(value);
+return Number.isFinite(num) ? String(num) : "Unknown";
+}
+if (value === true) return "Yes";
+if (value === false) return "No";
+return "Unknown";
+}
+
+function getReportChipClass(key, value) {
+if (value == null || value === "") return "chipNeutral";
+if (key === "evictionsCount") {
+const num = Number(value);
+if (!Number.isFinite(num)) return "chipNeutral";
+return num === 0 ? "chipGood" : "chipBad";
+}
+if (key === "petFriendly") {
+return value ? "chipGood" : "chipBad";
+}
+return value ? "chipBad" : "chipGood";
+}
+
+const REPORT_INFO = {
+rentStabilized: {
+title: "Rent Stabilized Units",
+body:
+`Community Reported
+A user has reported the building has at least one stabilized unit.
+
+DHCR STATUS 1:
+Multiple Dwelling A
+As defined under the Multiple Dwelling Law, a multiple dwelling building which is generally occupied as a permanent residence. The class includes such buildings as apartment houses, apartment hotels, maisonette apartments, and all other multiple dwellings except class B dwellings.
+All landlords in NYC that manage rent-stabilized units are required to register the units every year with Division of Housing and Community Renewal (DHCR). Please note that we are unable to confirm which units are stabilized but are simply sharing that records show the building has some stabilized units. Some buildings may have a combination of both market-rate and regulated apartments.`,
+},
+goodCauseEviction: {
+title: "Good Cause Eviction",
+body: "Good Cause Eviction: Yes",
+},
+bedbug1yr: {
+title: "1 Year Bedbug History",
+body:
+"Landlords are required to file an annual bedbug report with the city and state whether the building has had a bedbug infestation in the past year. We found no recent bedbug reports from these city filings.",
+},
+evictionsCount: {
+title: "Evictions",
+body:
+"Shows the number of reported eviction filings associated with the building (if available). A higher number can indicate frequent turnover or disputes. (Community + public sources; may be incomplete.)",
+},
+litigationHistory: {
+title: "Litigation History",
+body:
+"Indicates whether there are reported housing-related court cases associated with the building (if available). (Community + public sources; may be incomplete.)",
+},
+petFriendly: {
+title: "Pet Friendly",
+body:
+"Community reported whether pets are generally allowed. Always confirm with the lease and building rules.",
+},
+};
+
+function renderPropertyReportCard(p) {
+const rc = p && p.reportCard ? p.reportCard : {};
+const items = [
+{ key: "rentStabilized", label: "Rent Stabilized Units" },
+{ key: "goodCauseEviction", label: "Good Cause Eviction" },
+{ key: "evictionsCount", label: "Evictions" },
+{ key: "litigationHistory", label: "Litigation History" },
+{ key: "bedbug1yr", label: "1 Year Bedbug History" },
+{ key: "petFriendly", label: "Pet Friendly" },
+];
+
+const showNYOnly = new Set(["rentStabilized", "goodCauseEviction"]);
+const isNY = isNYProperty(p);
+const chips = items
+.filter((it) => (showNYOnly.has(it.key) ? isNY : true))
+.map((it) => {
+const val = rc && Object.prototype.hasOwnProperty.call(rc, it.key) ? rc[it.key] : null;
+const text = getReportValueText(it.key, val);
+const cls = getReportChipClass(it.key, val);
+return `
+     <div class="reportChip ${cls}">
+       <span><b>${esc(it.label)}:</b> ${esc(text)}</span>
+       <button class="chipInfoBtn" type="button" data-info="${esc(it.key)}" aria-label="Info">i</button>
+     </div>
+   `.trim();
+})
+.join("");
+
+return `
+   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60); margin-top:14px;">
+     <div class="pad">
+       <div class="kicker">Property Report Card</div>
+       <div class="tiny" style="margin-top:6px;">Community + public-record style signals (beta)</div>
+       <div class="reportChipGrid" style="margin-top:12px;">
+         ${chips || `<div class="muted">No report data.</div>`}
+       </div>
+       <div style="margin-top:10px;">
+         <a href="#" class="tiny" id="reportSuggestLink">Suggest an update</a>
+       </div>
+     </div>
+   </div>
+ `.trim();
+}
+
+function openReportInfo(key) {
+const info = REPORT_INFO[key];
+if (!info) return;
+const body = String(info.body || "").split("\n").map((line) => esc(line)).join("<br/>");
+openModal(`
+   <div class="modalHead">
+     <div class="modalTitle">${esc(info.title)}</div>
+     <button class="iconBtn" id="infoClose" type="button" aria-label="Close">×</button>
+   </div>
+   <div class="modalBody">
+     <div class="smallNote" style="line-height:1.6;">${body}</div>
+   </div>
+   <div class="modalFoot">
+     <button class="btn" id="infoOk" type="button">Close</button>
+   </div>
+ `);
+$("#infoClose")?.addEventListener("click", closeModal);
+$("#infoOk")?.addEventListener("click", closeModal);
+}
+
+function openReportSuggestModal(p) {
+if (!isUserSignedIn()) {
+alert("Sign in to suggest an update.");
+location.hash = "#/portal?umode=login";
+return;
+}
+const rc = p && p.reportCard ? p.reportCard : {};
+const boolSelect = (id, value) => `
+   <select class="input" id="${esc(id)}">
+     <option value="" ${value == null ? "selected" : ""}>Unknown</option>
+     <option value="true" ${value === true ? "selected" : ""}>Yes</option>
+     <option value="false" ${value === false ? "selected" : ""}>No</option>
+   </select>
+ `.trim();
+
+openModal(`
+   <div class="modalHead">
+     <div class="modalTitle">Suggest an update</div>
+     <button class="iconBtn" id="rcClose" type="button" aria-label="Close">×</button>
+   </div>
+   <div class="modalBody">
+     ${
+       isNYProperty(p)
+         ? `
+           <div class="field">
+             <label>Rent Stabilized Units</label>
+             ${boolSelect("rcRent", rc.rentStabilized)}
+           </div>
+           <div class="field">
+             <label>Good Cause Eviction</label>
+             ${boolSelect("rcGoodCause", rc.goodCauseEviction)}
+           </div>
+         `
+         : ""
+     }
+     <div class="field">
+       <label>Evictions</label>
+       <input class="input" id="rcEvictions" type="number" min="0" placeholder="Unknown" value="${
+         rc.evictionsCount != null && rc.evictionsCount !== "" ? esc(String(rc.evictionsCount)) : ""
+       }" />
+     </div>
+     <div class="field">
+       <label>Litigation History</label>
+       ${boolSelect("rcLitigation", rc.litigationHistory)}
+     </div>
+     <div class="field">
+       <label>1 Year Bedbug History</label>
+       ${boolSelect("rcBedbug", rc.bedbug1yr)}
+     </div>
+     <div class="field">
+       <label>Pet Friendly</label>
+       ${boolSelect("rcPet", rc.petFriendly)}
+     </div>
+   </div>
+   <div class="modalFoot">
+     <button class="btn btn--primary" id="rcSave" type="button">Save</button>
+     <button class="btn" id="rcCancel" type="button">Cancel</button>
+   </div>
+ `);
+
+$("#rcClose")?.addEventListener("click", closeModal);
+$("#rcCancel")?.addEventListener("click", closeModal);
+$("#rcSave")?.addEventListener("click", () => {
+const readBool = (id) => {
+const v = document.getElementById(id)?.value;
+if (v === "true") return true;
+if (v === "false") return false;
+return null;
+};
+const evRaw = $("#rcEvictions")?.value;
+const evNum = evRaw === "" || evRaw == null ? null : Number(evRaw);
+const next = {
+rentStabilized: isNYProperty(p) ? readBool("rcRent") : rc.rentStabilized ?? null,
+goodCauseEviction: isNYProperty(p) ? readBool("rcGoodCause") : rc.goodCauseEviction ?? null,
+evictionsCount: Number.isFinite(evNum) ? Math.max(0, evNum) : null,
+litigationHistory: readBool("rcLitigation"),
+bedbug1yr: readBool("rcBedbug"),
+petFriendly: readBool("rcPet"),
+};
+const target = DB.properties.find((x) => x && x.id === p.id);
+if (target) {
+target.reportCard = { ...target.reportCard, ...next };
+persist();
+}
+closeModal();
+route();
+});
 }
 
 function setPageTitle(title) {
@@ -4341,25 +4575,7 @@ const content = `
              </div>
            </div>
 
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60); margin-top:14px;">
-             <div class="pad">
-               <div class="kicker">Report card (demo)</div>
-               ${
-                 rep
-                   ? `
-                     <div class="smallNote" style="margin-top:10px; line-height:1.6;">
-                       <div><b>${esc(String(rep.violations_12mo))}</b> violations (12 mo)</div>
-                       <div><b>${esc(String(rep.complaints_12mo))}</b> complaints (12 mo)</div>
-                       <div><b>${esc(String(rep.bedbug_reports_12mo))}</b> bedbug reports (12 mo)</div>
-                       <div><b>${esc(String(rep.permits_open))}</b> open permits</div>
-                       <div><b>${esc(String(rep.eviction_filings_12mo))}</b> eviction filings (12 mo)</div>
-                     </div>
-                     <div class="tiny" style="margin-top:10px;">${esc(rep.notes || "")}</div>
-                   `
-                   : `<div class="muted" style="margin-top:10px;">No report data.</div>`
-               }
-             </div>
-           </div>
+           ${renderPropertyReportCard(p)}
 
            <div style="margin-top:14px;">
              ${reviewFormHTML("property", p.id)}
@@ -4403,6 +4619,18 @@ ensureRuntimeStyles();
 initPropertyMediaEmbed();
 initStarPickers();
 wireCategoryRatingToStars(`property_${p.id}`, false);
+
+document.querySelectorAll("[data-info]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const key = btn.getAttribute("data-info");
+if (key) openReportInfo(key);
+});
+});
+
+$("#reportSuggestLink")?.addEventListener("click", (e) => {
+e.preventDefault();
+openReportSuggestModal(p);
+});
 
 // Reviews
 const listEl = $("#propertyReviews");

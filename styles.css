@@ -186,6 +186,13 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .landlordDesc{line-height:1.5}
 .landlordDesc a{text-decoration:underline}
 .landlordDesc img{max-width:100%;height:auto;display:block;margin-top:8px;border-radius:12px}
+.reportChipGrid{display:flex;flex-wrap:wrap;gap:10px}
+.reportChip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.6);font-weight:700;font-size:13px}
+.chipGood{background:rgba(55,170,95,.12);border-color:rgba(55,170,95,.35);color:#1c5a35}
+.chipBad{background:rgba(206,66,66,.12);border-color:rgba(206,66,66,.35);color:#7b2a2a}
+.chipNeutral{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.08);color:#3b3b3b}
+.chipInfoBtn{width:18px;height:18px;border-radius:999px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.8);font-size:11px;font-weight:900;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.chipInfoBtn:hover{background:rgba(255,255,255,1)}
 .ratingNum{font-weight:950}
 .muted{color:rgba(21,17,14,.65);font-weight:750}
 
