@@ -3543,6 +3543,21 @@ return renderCategoryPicker(id, label);
 
 function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
+if (isLandlordSignedIn() && !isUserSignedIn()) {
+return `
+   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+     <div class="pad">
+       <div class="kicker">Leave a review</div>
+       <div class="muted" style="margin-top:8px; font-weight:800;">
+         You’re signed in as a landlord.
+       </div>
+       <div class="tiny" style="margin-top:8px; line-height:1.45;">
+         Switch to a tenant account in My account to post reviews.
+       </div>
+     </div>
+   </div>
+ `.trim();
+}
 if (!isUserSignedIn()) {
 return `
    <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
@@ -3981,18 +3996,24 @@ const content = `
 
            <div class="hr"></div>
 
-           <div class="kicker">Sign in</div>
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
-             <div class="pad">
-               <div class="muted" style="font-weight:900; line-height:1.55;">
-                 Landlords can respond to reviews after signing in.
-               </div>
-               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-                 <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Login</a>
-                 <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
-               </div>
-             </div>
-           </div>
+           ${
+             !isLandlordSignedIn()
+               ? `
+                 <div class="kicker">Sign in</div>
+                 <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                   <div class="pad">
+                     <div class="muted" style="font-weight:900; line-height:1.55;">
+                       Landlords can respond to reviews after signing in.
+                     </div>
+                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                       <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Login</a>
+                       <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
+                     </div>
+                   </div>
+                 </div>
+               `
+               : ""
+           }
 
            <div style="margin-top:14px;">
              <div class="kicker">Reviews</div>
