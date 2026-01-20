@@ -2450,6 +2450,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
+wireCategoryRatingToStars(`landlord_${l.id}`, true);
 
 // Region selector wiring for Search page (wired only through refresh to avoid stacking)
 // (do nothing here)
@@ -3597,6 +3598,57 @@ el.classList.toggle("isOn", v <= val);
 });
 }
 
+function updateStarsPickerValue(picker, val) {
+if (!picker) return;
+const v = Math.max(1, Math.min(5, Math.round(Number(val) || 0)));
+const inputId = picker.getAttribute("data-stars-input") || "";
+const input = inputId ? document.getElementById(inputId) : null;
+if (input) input.value = String(v);
+picker.querySelectorAll("[data-star]").forEach((el) => {
+const starVal = Number(el.getAttribute("data-star") || 0);
+el.classList.toggle("isOn", starVal <= v);
+});
+}
+
+function wireCategoryRatingToStars(formId, isLandlord) {
+const starPicker = document.querySelector(
+`[data-stars-input="rev_${formId}Stars"]`
+);
+if (!starPicker) return;
+
+const ids = isLandlord
+? [
+`rev_${formId}_respComm`,
+`rev_${formId}_maintRepairs`,
+`rev_${formId}_respectProf`,
+`rev_${formId}_fairnessTrans`,
+`rev_${formId}_depositReturn`,
+]
+: [
+`rev_${formId}_comm`,
+`rev_${formId}_repairs`,
+`rev_${formId}_clean`,
+`rev_${formId}_respect`,
+`rev_${formId}_deposit`,
+];
+
+const inputs = ids
+.map((id) => document.getElementById(id))
+.filter(Boolean);
+if (!inputs.length) return;
+
+const computeAvg = () => {
+const vals = inputs.map((el) => Number(el.value)).filter((v) => Number.isFinite(v));
+if (!vals.length) return 5;
+const sum = vals.reduce((a, b) => a + b, 0);
+return sum / vals.length;
+};
+
+const sync = () => updateStarsPickerValue(starPicker, computeAvg());
+inputs.forEach((el) => el.addEventListener("change", sync));
+sync();
+}
+
 function renderCategoryPicker(id, label) {
 const opts = [5, 4, 3, 2, 1]
 .map((v) => `<option value="${v}">${v}</option>`)
@@ -4350,6 +4402,7 @@ renderShell(content);
 ensureRuntimeStyles();
 initPropertyMediaEmbed();
 initStarPickers();
+wireCategoryRatingToStars(`property_${p.id}`, false);
 
 // Reviews
 const listEl = $("#propertyReviews");
