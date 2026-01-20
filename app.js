@@ -599,6 +599,7 @@ const user = currentLandlordUser();
 if (!user) return false;
 const l = DB.landlords.find((x) => x && x.id === landlordId);
 if (!l) return false;
+if (user.landlordId && user.landlordId === l.id) return true;
 const match = landlordForCompany(user.company);
 return !!(match && match.id === l.id);
 }
@@ -2976,12 +2977,15 @@ if (!landlordProfile) {
 alert("Could not create landlord profile. Try again.");
 return;
 }
+newUser.landlordId = landlordProfile.id;
 DB.currentLandlordUserId = newUser.id;
 
 $("#verifySubmit")?.addEventListener("click", () => {
 const user = currentLandlordUser();
 if (!user) return alert("Sign in as a landlord first.");
-const landlord = landlordForCompany(user.company);
+const landlord = user.landlordId
+? DB.landlords.find((l) => l && l.id === user.landlordId)
+: landlordForCompany(user.company);
 if (!landlord) return alert("No matching landlord profile found.");
 
 const hasType =
@@ -3038,6 +3042,9 @@ match.verified = true;
 if (!linked) {
 alert("No landlord profile found. Please update your company name.");
 return;
+}
+if (!match.landlordId || match.landlordId !== linked.id) {
+match.landlordId = linked.id;
 }
 DB.currentLandlordUserId = match.id;
 persist();
@@ -3699,8 +3706,8 @@ const replyHTML = reply
 
 const canReply =
 !!landlordContextIdForReply &&
-targetType === "landlord" &&
-canLandlordRespond(landlordContextIdForReply);
+canLandlordRespond(landlordContextIdForReply) &&
+(targetType === "landlord" || targetType === "property");
 
 const respondHTML = canReply
 ? `
@@ -4250,8 +4257,9 @@ initStarPickers();
 // Reviews
 const listEl = $("#propertyReviews");
 if (listEl) {
-listEl.innerHTML = renderReviewList("property", p.id, null);
-wireReviewListInteractions(listEl, null);
+const landlordIdForReply = l ? l.id : null;
+listEl.innerHTML = renderReviewList("property", p.id, landlordIdForReply);
+wireReviewListInteractions(listEl, landlordIdForReply);
 }
 
 // Review form
