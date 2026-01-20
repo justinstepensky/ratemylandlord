@@ -572,6 +572,27 @@ DB.landlords.find((l) => l && (norm(l.name) === c || norm(l.entity) === c)) || n
 );
 }
 
+function ensureLandlordProfile(company) {
+const name = String(company || "").trim();
+if (!name) return null;
+const existing = landlordForCompany(name);
+if (existing) return existing;
+const landlord = {
+id: idRand("l"),
+name,
+entity: "",
+isVerified: false,
+isTop: false,
+verified: false,
+top: false,
+verificationStatus: "none",
+verificationDocs: [],
+createdAt: Date.now(),
+};
+DB.landlords.unshift(landlord);
+return landlord;
+}
+
 function canLandlordRespond(landlordId) {
 if (!landlordId) return false;
 const user = currentLandlordUser();
@@ -2941,13 +2962,21 @@ alert("Enter your company/landlord name.");
 return;
 }
 DB.landlordUsers = DB.landlordUsers || [];
-DB.landlordUsers.push({
+const newUser = {
 id: idRand("u"),
 email,
 company,
 verified: false,
 createdAt: Date.now(),
-});
+};
+DB.landlordUsers.push(newUser);
+
+const landlordProfile = ensureLandlordProfile(company);
+if (!landlordProfile) {
+alert("Could not create landlord profile. Try again.");
+return;
+}
+DB.currentLandlordUserId = newUser.id;
 
 $("#verifySubmit")?.addEventListener("click", () => {
 const user = currentLandlordUser();
@@ -3002,9 +3031,13 @@ if (!match) {
 alert("No landlord account found for that email. Create one first.");
 return;
 }
-const linked = landlordForCompany(match.company);
+const linked = ensureLandlordProfile(match.company);
 if (linked && linked.isVerified) {
 match.verified = true;
+}
+if (!linked) {
+alert("No landlord profile found. Please update your company name.");
+return;
 }
 DB.currentLandlordUserId = match.id;
 persist();
