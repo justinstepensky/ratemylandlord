@@ -412,6 +412,7 @@ out.landlords = out.landlords
 id: String(l && l.id ? l.id : ""),
 name: String(l && l.name ? l.name : ""),
 entity: String(l && l.entity ? l.entity : ""),
+description: String(l && l.description ? l.description : ""),
 isVerified: !!(l && (l.isVerified || l.verified)),
 isTop: !!(l && (l.isTop || l.top)),
 verified: !!(l && (l.isVerified || l.verified)),
@@ -551,6 +552,66 @@ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c
 });
 }
 
+function sanitizeDescription(input) {
+const raw = String(input || "").trim();
+if (!raw) return "";
+const doc = new DOMParser().parseFromString(raw, "text/html");
+const allowed = new Set([
+"a",
+"img",
+"br",
+"p",
+"div",
+"span",
+"ul",
+"li",
+"strong",
+"em",
+"b",
+"i",
+]);
+const allowedAttrs = {
+a: ["href", "target", "rel"],
+img: ["src", "alt", "loading"],
+};
+
+const clean = (root) => {
+const children = Array.from(root.children || []);
+children.forEach((child) => {
+clean(child);
+const tag = String(child.tagName || "").toLowerCase();
+if (!allowed.has(tag)) {
+const frag = doc.createDocumentFragment();
+while (child.firstChild) frag.appendChild(child.firstChild);
+child.replaceWith(frag);
+return;
+}
+const attrs = allowedAttrs[tag] || [];
+Array.from(child.attributes || []).forEach((attr) => {
+const name = String(attr.name || "").toLowerCase();
+if (!attrs.includes(name)) child.removeAttribute(attr.name);
+});
+if (tag === "a") {
+const href = child.getAttribute("href") || "";
+if (!href) child.removeAttribute("href");
+child.setAttribute("target", "_blank");
+child.setAttribute("rel", "noopener noreferrer");
+}
+if (tag === "img") {
+const src = child.getAttribute("src") || "";
+if (!src) {
+child.remove();
+return;
+}
+child.setAttribute("loading", "lazy");
+}
+});
+};
+
+clean(doc.body);
+return doc.body.innerHTML.trim();
+}
+
 function fmtDate(ts) {
 const d = new Date(ts);
 return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
@@ -581,6 +642,7 @@ const landlord = {
 id: idRand("l"),
 name,
 entity: "",
+description: "",
 isVerified: false,
 isTop: false,
 verified: false,
@@ -3174,7 +3236,7 @@ const content = `
          <div class="card" style="box-shadow:none;">
            <div class="pad">
              <div class="kicker">Landlord account</div>
-             ${
+           ${
                landlordUser
                  ? `
                    <form id="acctLandlordForm">
@@ -3185,6 +3247,12 @@ const content = `
                      <div class="field">
                        <label>Company / Landlord name</label>
                        <input class="input" id="acctLandlordCompany" value="${esc(landlordUser.company || "")}" />
+                     </div>
+                     <div class="field">
+                       <label>Description</label>
+                       <textarea class="textarea" id="acctLandlordDesc" placeholder="Paste links, social media, or images (HTML allowed).">${esc(
+                         landlordRecord && landlordRecord.description ? landlordRecord.description : ""
+                       )}</textarea>
                      </div>
                      ${
                        landlordRecord
@@ -3243,9 +3311,15 @@ const email = $("#acctLandlordEmail")?.value ? $("#acctLandlordEmail").value.tri
 const company = $("#acctLandlordCompany")?.value
 ? $("#acctLandlordCompany").value.trim()
 : "";
+const desc = $("#acctLandlordDesc")?.value ? String($("#acctLandlordDesc").value) : "";
 if (!email || !company) return alert("Email and company are required.");
 u.email = email;
 u.company = company;
+const linked = ensureLandlordProfile(company);
+if (linked) {
+linked.description = desc;
+u.landlordId = linked.id;
+}
 persist();
 updateAccountLinks();
 alert("Account updated.");
@@ -3871,7 +3945,9 @@ const content = `
          <div>
            <div class="kicker">Landlord</div>
            <div class="pageTitle">${esc(l.name)} ${renderBadges(l)}</div>
-           <div class="pageSub">${esc(l.entity || "—")}</div>
+           <div class="pageSub landlordDesc">${
+             l.description ? sanitizeDescription(l.description) : esc(l.entity || "—")
+           }</div>
          </div>
          <a class="btn" href="#/search">Back</a>
        </div>

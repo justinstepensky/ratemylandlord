@@ -183,6 +183,9 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .lcMeta{margin-top:6px;color:rgba(21,17,14,.65);font-weight:750;font-size:13px}
 .lcRow{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stars{letter-spacing:2px;font-weight:950}
+.landlordDesc{line-height:1.5}
+.landlordDesc a{text-decoration:underline}
+.landlordDesc img{max-width:100%;height:auto;display:block;margin-top:8px;border-radius:12px}
 .ratingNum{font-weight:950}
 .muted{color:rgba(21,17,14,.65);font-weight:750}
 
