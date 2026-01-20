@@ -388,10 +388,21 @@ adminMode: !!db.adminMode,
 // ensure every review has targetType/targetId
 out.reviews = out.reviews
 .map((r) => {
-if (r && r.targetType && r.targetId) return r;
-if (r && r.landlordId) return { ...r, targetType: "landlord", targetId: r.landlordId };
-if (r && r.propertyId) return { ...r, targetType: "property", targetId: r.propertyId };
-return r;
+if (!r) return r;
+let next = r;
+if (r && r.targetType && r.targetId) next = r;
+else if (r && r.landlordId) next = { ...r, targetType: "landlord", targetId: r.landlordId };
+else if (r && r.propertyId) next = { ...r, targetType: "property", targetId: r.propertyId };
+
+const categoryStars =
+next && next.categoryStars && typeof next.categoryStars === "object" ? next.categoryStars : null;
+let stars = Number(next && next.stars != null ? next.stars : NaN);
+if (!Number.isFinite(stars)) {
+const computed = avgFromCategoryStars(categoryStars);
+if (computed != null) stars = computed;
+else stars = 5;
+}
+return { ...next, stars };
 })
 .filter(Boolean);
 
@@ -684,6 +695,16 @@ if (!den) return null;
 return num / den;
 }
 
+function avgFromCategoryStars(categoryStars) {
+if (!categoryStars || typeof categoryStars !== "object") return null;
+const vals = Object.values(categoryStars)
+.map((v) => Number(v))
+.filter((v) => Number.isFinite(v));
+if (!vals.length) return null;
+const sum = vals.reduce((a, b) => a + b, 0);
+return sum / vals.length;
+}
+
 function reviewsFor(targetType, targetId) {
 return DB.reviews
 .filter((r) => r.targetType === targetType && r.targetId === targetId)
@@ -699,7 +720,10 @@ if (count === 0) return { count: 0, avg: null, avgRounded: null, dist: [0, 0, 0,
 const avg = weightedAverageStars(rs);
 const avgRounded = round1(avg);
 const dist = [0, 0, 0, 0, 0];
-for (const r of rs) dist[r.stars - 1] += 1;
+for (const r of rs) {
+const bucket = Math.max(1, Math.min(5, Math.round(Number(r.stars) || 0)));
+dist[bucket - 1] += 1;
+}
 
 return { count, avg, avgRounded, dist };
 }
@@ -738,18 +762,33 @@ return avg;
 }
 
 function categoryAveragesForLandlord(landlordId) {
-const rs = reviewsFor("landlord", landlordId).filter((r) => r && r.categories);
+const rs = reviewsFor("landlord", landlordId).filter(
+(r) => r && (r.categoryStars || r.categories)
+);
 if (!rs.length) return null;
-const sums = { comm: 0, repairs: 0, clean: 0, respect: 0, deposit: 0 };
+const sums = {
+responsivenessCommunication: 0,
+maintenanceRepairs: 0,
+respectProfessionalism: 0,
+fairnessTransparency: 0,
+depositReturn: 0,
+};
 let n = 0;
 rs.forEach((r) => {
-const c = r.categories || {};
+const c = r.categoryStars || r.categories || {};
 const vals = {
-comm: Number(c.comm),
-repairs: Number(c.repairs),
-clean: Number(c.clean),
-respect: Number(c.respect),
-deposit: Number(c.deposit),
+responsivenessCommunication:
+Number(c.responsivenessCommunication != null ? c.responsivenessCommunication : c.comm),
+maintenanceRepairs: Number(
+c.maintenanceRepairs != null ? c.maintenanceRepairs : c.repairs != null ? c.repairs : c.maint
+),
+respectProfessionalism: Number(
+c.respectProfessionalism != null ? c.respectProfessionalism : c.respect
+),
+fairnessTransparency: Number(
+c.fairnessTransparency != null ? c.fairnessTransparency : c.fairness
+),
+depositReturn: Number(c.depositReturn != null ? c.depositReturn : c.deposit),
 };
 Object.keys(sums).forEach((k) => {
 if (Number.isFinite(vals[k])) sums[k] += vals[k];
@@ -1612,6 +1651,43 @@ window.addEventListener("resize", apply);
 function starVisFromAvg(avgRounded) {
 if (avgRounded == null) return "☆☆☆☆☆";
 return avgRounded >= 4 ? "★★★★☆" : avgRounded >= 3 ? "★★★☆☆" : avgRounded >= 2 ? "★★☆☆☆" : "★☆☆☆☆";
+}
+
+function renderFractionalStars(value, px = 14, gap = 3) {
+const v = Math.max(0, Math.min(5, Number(value) || 0));
+const full = Math.floor(v);
+const frac = v - full;
+const starPath =
+"M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+const scale = px / 24;
+const step = px + gap;
+const width = px * 5 + gap * 4;
+const height = px;
+const idBase = Math.random().toString(16).slice(2);
+
+let defs = "";
+let stars = "";
+for (let i = 0; i < 5; i++) {
+let fillPct = 0;
+if (i < full) fillPct = 1;
+else if (i === full) fillPct = frac;
+const pct = Math.round(fillPct * 100);
+const gid = `starGrad_${idBase}_${i}`;
+defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="${pct}%" stop-color="currentColor"></stop>
+  <stop offset="${pct}%" stop-color="#e0e0e0"></stop>
+</linearGradient>`;
+stars += `<path d="${starPath}" transform="translate(${i * step},0) scale(${scale})" fill="url(#${gid})"></path>`;
+}
+
+return `
+<span class="stars" aria-label="${esc(v.toFixed(1))} out of 5">
+  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-hidden="true" style="display:block;">
+    <defs>${defs}</defs>
+    ${stars}
+  </svg>
+</span>
+`.trim();
 }
 
 function clampStars(n) {
@@ -3267,11 +3343,11 @@ return `
            ? `
              <div class="hr" style="margin:12px 0;"></div>
              <div class="kicker">Category ratings</div>
-             ${renderLandlordCategoryPicker(`rev_${formId}_comm`, "Communication")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_repairs`, "Repairs / Maintenance speed")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_clean`, "Cleanliness / building conditions")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_respect`, "Respect / fairness")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_deposit`, "Deposit return")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_respComm`, "Responsiveness &amp; Communication")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_maintRepairs`, "Maintenance &amp; Repairs")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_respectProf`, "Respect &amp; Professionalism")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_fairnessTrans`, "Fairness &amp; Transparency")}
+             ${renderLandlordCategoryPicker(`rev_${formId}_depositReturn`, "Deposit Return")}
            `
            : ""
        }
@@ -3382,7 +3458,8 @@ const replyArr = DB.replies || [];
 
 return rs
 .map((r) => {
-const stars = "★".repeat(r.stars) + "☆".repeat(5 - r.stars);
+const stars = renderFractionalStars(r.stars, 14, 3);
+const starText = Number(r.stars);
 const date = fmtDate(r.createdAt);
 
 const reply = replyArr.find((x) => x && x.reviewId === r.id);
@@ -3422,7 +3499,10 @@ return `
          <div class="pad">
            <div class="lcRow" style="justify-content:space-between;">
              <div style="display:flex; gap:10px; align-items:center;">
-               <span class="stars">${esc(stars)}</span>
+               ${stars}
+               <span class="ratingNum">${esc(
+                 Number.isFinite(starText) ? starText.toFixed(1) : "—"
+               )}</span>
                <span class="muted" style="font-weight:900;">${esc(date)}</span>
              </div>
              <button class="btn miniBtn" type="button" data-flag="${esc(r.id)}">Report</button>
@@ -3526,11 +3606,11 @@ const starVis = starVisFromAvg(st.avgRounded);
 const landlordScoreText = computeLandlordScoreText(l.id);
 const landlordCats = categoryAveragesForLandlord(l.id);
 const landlordCatLabels = {
-comm: "Communication",
-repairs: "Repairs / Maintenance speed",
-clean: "Cleanliness / building conditions",
-respect: "Respect / fairness",
-deposit: "Deposit return",
+responsivenessCommunication: "Responsiveness & Communication",
+maintenanceRepairs: "Maintenance & Repairs",
+respectProfessionalism: "Respect & Professionalism",
+fairnessTransparency: "Fairness & Transparency",
+depositReturn: "Deposit Return",
 };
 const landlordInsights = categoryInsights(landlordCats, landlordCatLabels);
 
@@ -3612,11 +3692,11 @@ const content = `
               ${
                 landlordCats
                   ? `
-                    <div class="lcRow" style="margin-top:8px;"><div class="muted">${esc(landlordCatLabels.comm)}</div><div>${esc(String(landlordCats.comm))}</div></div>
-                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.repairs)}</div><div>${esc(String(landlordCats.repairs))}</div></div>
-                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.clean)}</div><div>${esc(String(landlordCats.clean))}</div></div>
-                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.respect)}</div><div>${esc(String(landlordCats.respect))}</div></div>
-                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.deposit)}</div><div>${esc(String(landlordCats.deposit))}</div></div>
+                    <div class="lcRow" style="margin-top:8px;"><div class="muted">${esc(landlordCatLabels.responsivenessCommunication)}</div><div>${esc(String(landlordCats.responsivenessCommunication))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.maintenanceRepairs)}</div><div>${esc(String(landlordCats.maintenanceRepairs))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.respectProfessionalism)}</div><div>${esc(String(landlordCats.respectProfessionalism))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.fairnessTransparency)}</div><div>${esc(String(landlordCats.fairnessTransparency))}</div></div>
+                    <div class="lcRow" style="margin-top:6px;"><div class="muted">${esc(landlordCatLabels.depositReturn)}</div><div>${esc(String(landlordCats.depositReturn))}</div></div>
                     <div class="hr" style="margin:12px 0;"></div>
                     <div class="tiny"><b>Most common complaints:</b> ${
                       landlordInsights.complaints.length ? esc(landlordInsights.complaints.join(", ")) : "None yet"
@@ -3734,25 +3814,25 @@ alert("Sign in to post a review.");
 location.hash = "#/portal?umode=signup";
 return;
 }
-const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 
-const categories = {
-comm: Number($(`#rev_${formId}_comm`)?.value || 5),
-repairs: Number($(`#rev_${formId}_repairs`)?.value || 5),
-clean: Number($(`#rev_${formId}_clean`)?.value || 5),
-respect: Number($(`#rev_${formId}_respect`)?.value || 5),
-deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
+const categoryStars = {
+responsivenessCommunication: Number($(`#rev_${formId}_respComm`)?.value || 5),
+maintenanceRepairs: Number($(`#rev_${formId}_maintRepairs`)?.value || 5),
+respectProfessionalism: Number($(`#rev_${formId}_respectProf`)?.value || 5),
+fairnessTransparency: Number($(`#rev_${formId}_fairnessTrans`)?.value || 5),
+depositReturn: Number($(`#rev_${formId}_depositReturn`)?.value || 5),
 };
+const overallStars = avgFromCategoryStars(categoryStars) ?? 5;
 
 DB.reviews.unshift({
 id: idRand("r"),
 targetType: "landlord",
 targetId: l.id,
 userId: DB.currentUserId || "",
-stars,
-categories,
+stars: overallStars,
+categoryStars,
 text,
 createdAt: Date.now(),
 });
