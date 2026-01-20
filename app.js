@@ -575,7 +575,7 @@ DB.landlords.find((l) => l && (norm(l.name) === c || norm(l.entity) === c)) || n
 function canLandlordRespond(landlordId) {
 if (!landlordId) return false;
 const user = currentLandlordUser();
-if (!user || !user.verified) return false;
+if (!user) return false;
 const l = DB.landlords.find((x) => x && x.id === landlordId);
 if (!l) return false;
 const match = landlordForCompany(user.company);
@@ -637,6 +637,10 @@ return (DB.landlordUsers || []).find((u) => u && u.id === id) || null;
 
 function isLandlordSignedIn() {
 return !!currentLandlordUser();
+}
+
+function isAnySignedIn() {
+return isUserSignedIn() || isLandlordSignedIn();
 }
 
 function parseId(id) {
@@ -1549,6 +1553,7 @@ if (base === "add") return renderAdd();
 if (base === "how") return renderHow();
 if (base === "trust") return renderTrust();
 if (base === "portal") return renderPortal();
+if (base === "account") return renderAccount();
 if (base === "toolkit") return renderToolkit();
 if (base === "admin") return renderAdmin();
 if (base === "landlord" && param) return renderLandlord(param);
@@ -1937,9 +1942,30 @@ carouselTimer = setInterval(() => go(idx + 1), 4500);
 /* -----------------------------
   Shell
 ------------------------------ */
+function updateAccountLinks() {
+const signedIn = isAnySignedIn();
+const label = signedIn ? "My Account" : "Log In";
+const href = signedIn ? "#/account" : "#/portal";
+
+const headerBtn = document.querySelector("header .nav__right a.btn");
+if (headerBtn) {
+headerBtn.textContent = label;
+headerBtn.setAttribute("href", href);
+}
+
+const drawerPrimary = document.querySelector("#drawer .drawer__item--primary");
+if (drawerPrimary) {
+drawerPrimary.textContent = label;
+drawerPrimary.setAttribute("href", href);
+}
+}
+
 function renderShell(content) {
 const app = $("#app");
 if (!app) return;
+
+const accountHref = isAnySignedIn() ? "#/account" : "#/portal";
+const accountLabel = isAnySignedIn() ? "My account" : "Sign in";
 
 app.innerHTML = `
    ${content}
@@ -1950,12 +1976,13 @@ app.innerHTML = `
            <a href="#/how">How it works</a>
            <a href="#/toolkit">Tenant Toolkit</a>
            <a href="#/search">Search</a>
-           <a href="#/portal">Sign in</a>
+           <a href="${esc(accountHref)}" data-account-link="1">${esc(accountLabel)}</a>
            <a href="#/admin">Admin</a>
          </div>
        </div>
  `;
 ensureHashLinkRouting();
+updateAccountLinks();
 }
 
 /* -----------------------------
@@ -2659,7 +2686,7 @@ renderShell(`
          <div>
            <div class="kicker">How it works</div>
            <div class="pageTitle">Simple, fast, and public</div>
-           <div class="pageSub">Reviews require accounts. Landlords verify to respond (coming soon).</div>
+           <div class="pageSub">Reviews require accounts. Landlords can respond after signing in.</div>
          </div>
          <a class="btn" href="#/">Home</a>
        </div>
@@ -2731,7 +2758,7 @@ const content = `
          <div class="card" style="box-shadow:none;">
            <div class="pad">
              <div class="kicker">Landlord access</div>
-             <div class="tiny" style="margin-top:6px;">Verify to respond to reviews.</div>
+             <div class="tiny" style="margin-top:6px;">Sign in to respond to reviews.</div>
              <div class="hr" style="margin:12px 0;"></div>
              <div style="display:flex; gap:10px; flex-wrap:wrap;">
                <a class="btn ${landlordMode === "login" ? "btn--primary" : ""}" href="#/portal?mode=login&umode=${userMode}">Log In</a>
@@ -2783,9 +2810,9 @@ const content = `
              <div class="tiny" style="margin-top:10px; line-height:1.45;">
                ${
                  landlordMode === "signup"
-                   ? "After sign up, you’ll be verified before responding to reviews."
-                   : "Landlords can respond to reviews after verification."
-               }
+                   ? "After sign up, you can respond to reviews."
+                   : "Landlords can respond to reviews after signing in."
+             }
              </div>
 
              <div class="hr"></div>
@@ -3025,6 +3052,170 @@ DB.currentUserId = match.id;
 persist();
 alert("Demo: signed in (no real auth wired).");
 location.hash = "#/";
+});
+}
+
+/* -----------------------------
+  ACCOUNT
+------------------------------ */
+function renderAccount() {
+setPageTitle("My account");
+const user = currentUser();
+const landlordUser = currentLandlordUser();
+const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) : null;
+
+if (!user && !landlordUser) {
+renderShell(`
+     <section class="pageCard card">
+       <div class="pad">
+         <div class="topRow">
+           <div>
+             <div class="kicker">My account</div>
+             <div class="pageTitle">Sign in to manage your account</div>
+             <div class="pageSub">Access saved settings, reviews, and landlord tools.</div>
+           </div>
+           <a class="btn" href="#/">Home</a>
+         </div>
+         <div class="hr"></div>
+         <div style="display:flex; gap:10px; flex-wrap:wrap;">
+           <a class="btn btn--primary" href="#/portal?umode=login">Sign in</a>
+           <a class="btn" href="#/portal?umode=signup">Create account</a>
+         </div>
+       </div>
+     </section>
+   `);
+return;
+}
+
+const content = `
+   <section class="pageCard card">
+     <div class="pad">
+       <div class="topRow">
+         <div>
+           <div class="kicker">My account</div>
+           <div class="pageTitle">Account settings</div>
+           <div class="pageSub">Update your info or sign out.</div>
+         </div>
+         <a class="btn" href="#/">Home</a>
+       </div>
+
+       <div class="hr"></div>
+
+       <div class="twoCol">
+         <div class="card" style="box-shadow:none;">
+           <div class="pad">
+             <div class="kicker">User account</div>
+             ${
+               user
+                 ? `
+                   <form id="acctUserForm">
+                     <div class="field">
+                       <label>Email</label>
+                       <input class="input" id="acctUserEmail" value="${esc(user.email || "")}" />
+                     </div>
+                     <div class="field">
+                       <label>Name</label>
+                       <input class="input" id="acctUserName" value="${esc(user.name || "")}" placeholder="Optional" />
+                     </div>
+                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+                       <button class="btn btn--primary" type="submit">Save</button>
+                       <button class="btn" id="acctUserLogout" type="button">Log out</button>
+                     </div>
+                   </form>
+                 `
+                 : `
+                   <div class="muted" style="margin-top:8px;">Not signed in.</div>
+                   <a class="btn" style="margin-top:10px;" href="#/portal?umode=login">Sign in</a>
+                 `
+             }
+           </div>
+         </div>
+
+         <div class="card" style="box-shadow:none;">
+           <div class="pad">
+             <div class="kicker">Landlord account</div>
+             ${
+               landlordUser
+                 ? `
+                   <form id="acctLandlordForm">
+                     <div class="field">
+                       <label>Email</label>
+                       <input class="input" id="acctLandlordEmail" value="${esc(landlordUser.email || "")}" />
+                     </div>
+                     <div class="field">
+                       <label>Company / Landlord name</label>
+                       <input class="input" id="acctLandlordCompany" value="${esc(landlordUser.company || "")}" />
+                     </div>
+                     ${
+                       landlordRecord
+                         ? `<div class="tiny" style="margin-top:6px;">Linked profile: <a href="#/landlord/${esc(
+                             landlordRecord.id
+                           )}">${esc(landlordRecord.name)}</a></div>`
+                         : `<div class="tiny" style="margin-top:6px;">No linked landlord profile yet.</div>`
+                     }
+                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+                       <button class="btn btn--primary" type="submit">Save</button>
+                       <button class="btn" id="acctLandlordLogout" type="button">Log out</button>
+                     </div>
+                   </form>
+                 `
+                 : `
+                   <div class="muted" style="margin-top:8px;">Not signed in.</div>
+                   <a class="btn" style="margin-top:10px;" href="#/portal?mode=login&umode=login">Landlord sign in</a>
+                 `
+             }
+           </div>
+         </div>
+       </div>
+     </div>
+   </section>
+ `;
+
+renderShell(content);
+ensureRuntimeStyles();
+
+$("#acctUserForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const u = currentUser();
+if (!u) return;
+const email = $("#acctUserEmail")?.value ? $("#acctUserEmail").value.trim() : "";
+const name = $("#acctUserName")?.value ? $("#acctUserName").value.trim() : "";
+if (!email) return alert("Email is required.");
+u.email = email;
+u.name = name;
+persist();
+updateAccountLinks();
+alert("Account updated.");
+});
+
+$("#acctUserLogout")?.addEventListener("click", () => {
+DB.currentUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
+
+$("#acctLandlordForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const u = currentLandlordUser();
+if (!u) return;
+const email = $("#acctLandlordEmail")?.value ? $("#acctLandlordEmail").value.trim() : "";
+const company = $("#acctLandlordCompany")?.value
+? $("#acctLandlordCompany").value.trim()
+: "";
+if (!email || !company) return alert("Email and company are required.");
+u.email = email;
+u.company = company;
+persist();
+updateAccountLinks();
+alert("Account updated.");
+});
+
+$("#acctLandlordLogout")?.addEventListener("click", () => {
+DB.currentLandlordUserId = "";
+persist();
+updateAccountLinks();
+route();
 });
 }
 
@@ -3714,10 +3905,6 @@ const content = `
              ${reviewFormHTML("landlord", l.id)}
            </div>
 
-           <div style="margin-top:14px;">
-             <div class="kicker">Reviews</div>
-             <div class="list" id="landlordReviews" style="margin-top:10px;"></div>
-           </div>
          </div>
 
          <div>
@@ -3758,13 +3945,18 @@ const content = `
            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
              <div class="pad">
                <div class="muted" style="font-weight:900; line-height:1.55;">
-                 Landlords can verify to respond to reviews.
+                 Landlords can respond to reviews after signing in.
                </div>
                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
                  <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Login</a>
                  <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
                </div>
              </div>
+           </div>
+
+           <div style="margin-top:14px;">
+             <div class="kicker">Reviews</div>
+             <div class="list" id="landlordReviews" style="margin-top:10px;"></div>
            </div>
 
          </div>
