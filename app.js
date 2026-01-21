@@ -1791,6 +1791,39 @@ btn.textContent = shown ? "Show HTML" : "Hide HTML";
 function leafletReady() {
 return typeof window.L !== "undefined" && typeof window.L.map === "function";
 }
+
+let leafletLoadPromise = null;
+function loadLeafletAssetsOnce() {
+if (leafletReady()) return Promise.resolve(true);
+if (leafletLoadPromise) return leafletLoadPromise;
+
+leafletLoadPromise = new Promise((resolve) => {
+const hasCSS = !!document.querySelector('link[rel="stylesheet"][href*="leaflet"]');
+const hasJS = !!document.querySelector('script[src*="leaflet"]');
+
+if (!hasCSS) {
+const link = document.createElement("link");
+link.rel = "stylesheet";
+link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+document.head.appendChild(link);
+}
+
+if (hasJS) {
+// If a script tag already exists, just wait briefly and resolve.
+setTimeout(() => resolve(leafletReady()), 150);
+return;
+}
+
+const script = document.createElement("script");
+script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+script.defer = true;
+script.onload = () => resolve(true);
+script.onerror = () => resolve(false);
+document.head.appendChild(script);
+});
+
+return leafletLoadPromise;
+}
 /* -----------------------------
   Map Regions (NYC/MIA/LA/CHI)
 ------------------------------ */
@@ -1908,6 +1941,42 @@ return map;
 console.error("Map init failed:", e);
 return null;
 }
+}
+
+function initLeafletMapWithRetry(el, center, zoom, onReady) {
+if (!el) return null;
+
+let tries = 0;
+const maxTries = 12;
+const delay = 200;
+
+const attempt = () => {
+if (!leafletReady()) {
+if (tries === 0) loadLeafletAssetsOnce();
+if (tries < maxTries) {
+tries += 1;
+setTimeout(attempt, delay);
+return;
+}
+el.innerHTML = `<div class="muted">Map preview unavailable.</div>`;
+return;
+}
+
+const map = initLeafletMap(el, center, zoom);
+if (!map) {
+if (tries < maxTries) {
+tries += 1;
+setTimeout(attempt, delay);
+return;
+}
+el.innerHTML = `<div class="muted">Map preview unavailable.</div>`;
+return;
+}
+
+if (typeof onReady === "function") onReady(map);
+};
+
+attempt();
 }
 
 /* -----------------------------
@@ -2504,11 +2573,9 @@ if (!mapEl) return;
 const regionKey = getRegionKey();
 const cfg = REGIONS[regionKey] || REGIONS.NYC;
 
-const map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
-if (!map) return;
-
 const propsInRegion = filterPropertiesByRegion(DB.properties, regionKey);
 
+initLeafletMapWithRetry(mapEl, cfg.center, cfg.zoom, (map) => {
 for (const p of propsInRegion) {
 if (typeof p.lat === "number" && typeof p.lng === "number") {
 const a = p.address || {};
@@ -2525,6 +2592,7 @@ window.L.marker([p.lat, p.lng])
 } catch {}
 }
 }
+});
 }, 0);
 
 // Region selector rerender (simple + reliable)
@@ -2566,6 +2634,7 @@ style.textContent = `
      flex:1;
      display:flex;
      min-height:0;
+     flex-direction:column;
    }
    .splitRow--banner #highCarousel{
      flex:1;
@@ -2877,9 +2946,7 @@ if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(
 const mapEl = $("#searchMap");
 if (mapEl) mapEl.innerHTML = "";
 const cfg = REGIONS[regionKey] || REGIONS.NYC;
-const map = initLeafletMap(mapEl, cfg.center, cfg.zoom);
-if (!map) return;
-
+initLeafletMapWithRetry(mapEl, cfg.center, cfg.zoom, (map) => {
 for (const p of props) {
 if (typeof p.lat === "number" && typeof p.lng === "number") {
 const a = p.address || {};
@@ -2893,6 +2960,7 @@ window.L.marker([p.lat, p.lng])
 } catch {}
 }
 }
+});
 }
 
 doBtn?.addEventListener("click", () => {
@@ -3009,15 +3077,15 @@ stateEl?.addEventListener("change", syncAddMapToState);
 setTimeout(() => {
 const rk = getRegionKey();
 const cfg = REGIONS[rk] || REGIONS.NYC;
-addMap = initLeafletMap($("#addMap"), cfg.center, cfg.zoom);
-if (!addMap) return;
-
+initLeafletMapWithRetry($("#addMap"), cfg.center, cfg.zoom, (map) => {
+addMap = map;
 addMap.on("click", (e) => {
 picked = { lat: e.latlng.lat, lng: e.latlng.lng };
 try {
 if (addMarker) addMarker.remove();
 addMarker = window.L.marker([picked.lat, picked.lng]).addTo(addMap);
 } catch {}
+});
 });
 }, 0);
 
