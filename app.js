@@ -3905,7 +3905,7 @@ function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
 if (isLandlordSignedIn() && !isUserSignedIn()) {
 return `
-   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+   <div class="card bubble--white" style="box-shadow:none;">
      <div class="pad">
        <div class="kicker">Leave a review</div>
        <div class="muted" style="margin-top:8px; font-weight:800;">
@@ -3920,7 +3920,7 @@ return `
 }
 if (!isUserSignedIn()) {
 return `
-   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+   <div class="card bubble--white" style="box-shadow:none;">
      <div class="pad">
        <div class="kicker">Leave a review</div>
        <div class="muted" style="margin-top:8px; font-weight:800;">
@@ -3936,7 +3936,7 @@ return `
  `.trim();
 }
 return `
-   <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+   <div class="card bubble--white" style="box-shadow:none;">
      <div class="pad">
        <div class="kicker">Leave a review</div>
 
@@ -4066,6 +4066,15 @@ return rs
 .map((r) => {
 const stars = renderFractionalStars(r.stars, 14, 3);
 const starText = Number(r.stars);
+const tier = cardTier(Number.isFinite(starText) ? starText : 0, 1);
+const tintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
 const date = fmtDate(r.createdAt);
 
 const reply = replyArr.find((x) => x && x.reviewId === r.id);
@@ -4101,7 +4110,7 @@ const respondHTML = canReply
 : "";
 
 return `
-       <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+       <div class="card ${tintClass}" style="box-shadow:none;">
          <div class="pad">
            <div class="lcRow" style="justify-content:space-between;">
              <div style="display:flex; gap:10px; align-items:center;">
@@ -4207,6 +4216,14 @@ setPageTitle(l.name);
 
 const st = ratingStats("landlord", l.id);
 const tier = cardTier(st.avgRounded ?? 0, st.count);
+const ratingTintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
 const landlordScoreText = computeLandlordScoreText(l.id);
@@ -4242,7 +4259,7 @@ const content = `
 
        <div class="splitRow" style="margin-top:0;">
          <div>
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+           <div class="card ${ratingTintClass}" style="box-shadow:none;">
              <div class="pad">
                <div class="kicker">Rating</div>
 
@@ -4334,7 +4351,7 @@ const content = `
                        const stP = ratingStats("property", p.id);
                        const avgP = stP.avgRounded == null ? "—" : stP.avgRounded.toFixed(1);
                        return `
-                         <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                         <div class="card bubble--gray" style="box-shadow:none;">
                            <div class="pad">
                              <div class="lcRow" style="justify-content:space-between;">
                                <div>
@@ -4362,7 +4379,7 @@ const content = `
              !isLandlordSignedIn()
                ? `
                  <div class="kicker">Sign in</div>
-                 <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                 <div class="card bubble--white" style="box-shadow:none;">
                    <div class="pad">
                      <div class="muted" style="font-weight:900; line-height:1.55;">
                        Landlords can respond to reviews after signing in.
@@ -4495,6 +4512,14 @@ const rep = l ? reportFor(l.id) : null;
 const st = ratingStats("property", p.id);
 const landlordStats = l ? ratingStats("landlord", l.id) : null;
 const tier = cardTier(st.avgRounded ?? 0, st.count);
+const ratingTintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
 const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
 const starVis = starVisFromAvg(st.avgRounded);
 const landlordAvgText =
@@ -4527,7 +4552,7 @@ const content = `
 
        <div class="splitRow" style="margin-top:0;">
          <div>
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+           <div class="card ${ratingTintClass}" style="box-shadow:none;">
              <div class="pad">
                <div class="kicker">Rating</div>
                <div class="lcRow" style="margin-top:10px;">

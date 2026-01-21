@@ -200,6 +200,8 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .lc--green{outline:2px solid rgba(22,130,72,.18);background: rgba(204, 255, 225, .18)}
 .lc--yellow{outline:2px solid rgba(166,120,0,.16);background: rgba(255, 238, 186, .20)}
 .lc--red{outline:2px solid rgba(160, 30, 30, .16);background: rgba(255, 214, 214, .22)}
+.bubble--white{background: rgba(255,255,255,.95)}
+.bubble--gray{background: rgba(242,242,242,.92)}
 
 /* Pills */
 .pill{
