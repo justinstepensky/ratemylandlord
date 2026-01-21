@@ -4684,6 +4684,16 @@ limited.map(
 ).then((arr) => arr.filter(Boolean));
 }
 
+function collectProofInputs(formId) {
+const files = [];
+for (let i = 0; i < 5; i += 1) {
+const input = document.getElementById(`rev_${formId}Proof_${i}`);
+const f = input && input.files ? input.files[0] : null;
+if (f) files.push(f);
+}
+return files;
+}
+
 function getProofListFromDOM(formId) {
 const el = document.getElementById(`rev_${formId}ProofList`);
 if (!el) return [];
@@ -4859,8 +4869,15 @@ return `
 
        <div class="field">
          <label>Attach proof (optional)</label>
-         <input class="input" id="rev_${esc(formId)}Proof" type="file" multiple />
-         <div class="tiny" style="margin-top:6px;">Photos or files that support your review (up to 5).</div>
+         <div style="display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px;">
+           ${[0, 1, 2, 3, 4]
+             .map(
+               (i) =>
+                 `<input class="input" id="rev_${esc(formId)}Proof_${i}" type="file" accept="image/*" />`
+             )
+             .join("")}
+         </div>
+         <div class="tiny" style="margin-top:6px;">Up to 5 photos.</div>
          <div id="rev_${esc(formId)}ProofWrap">
            <div id="rev_${esc(formId)}ProofList" data-proof='${esc(JSON.stringify(existingProof))}'></div>
            ${
@@ -5410,7 +5427,7 @@ const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).val
 if (!text) return alert("Write a review first.");
 const existingProof = getProofListFromDOM(formId);
 const proofFilesNew = await readProofFiles(
-  $(`#rev_${formId}Proof`)?.files || [],
+  collectProofInputs(formId),
   Math.max(0, 5 - existingProof.length)
 );
 const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
@@ -5658,7 +5675,7 @@ const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).val
 if (!text) return alert("Write a review first.");
 const existingProof = getProofListFromDOM(formId);
 const proofFilesNew = await readProofFiles(
-  $(`#rev_${formId}Proof`)?.files || [],
+  collectProofInputs(formId),
   Math.max(0, 5 - existingProof.length)
 );
 const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
