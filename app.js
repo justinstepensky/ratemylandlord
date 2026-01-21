@@ -2557,6 +2557,36 @@ style.textContent = `
    .splitRow--banner .homePaneCard{
      min-height: 420px;
    }
+   .splitRow--banner .homePaneCard .pad{
+     display:flex;
+     flex-direction:column;
+     height:100%;
+   }
+   .splitRow--banner .homePaneBody{
+     flex:1;
+     display:flex;
+     min-height:0;
+   }
+   .splitRow--banner #highCarousel{
+     flex:1;
+     display:flex;
+     flex-direction:column;
+     min-height:0;
+   }
+   .splitRow--banner #highTrack{
+     flex:1;
+   }
+   .splitRow--banner #highTrack,
+   .splitRow--banner .carouselSlide{
+     height:100%;
+   }
+   .splitRow--banner .carouselSlide{
+     display:flex;
+   }
+   .splitRow--banner .carouselSlide .lc{
+     flex:1;
+     align-items:stretch;
+   }
 
    @media (max-width: 980px){
      .splitRow--banner{
