@@ -441,6 +441,60 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 }
 .portalSwitch input:checked + .portalSlider{background:rgba(21,17,14,.85)}
 .portalSwitch input:checked + .portalSlider:before{transform:translateX(20px)}
+.portalFilters{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.portalInbox{
+  display:grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap:14px;
+}
+.threadList{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.threadItem{
+  position:relative;
+  text-align:left;
+  padding:12px;
+  border-radius:14px;
+  border:1px solid rgba(20,16,12,.12);
+  background: rgba(255,255,255,.72);
+  cursor:pointer;
+}
+.threadItem.isActive{border-color: rgba(21,17,14,.45);background: rgba(255,255,255,.92)}
+.threadTitle{font-weight:900}
+.threadMeta{font-size:12px;color:rgba(21,17,14,.55);margin-top:4px}
+.threadPreview{font-size:12px;color:rgba(21,17,14,.75);margin-top:6px}
+.threadBadge{
+  position:absolute;
+  top:10px;
+  right:10px;
+  background: rgba(21,17,14,.92);
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  border-radius:999px;
+  padding:2px 6px;
+}
+.threadPane{border:1px solid rgba(20,16,12,.12);border-radius:14px;padding:12px;background:rgba(255,255,255,.72)}
+.threadHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.threadMessages{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:360px;overflow:auto;padding-right:4px}
+.threadMessage{display:flex;flex-direction:column;gap:4px}
+.threadMessage--landlord{align-items:flex-end}
+.threadBubble{
+  max-width:75%;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid rgba(20,16,12,.10);
+  background: rgba(255,255,255,.92);
+}
+.threadMessage--landlord .threadBubble{background: rgba(21,17,14,.92);color:#fff;border-color: rgba(21,17,14,.25)}
 
 /* Drawer */
 .drawerOverlay{
@@ -552,6 +606,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .splitRow{grid-template-columns:1fr}
   .twoCol{grid-template-columns:1fr}
   .portalGrid{grid-template-columns:1fr}
+  .portalInbox{grid-template-columns:1fr}
   .toolkitGrid{grid-template-columns:1fr}
   .h1{font-size:36px}
   .resultsGrid{grid-template-columns:1fr}
