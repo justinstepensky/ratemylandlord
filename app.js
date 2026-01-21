@@ -3925,13 +3925,7 @@ return `
              it.href
            )}">${esc(it.label)}</a></div>
            <div class="smallNote" style="margin-top:10px;">${esc(it.r.text || "")}</div>
-           ${
-             it.r.proofFiles && it.r.proofFiles.length
-               ? `<div class="tiny" style="margin-top:8px;">Proof attached: ${esc(
-                   proofFilesSummary(it.r.proofFiles)
-                 )}</div>`
-               : ""
-           }
+           ${it.r.proofFiles && it.r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofFiles(it.r.proofFiles)}` : ""}
            ${
              reply
                ? `
@@ -4616,6 +4610,53 @@ if (!Array.isArray(files) || !files.length) return "";
 return files.map((f) => f && f.name ? String(f.name) : "attachment").join(", ");
 }
 
+function renderProofFiles(files) {
+if (!Array.isArray(files) || !files.length) return "";
+const items = files
+  .map((f) => {
+    if (f && f.dataUrl) {
+      return `<img src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(20,16,12,.12);" />`;
+    }
+    return `<span class="tiny" style="padding:6px 8px;border-radius:8px;border:1px solid rgba(20,16,12,.12);background:rgba(255,255,255,.6);">${esc(
+      f && f.name ? f.name : "Attachment"
+    )}</span>`;
+  })
+  .join("");
+return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`;
+}
+
+function readProofFiles(fileList) {
+const files = Array.from(fileList || []);
+if (!files.length) return Promise.resolve([]);
+const maxBytes = 1500000;
+return Promise.all(
+files.map(
+  (f) =>
+    new Promise((resolve) => {
+      if (!f || typeof f.size !== "number") return resolve(null);
+      if (f.size > maxBytes) {
+        alert(`File too large: ${f.name}. Max 1.5MB.`);
+        return resolve(null);
+      }
+      if (f.type && f.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            dataUrl: String(reader.result || ""),
+          });
+        reader.onerror = () => resolve({ name: f.name, size: f.size, type: f.type });
+        reader.readAsDataURL(f);
+      } else {
+        resolve({ name: f.name, size: f.size, type: f.type });
+      }
+    })
+)
+).then((arr) => arr.filter(Boolean));
+}
+
 function renderLandlordCategoryPicker(id, label, defaultVal = 5) {
 return renderCategoryPicker(id, label, defaultVal);
 }
@@ -4751,7 +4792,7 @@ return `
          <input class="input" id="rev_${esc(formId)}Proof" type="file" multiple />
          ${
            existingProof.length
-             ? `<div class="tiny" style="margin-top:6px;">Current proof: ${esc(proofFilesSummary(existingProof))}</div>`
+             ? `<div class="tiny" style="margin-top:6px;">Current proof</div>${renderProofFiles(existingProof)}`
              : `<div class="tiny" style="margin-top:6px;">Photos or files that support your review.</div>`
          }
        </div>
@@ -4963,13 +5004,7 @@ return `
            </div>
 
            <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
-           ${
-             r.proofFiles && r.proofFiles.length
-               ? `<div class="tiny" style="margin-top:8px;">Proof attached: ${esc(
-                   proofFilesSummary(r.proofFiles)
-                 )}</div>`
-               : ""
-           }
+           ${r.proofFiles && r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofFiles(r.proofFiles)}` : ""}
            ${replyHTML}
            ${respondHTML}
          </div>
@@ -5290,7 +5325,7 @@ wireReviewListInteractions(listEl, l.id, "landlord", l.id);
 
 // Review form wiring
 const formId = `landlord_${l.id}`;
-$(`#rev_${formId}Submit`)?.addEventListener("click", () => {
+$(`#rev_${formId}Submit`)?.addEventListener("click", async () => {
 if (!isUserSignedIn()) {
 alert("Sign in to post a review.");
 location.hash = "#/portal?umode=signup";
@@ -5298,11 +5333,7 @@ return;
 }
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const proofFiles = Array.from($(`#rev_${formId}Proof`)?.files || []).map((f) => ({
-name: f.name,
-size: f.size,
-type: f.type,
-}));
+const proofFiles = await readProofFiles($(`#rev_${formId}Proof`)?.files || []);
 
 const categoryStars = {
 responsivenessCommunication: Number($(`#rev_${formId}_respComm`)?.value || 5),
@@ -5535,7 +5566,7 @@ wireReviewListInteractions(listEl, landlordIdForReply, "property", p.id);
 
 // Review form
 const formId = `property_${p.id}`;
-$(`#rev_${formId}Submit`)?.addEventListener("click", () => {
+$(`#rev_${formId}Submit`)?.addEventListener("click", async () => {
 if (!isUserSignedIn()) {
 alert("Sign in to post a review.");
 location.hash = "#/portal?umode=signup";
@@ -5544,11 +5575,7 @@ return;
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const proofFiles = Array.from($(`#rev_${formId}Proof`)?.files || []).map((f) => ({
-name: f.name,
-size: f.size,
-type: f.type,
-}));
+const proofFiles = await readProofFiles($(`#rev_${formId}Proof`)?.files || []);
 
 const categories = {
 comm: Number($(`#rev_${formId}_comm`)?.value || 5),
