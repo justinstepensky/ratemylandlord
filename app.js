@@ -4625,12 +4625,39 @@ const items = files
 return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`;
 }
 
-function readProofFiles(fileList) {
+function renderEditableProofFiles(files, formId) {
+if (!Array.isArray(files) || !files.length) return "";
+const items = files
+  .map((f, idx) => {
+    const preview = f && f.dataUrl
+      ? `<img src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(20,16,12,.12);" />`
+      : `<span class="tiny" style="padding:6px 8px;border-radius:8px;border:1px solid rgba(20,16,12,.12);background:rgba(255,255,255,.6);">${esc(
+          f && f.name ? f.name : "Attachment"
+        )}</span>`;
+    return `
+      <div style="position:relative; display:inline-flex; align-items:center; justify-content:center;">
+        ${preview}
+        <button class="btn miniBtn" type="button" data-proof-remove="${esc(idx)}" data-proof-form="${esc(
+          formId
+        )}" style="position:absolute; top:-8px; right:-8px; padding:4px 6px;">×</button>
+      </div>
+    `.trim();
+  })
+  .join("");
+return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`;
+}
+
+function readProofFiles(fileList, maxCount) {
 const files = Array.from(fileList || []);
 if (!files.length) return Promise.resolve([]);
 const maxBytes = 1500000;
+const capped = Number.isFinite(maxCount) ? Math.max(0, Math.min(files.length, maxCount)) : files.length;
+const limited = files.slice(0, capped);
+if (maxCount != null && files.length > capped) {
+alert(`You can add up to ${maxCount} more photo${maxCount === 1 ? "" : "s"}.`);
+}
 return Promise.all(
-files.map(
+limited.map(
   (f) =>
     new Promise((resolve) => {
       if (!f || typeof f.size !== "number") return resolve(null);
@@ -4655,6 +4682,49 @@ files.map(
     })
 )
 ).then((arr) => arr.filter(Boolean));
+}
+
+function getProofListFromDOM(formId) {
+const el = document.getElementById(`rev_${formId}ProofList`);
+if (!el) return [];
+try {
+const raw = el.getAttribute("data-proof") || "[]";
+const parsed = JSON.parse(raw);
+return Array.isArray(parsed) ? parsed : [];
+} catch {
+return [];
+}
+}
+
+function setProofListToDOM(formId, files) {
+const el = document.getElementById(`rev_${formId}ProofList`);
+if (!el) return;
+const safe = Array.isArray(files) ? files : [];
+el.setAttribute("data-proof", JSON.stringify(safe));
+el.innerHTML = renderEditableProofFiles(safe, formId);
+}
+
+function wireReviewProofEditor(formId) {
+const root = document.getElementById(`rev_${formId}ProofWrap`);
+if (!root) return;
+const current = getProofListFromDOM(formId);
+setProofListToDOM(formId, current);
+
+root.querySelectorAll("[data-proof-clear]").forEach((btn) => {
+btn.addEventListener("click", () => {
+setProofListToDOM(formId, []);
+});
+});
+
+root.addEventListener("click", (e) => {
+const btn = e.target && e.target.closest ? e.target.closest("[data-proof-remove]") : null;
+if (!btn) return;
+const idx = Number(btn.getAttribute("data-proof-remove"));
+if (!Number.isFinite(idx)) return;
+const list = getProofListFromDOM(formId);
+list.splice(idx, 1);
+setProofListToDOM(formId, list);
+});
 }
 
 function renderLandlordCategoryPicker(id, label, defaultVal = 5) {
@@ -4790,11 +4860,15 @@ return `
        <div class="field">
          <label>Attach proof (optional)</label>
          <input class="input" id="rev_${esc(formId)}Proof" type="file" multiple />
-         ${
-           existingProof.length
-             ? `<div class="tiny" style="margin-top:6px;">Current proof</div>${renderProofFiles(existingProof)}`
-             : `<div class="tiny" style="margin-top:6px;">Photos or files that support your review.</div>`
-         }
+         <div class="tiny" style="margin-top:6px;">Photos or files that support your review (up to 5).</div>
+         <div id="rev_${esc(formId)}ProofWrap">
+           <div id="rev_${esc(formId)}ProofList" data-proof='${esc(JSON.stringify(existingProof))}'></div>
+           ${
+             existingProof.length
+               ? `<div style="margin-top:8px;"><button class="btn miniBtn" type="button" data-proof-clear="1">Remove all</button></div>`
+               : ""
+           }
+         </div>
        </div>
 
        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
@@ -5293,6 +5367,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
+wireReviewProofEditor(`landlord_${l.id}`);
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 
 // Wire dropdown
@@ -5333,7 +5408,12 @@ return;
 }
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const proofFiles = await readProofFiles($(`#rev_${formId}Proof`)?.files || []);
+const existingProof = getProofListFromDOM(formId);
+const proofFilesNew = await readProofFiles(
+  $(`#rev_${formId}Proof`)?.files || [],
+  Math.max(0, 5 - existingProof.length)
+);
+const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
 
 const categoryStars = {
 responsivenessCommunication: Number($(`#rev_${formId}_respComm`)?.value || 5),
@@ -5538,6 +5618,7 @@ ensureRuntimeStyles();
 initPropertyMediaEmbed();
 initStarPickers();
 wireCategoryRatingToStars(`property_${p.id}`, false);
+wireReviewProofEditor(`property_${p.id}`);
 if (l) {
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 } else {
@@ -5575,7 +5656,12 @@ return;
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const proofFiles = await readProofFiles($(`#rev_${formId}Proof`)?.files || []);
+const existingProof = getProofListFromDOM(formId);
+const proofFilesNew = await readProofFiles(
+  $(`#rev_${formId}Proof`)?.files || [],
+  Math.max(0, 5 - existingProof.length)
+);
+const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
 
 const categories = {
 comm: Number($(`#rev_${formId}_comm`)?.value || 5),
