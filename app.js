@@ -3409,8 +3409,8 @@ setPageTitle("Sign in");
 
 const landlordMode = getQueryParam("mode") === "signup" ? "signup" : "login";
 const userMode = getQueryParam("umode") === "login" ? "login" : "signup";
+const portalRole = getQueryParam("role") === "tenant" ? "tenant" : "landlord";
 const wantsVerify = getQueryParam("verify") === "1";
-const nextParam = getQueryParam("next");
 const landlordUser = currentLandlordUser();
 const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) : null;
 const landlordProps = landlordRecord
@@ -3431,8 +3431,17 @@ const content = `
 
        <div class="hr"></div>
 
+       <div class="portalToggle" role="group" aria-label="Choose account type">
+         <span class="portalRoleLabel" data-portal-label="landlord">Landlord</span>
+         <label class="portalSwitch">
+           <input id="portalRoleToggle" type="checkbox" aria-label="Toggle landlord or tenant login" ${portalRole === "tenant" ? "checked" : ""} />
+           <span class="portalSlider"></span>
+         </label>
+         <span class="portalRoleLabel" data-portal-label="tenant">Tenant</span>
+       </div>
+
        <div class="twoCol">
-         <div class="card" style="box-shadow:none;">
+         <div class="card portalPanel" data-portal-panel="landlord" style="box-shadow:none;">
            <div class="pad">
              <div class="kicker">Landlord access</div>
              <div class="tiny" style="margin-top:6px;">Sign in to respond to reviews.</div>
@@ -3541,9 +3550,9 @@ const content = `
            </div>
          </div>
 
-         <div class="card" style="box-shadow:none;">
+         <div class="card portalPanel" data-portal-panel="tenant" style="box-shadow:none;">
            <div class="pad">
-             <div class="kicker">User access</div>
+             <div class="kicker">Tenant access</div>
              <div class="tiny" style="margin-top:6px;">Create an account to rate landlords or buildings.</div>
              <div class="hr" style="margin:12px 0;"></div>
              <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -3596,8 +3605,29 @@ setTimeout(() => {
 document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }, 0);
 }
-const nextHash = nextParam ? `#${decodeURIComponent(nextParam)}` : "";
-const goNextOrHome = () => navigateTo(nextHash || "#/");
+const goNextOrHome = () => navigateTo("#/account");
+const setPortalRole = (role) => {
+const panels = Array.from(document.querySelectorAll("[data-portal-panel]"));
+panels.forEach((panel) => {
+const key = panel.getAttribute("data-portal-panel");
+panel.classList.toggle("isActive", key === role);
+});
+const labels = Array.from(document.querySelectorAll("[data-portal-label]"));
+labels.forEach((label) => {
+const key = label.getAttribute("data-portal-label");
+label.classList.toggle("isActive", key === role);
+});
+};
+const toggle = $("#portalRoleToggle");
+if (toggle) {
+toggle.checked = portalRole === "tenant";
+setPortalRole(toggle.checked ? "tenant" : "landlord");
+toggle.addEventListener("change", () => {
+setPortalRole(toggle.checked ? "tenant" : "landlord");
+});
+} else {
+setPortalRole(portalRole);
+}
 
 // SSO buttons demo
 document.querySelectorAll("[data-sso]").forEach((btn) => {
@@ -3737,7 +3767,7 @@ if (existing) {
 DB.currentUserId = existing.id;
 persist();
 alert("Demo: account already exists. Signed you in.");
-location.hash = "#/";
+navigateTo("#/account");
 return;
 }
 const user = { id: idRand("u"), email, createdAt: Date.now() };
@@ -3745,7 +3775,7 @@ DB.users.push(user);
 DB.currentUserId = user.id;
 persist();
 alert("Demo: account created. You can now rate.");
-location.hash = "#/";
+navigateTo("#/account");
 return;
 }
 
@@ -3757,7 +3787,7 @@ return;
 DB.currentUserId = match.id;
 persist();
 alert("Demo: signed in (no real auth wired).");
-location.hash = "#/";
+navigateTo("#/account");
 });
 }
 

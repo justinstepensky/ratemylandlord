@@ -401,6 +401,46 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 
 /* Portal */
 .portalGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.portalToggle{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin:8px 0 14px;
+}
+.portalRoleLabel{
+  font-weight:900;
+  font-size:12px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:rgba(21,17,14,.55);
+}
+.portalRoleLabel.isActive{color:rgba(21,17,14,.90)}
+.portalSwitch{position:relative;width:46px;height:26px;display:inline-block}
+.portalSwitch input{opacity:0;width:0;height:0}
+.portalSlider{
+  position:absolute;
+  inset:0;
+  cursor:pointer;
+  background:rgba(21,17,14,.15);
+  border-radius:999px;
+  transition:all .2s ease;
+  border:1px solid rgba(20,16,12,.12);
+}
+.portalSlider:before{
+  content:"";
+  position:absolute;
+  height:20px;
+  width:20px;
+  left:2px;
+  top:2px;
+  border-radius:999px;
+  background:#fff;
+  transition:transform .2s ease;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+}
+.portalSwitch input:checked + .portalSlider{background:rgba(21,17,14,.85)}
+.portalSwitch input:checked + .portalSlider:before{transform:translateX(20px)}
 
 /* Drawer */
 .drawerOverlay{
@@ -515,6 +555,9 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .toolkitGrid{grid-template-columns:1fr}
   .h1{font-size:36px}
   .resultsGrid{grid-template-columns:1fr}
+  .portalToggle{display:flex}
+  .portalPanel{display:none}
+  .portalPanel.isActive{display:block}
 }
 @media (max-width:720px){
   .wrap{padding:0 14px}
