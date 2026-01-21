@@ -5346,7 +5346,7 @@ ensureRuntimeStyles();
 
 $("#adminLogin")?.addEventListener("click", () => {
 const pass = $("#adminPass")?.value ? String($("#adminPass").value).trim() : "";
-if (pass !== "casa-admin") return alert("Invalid password.");
+if (pass !== "casa") return alert("Invalid password.");
 DB.adminMode = true;
 persist();
 route();
