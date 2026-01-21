@@ -3193,26 +3193,6 @@ const content = `
          </div>
        </div>
 
-       ${
-         landlordUser
-           ? `
-             <div class="hr"></div>
-             ${
-               landlordRecord
-                 ? `<div class="tiny" style="margin-top:-6px;">Landlord verification: ${esc(
-                     landlordRecord.verificationStatus || "none"
-                   )} • <a href="#/verify">Upload documents</a></div>`
-                 : ""
-             }
-             <div class="kicker">Notifications</div>
-             <div class="list" id="landlordNotifications" style="margin-top:10px;"></div>
-
-             <div class="hr"></div>
-             <div class="kicker">Property claims</div>
-             <div class="list" id="propertyClaims" style="margin-top:10px;"></div>
-           `
-           : ""
-       }
      </div>
    </section>
  `;
