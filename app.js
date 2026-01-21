@@ -2827,17 +2827,18 @@ const content = `
 
        <div class="hr"></div>
 
-       <div id="landlordControls" style="margin-top:0;">
+       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:0;">
+         <button class="btn miniBtn btn--primary" id="toggleLandlords" type="button">Landlords</button>
+         <button class="btn miniBtn" id="toggleAddresses" type="button">Addresses</button>
+       </div>
+
+       <div id="landlordControls" style="margin-top:10px;">
          <div class="kicker">Landlords</div>
-         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
-           <button class="btn miniBtn btn--primary" id="toggleLandlords" type="button">Landlords</button>
-           <button class="btn miniBtn" id="toggleAddresses" type="button">Addresses</button>
-         </div>
-         <div id="alphaFilter" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; margin-top:10px; padding-bottom:4px;"></div>
+         <div id="alphaFilter" style="display:flex; gap:4px; flex-wrap:nowrap; white-space:nowrap; margin-top:10px;"></div>
          <div class="list" id="landlordResults" style="margin-top:10px;"></div>
        </div>
 
-       <div id="addressControls" style="margin-top:0; display:none;">
+       <div id="addressControls" style="margin-top:10px; display:none;">
          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
            <div class="kicker">Addresses</div>
            <label class="tiny" style="display:flex; gap:8px; align-items:center;">
@@ -3030,7 +3031,7 @@ alphaWrap.innerHTML = items
 .map((l) => {
 const label = l === "all" ? "All" : l;
 const isOn = alphaFilter === l;
-return `<button type="button" class="btn miniBtn ${isOn ? "btn--primary" : ""}" data-alpha="${esc(l)}">${esc(label)}</button>`;
+return `<button type="button" class="btn miniBtn ${isOn ? "btn--primary" : ""}" data-alpha="${esc(l)}" style="font-size:11px; padding:6px 7px;">${esc(label)}</button>`;
 })
 .join("");
 alphaWrap.querySelectorAll("[data-alpha]").forEach((btn) => {
