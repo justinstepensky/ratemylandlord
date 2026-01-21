@@ -1984,7 +1984,8 @@ if (isUserSignedIn()) return;
 const landlordUser = currentLandlordUser();
 if (!landlordUser) {
 alert("Log in or sign up as a landlord to claim ownership.");
-location.hash = "#/portal?mode=login&umode=signup";
+const next = encodeURIComponent((location.hash || "#/").replace("#", ""));
+location.hash = `#/portal?mode=login&umode=signup&next=${next}`;
 return;
 }
 const landlord = landlordUser.landlordId
@@ -3348,6 +3349,7 @@ setPageTitle("Sign in");
 const landlordMode = getQueryParam("mode") === "signup" ? "signup" : "login";
 const userMode = getQueryParam("umode") === "login" ? "login" : "signup";
 const wantsVerify = getQueryParam("verify") === "1";
+const nextParam = getQueryParam("next");
 const landlordUser = currentLandlordUser();
 const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) : null;
 const landlordProps = landlordRecord
@@ -3533,6 +3535,8 @@ setTimeout(() => {
 document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }, 0);
 }
+const nextHash = nextParam ? `#${decodeURIComponent(nextParam)}` : "";
+const goNextOrHome = () => navigateTo(nextHash || "#/");
 
 /* -----------------------------
   OWNER VERIFICATION (Landlords only)
@@ -3783,7 +3787,7 @@ alert("Verification submitted (demo).");
 });
 persist();
 alert("Demo: account created. Verification pending.");
-location.hash = "#/";
+goNextOrHome();
 } else {
 const match = DB.landlordUsers.find((u) => u && u.email && norm(u.email) === norm(email));
 if (!match) {
@@ -3804,7 +3808,7 @@ match.landlordId = linked.id;
 DB.currentLandlordUserId = match.id;
 persist();
 alert("Demo: signed in (no real auth wired).");
-location.hash = "#/";
+goNextOrHome();
 }
 });
 
