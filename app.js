@@ -2923,7 +2923,7 @@ const content = `
 
        <div id="landlordControls" style="margin-top:10px;">
          <div class="kicker">Landlords</div>
-         <div id="alphaFilter" style="display:flex; gap:4px; flex-wrap:nowrap; white-space:nowrap; margin-top:10px;"></div>
+         <div id="alphaFilter" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(22px, 1fr)); gap:4px; margin-top:10px;"></div>
          <div class="list" id="landlordResults" style="margin-top:10px;"></div>
        </div>
 
@@ -3120,7 +3120,7 @@ alphaWrap.innerHTML = items
 .map((l) => {
 const label = l === "all" ? "All" : l;
 const isOn = alphaFilter === l;
-return `<button type="button" class="btn miniBtn ${isOn ? "btn--primary" : ""}" data-alpha="${esc(l)}" style="font-size:11px; padding:6px 7px;">${esc(label)}</button>`;
+return `<button type="button" class="btn miniBtn ${isOn ? "btn--primary" : ""}" data-alpha="${esc(l)}" style="font-size:11px; padding:6px 7px; width:100%; min-width:0;">${esc(label)}</button>`;
 })
 .join("");
 alphaWrap.querySelectorAll("[data-alpha]").forEach((btn) => {
