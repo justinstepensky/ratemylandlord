@@ -5544,6 +5544,11 @@ return;
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
+const proofFiles = Array.from($(`#rev_${formId}Proof`)?.files || []).map((f) => ({
+name: f.name,
+size: f.size,
+type: f.type,
+}));
 
 const categories = {
 comm: Number($(`#rev_${formId}_comm`)?.value || 5),
