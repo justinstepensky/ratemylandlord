@@ -2818,11 +2818,6 @@ const content = `
          <button class="btn btn--primary" id="doSearch" type="button">Search</button>
        </div>
 
-       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
-         <button class="btn miniBtn btn--primary" id="toggleLandlords" type="button">Landlords</button>
-         <button class="btn miniBtn" id="toggleAddresses" type="button">Addresses</button>
-       </div>
-       
         <div id="searchRegion" style="margin-top:12px;">
          ${regionSelectorHTML(getRegionKey())}
        </div>
@@ -2834,7 +2829,11 @@ const content = `
 
        <div id="landlordControls" style="margin-top:0;">
          <div class="kicker">Landlords</div>
-         <div id="alphaFilter" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"></div>
+         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+           <button class="btn miniBtn btn--primary" id="toggleLandlords" type="button">Landlords</button>
+           <button class="btn miniBtn" id="toggleAddresses" type="button">Addresses</button>
+         </div>
+         <div id="alphaFilter" style="display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; margin-top:10px; padding-bottom:4px;"></div>
          <div class="list" id="landlordResults" style="margin-top:10px;"></div>
        </div>
 
@@ -2843,7 +2842,7 @@ const content = `
            <div class="kicker">Addresses</div>
            <label class="tiny" style="display:flex; gap:8px; align-items:center;">
              Sort
-             <select class="input" id="addressSort" style="height:34px;">
+             <select class="input" id="addressSort" style="height:34px; padding:0 12px; width:auto;">
                <option value="alpha">Alphabetical</option>
                <option value="rating-desc">Rating: Highest - Lowest</option>
                <option value="rating-asc">Rating: Lowest - Highest</option>
