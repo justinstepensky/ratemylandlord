@@ -4804,18 +4804,6 @@ list[i] = null;
 setProofListToDOM(formId, list);
 return;
 }
-
-function ensureProofViewerHandlers() {
-if (window.__casaProofViewerBound) return;
-window.__casaProofViewerBound = true;
-document.addEventListener("click", (e) => {
-const btn = e.target && e.target.closest ? e.target.closest("[data-proof-view]") : null;
-if (!btn) return;
-const setId = btn.getAttribute("data-proof-view") || "";
-const idx = Number(btn.getAttribute("data-proof-idx") || 0);
-openProofViewer(setId, idx);
-});
-}
 const read = await readProofFiles([file], 1);
 list[i] = read.length ? read[0] : null;
 setProofListToDOM(formId, list);
@@ -4842,6 +4830,18 @@ list[idx] = null;
 setProofListToDOM(formId, list);
 const input = document.getElementById(`rev_${formId}Proof_${idx}`);
 if (input) input.value = "";
+});
+}
+
+function ensureProofViewerHandlers() {
+if (window.__casaProofViewerBound) return;
+window.__casaProofViewerBound = true;
+document.addEventListener("click", (e) => {
+const btn = e.target && e.target.closest ? e.target.closest("[data-proof-view]") : null;
+if (!btn) return;
+const setId = btn.getAttribute("data-proof-view") || "";
+const idx = Number(btn.getAttribute("data-proof-idx") || 0);
+openProofViewer(setId, idx);
 });
 }
 
