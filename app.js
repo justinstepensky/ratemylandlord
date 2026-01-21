@@ -4948,22 +4948,22 @@ return `
              <div class="kicker">Category ratings</div>
              ${renderLandlordCategoryPicker(
                `rev_${formId}_respComm`,
-               "Responsiveness &amp; Communication",
+               "Responsiveness & Communication",
                Number(cat.responsivenessCommunication ?? cat.comm ?? 5)
              )}
              ${renderLandlordCategoryPicker(
                `rev_${formId}_maintRepairs`,
-               "Maintenance &amp; Repairs",
+               "Maintenance & Repairs",
                Number(cat.maintenanceRepairs ?? cat.repairs ?? cat.maint ?? 5)
              )}
              ${renderLandlordCategoryPicker(
                `rev_${formId}_respectProf`,
-               "Respect &amp; Professionalism",
+               "Respect & Professionalism",
                Number(cat.respectProfessionalism ?? cat.respect ?? 5)
              )}
              ${renderLandlordCategoryPicker(
                `rev_${formId}_fairnessTrans`,
-               "Fairness &amp; Transparency",
+               "Fairness & Transparency",
                Number(cat.fairnessTransparency ?? cat.fairness ?? 5)
              )}
              ${renderLandlordCategoryPicker(
