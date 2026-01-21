@@ -1701,6 +1701,54 @@ overlay.innerHTML = "";
 document.body.style.overflow = "";
 }
 
+function openProofViewer(setId, startIdx = 0) {
+const sets = window.__casaProofSets || {};
+const files = Array.isArray(sets[setId]) ? sets[setId] : [];
+const images = files.filter((f) => f && f.dataUrl);
+if (!images.length) return;
+
+let idx = Math.max(0, Math.min(images.length - 1, Number(startIdx) || 0));
+
+openModal(`
+  <div class="modalHead">
+    <div class="modalTitle">Proof photos</div>
+    <button class="iconBtn" id="proofClose" aria-label="Close" type="button">×</button>
+  </div>
+  <div class="modalBody">
+    <div class="proofLightbox">
+      <button class="iconBtn proofNav" id="proofPrev" type="button" aria-label="Previous">‹</button>
+      <img class="proofLightboxImg" id="proofImg" alt="Proof photo" />
+      <button class="iconBtn proofNav" id="proofNext" type="button" aria-label="Next">›</button>
+    </div>
+    <div class="tiny" id="proofCount" style="margin-top:10px;"></div>
+  </div>
+`);
+
+const imgEl = $("#proofImg");
+const countEl = $("#proofCount");
+const prevBtn = $("#proofPrev");
+const nextBtn = $("#proofNext");
+
+const render = () => {
+if (imgEl) imgEl.src = images[idx].dataUrl || "";
+if (countEl) countEl.textContent = `${idx + 1} / ${images.length}`;
+const hasMany = images.length > 1;
+if (prevBtn) prevBtn.style.display = hasMany ? "inline-flex" : "none";
+if (nextBtn) nextBtn.style.display = hasMany ? "inline-flex" : "none";
+};
+
+const step = (dir) => {
+idx = (idx + dir + images.length) % images.length;
+render();
+};
+
+$("#proofClose")?.addEventListener("click", closeModal);
+prevBtn?.addEventListener("click", () => step(-1));
+nextBtn?.addEventListener("click", () => step(1));
+
+render();
+}
+
 /* Embed modal */
 function openBadgeEmbedModal(landlordId) {
 const l = DB.landlords.find((x) => x.id === landlordId);
@@ -2472,6 +2520,7 @@ app.innerHTML = `
  `;
 ensureHashLinkRouting();
 updateAccountLinks();
+ensureProofViewerHandlers();
 }
 
 /* -----------------------------
@@ -3925,7 +3974,7 @@ return `
              it.href
            )}">${esc(it.label)}</a></div>
            <div class="smallNote" style="margin-top:10px;">${esc(it.r.text || "")}</div>
-           ${it.r.proofFiles && it.r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofFiles(it.r.proofFiles)}` : ""}
+           ${it.r.proofFiles && it.r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofGallery(it.r.proofFiles, `hub_${esc(it.r.id)}`)}` : ""}
            ${
              reply
                ? `
@@ -4625,6 +4674,26 @@ const items = files
 return `<div class="proofPreviewGrid">${items}</div>`;
 }
 
+function renderProofGallery(files, groupId) {
+const list = Array.isArray(files) ? files : [];
+const images = list.filter((f) => f && f.dataUrl);
+if (!images.length) return "";
+window.__casaProofSets = window.__casaProofSets || {};
+window.__casaProofSets[groupId] = images;
+const items = images
+  .map((f, idx) => {
+    return `
+      <button class="proofThumbBtn" type="button" data-proof-view="${esc(groupId)}" data-proof-idx="${esc(
+      idx
+    )}" aria-label="Open proof photo">
+        <img class="proofThumb" src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" />
+      </button>
+    `.trim();
+  })
+  .join("");
+return `<div class="proofPreviewGrid">${items}</div>`;
+}
+
 function renderEditableProofFiles(files, formId) {
 const list = Array.isArray(files) ? files : [];
 const items = list
@@ -4652,7 +4721,6 @@ return items ? `<div class="proofPreviewGrid">${items}</div>` : "";
 function readProofFiles(fileList, maxCount) {
 const files = Array.from(fileList || []);
 if (!files.length) return Promise.resolve([]);
-const maxBytes = 1500000;
 const capped = Number.isFinite(maxCount) ? Math.max(0, Math.min(files.length, maxCount)) : files.length;
 const limited = files.slice(0, capped);
 if (maxCount != null && files.length > capped) {
@@ -4663,10 +4731,6 @@ limited.map(
   (f) =>
     new Promise((resolve) => {
       if (!f || typeof f.size !== "number") return resolve(null);
-      if (f.size > maxBytes) {
-        alert(`File too large: ${f.name}. Max 1.5MB.`);
-        return resolve(null);
-      }
       if (f.type && f.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = () =>
@@ -4739,6 +4803,18 @@ if (!file) {
 list[i] = null;
 setProofListToDOM(formId, list);
 return;
+}
+
+function ensureProofViewerHandlers() {
+if (window.__casaProofViewerBound) return;
+window.__casaProofViewerBound = true;
+document.addEventListener("click", (e) => {
+const btn = e.target && e.target.closest ? e.target.closest("[data-proof-view]") : null;
+if (!btn) return;
+const setId = btn.getAttribute("data-proof-view") || "";
+const idx = Number(btn.getAttribute("data-proof-idx") || 0);
+openProofViewer(setId, idx);
+});
 }
 const read = await readProofFiles([file], 1);
 list[i] = read.length ? read[0] : null;
@@ -5127,7 +5203,7 @@ return `
            </div>
 
            <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
-           ${r.proofFiles && r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofFiles(r.proofFiles)}` : ""}
+           ${r.proofFiles && r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofGallery(r.proofFiles, `review_${esc(r.id)}`)}` : ""}
            ${replyHTML}
            ${respondHTML}
          </div>

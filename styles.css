@@ -138,6 +138,12 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   flex-wrap:wrap;
   margin-top:8px;
 }
+.proofThumbBtn{
+  border:0;
+  padding:0;
+  background:transparent;
+  cursor:pointer;
+}
 .proofPreviewItem{
   position:relative;
   display:inline-flex;
@@ -162,6 +168,27 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   border-radius:8px;
   border:1px solid rgba(20,16,12,.12);
   background:rgba(255,255,255,.6);
+}
+.proofLightbox{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+.proofLightboxImg{
+  max-width:min(82vw, 680px);
+  max-height:70vh;
+  border-radius:14px;
+  border:1px solid rgba(20,16,12,.12);
+  background: rgba(255,255,255,.6);
+}
+.proofNav{
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  border:1px solid rgba(20,16,12,.12);
+  background: rgba(255,255,255,.85);
+  font-weight:900;
 }
 @media (max-width: 880px){
   .proofGrid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
@@ -488,4 +515,30 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .toolkitGrid{grid-template-columns:1fr}
   .h1{font-size:36px}
   .resultsGrid{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .wrap{padding:0 14px}
+  .pad{padding:14px}
+  .h1{font-size:30px}
+  .pageTitle{font-size:20px}
+  .heroSearch{flex-direction:column}
+  .heroSearch .input{min-width:0;width:100%}
+  .heroSearch .btn{width:100%}
+  .sectionHead{flex-direction:column;align-items:flex-start}
+  .sectionHead .btn{align-self:flex-start}
+  .lc{flex-direction:column;align-items:flex-start}
+  .lcRight{align-items:flex-start;width:100%}
+  .map{height:240px}
+  .modal{width:min(720px, 100%)}
+}
+@media (max-width:520px){
+  .nav__inner{padding:10px 0}
+  .brand__name{font-size:20px}
+  .btn{padding:9px 12px}
+  .miniBtn{padding:8px 10px}
+  .input,.textarea,select.input{font-size:13px}
+  .proofThumb{width:72px;height:72px}
+  .modalBody{padding:12px}
+  .modalHead{padding:12px}
+  .modalFoot{padding:12px}
 }
