@@ -4252,7 +4252,10 @@ const content = `
              l.description ? sanitizeDescription(l.description) : esc(l.entity || "—")
            }</div>
          </div>
-         <a class="btn" href="#/search">Back</a>
+         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+           <a class="btn" href="#/search">Back</a>
+           <a class="tiny" href="#/portal?mode=login&umode=signup">Are you the owner?</a>
+         </div>
        </div>
 
        <div class="hr"></div>
@@ -4374,25 +4377,6 @@ const content = `
            </div>
 
            <div class="hr"></div>
-
-           ${
-             !isLandlordSignedIn()
-               ? `
-                 <div class="kicker">Sign in</div>
-                 <div class="card bubble--white" style="box-shadow:none;">
-                   <div class="pad">
-                     <div class="muted" style="font-weight:900; line-height:1.55;">
-                       Landlords can respond to reviews after signing in.
-                     </div>
-                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-                       <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Login</a>
-                       <a class="btn" href="#/portal?mode=signup&umode=signup">Landlord sign up</a>
-                     </div>
-                   </div>
-                 </div>
-               `
-               : ""
-           }
 
            <div style="margin-top:14px;">
              <div class="kicker">Reviews</div>
