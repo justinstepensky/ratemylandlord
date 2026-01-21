@@ -4615,14 +4615,14 @@ if (!Array.isArray(files) || !files.length) return "";
 const items = files
   .map((f) => {
     if (f && f.dataUrl) {
-      return `<img src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(20,16,12,.12);" />`;
+      return `<img class="proofThumb" src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" />`;
     }
-    return `<span class="tiny" style="padding:6px 8px;border-radius:8px;border:1px solid rgba(20,16,12,.12);background:rgba(255,255,255,.6);">${esc(
+    return `<span class="tiny proofFileChip">${esc(
       f && f.name ? f.name : "Attachment"
     )}</span>`;
   })
   .join("");
-return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`;
+return `<div class="proofPreviewGrid">${items}</div>`;
 }
 
 function renderEditableProofFiles(files, formId) {
@@ -4631,24 +4631,22 @@ const items = list
   .map((f, idx) => {
     if (!f) return "";
     const preview = f && f.dataUrl
-      ? `<img src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(20,16,12,.12);" />`
-      : `<span class="tiny" style="padding:6px 8px;border-radius:8px;border:1px solid rgba(20,16,12,.12);background:rgba(255,255,255,.6);">${esc(
+      ? `<img class="proofThumb" src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" />`
+      : `<span class="tiny proofFileChip">${esc(
           f && f.name ? f.name : "Attachment"
         )}</span>`;
     return `
-      <div style="position:relative; display:inline-flex; align-items:center; justify-content:center;">
+      <div class="proofPreviewItem">
         ${preview}
-        <button class="btn miniBtn" type="button" data-proof-remove="${esc(idx)}" data-proof-form="${esc(
+        <button class="btn miniBtn proofRemove" type="button" data-proof-remove="${esc(idx)}" data-proof-form="${esc(
           formId
-        )}" style="position:absolute; top:-8px; right:-8px; padding:4px 6px;">×</button>
+        )}">×</button>
       </div>
     `.trim();
   })
   .filter(Boolean)
   .join("");
-return items
-  ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`
-  : "";
+return items ? `<div class="proofPreviewGrid">${items}</div>` : "";
 }
 
 function readProofFiles(fileList, maxCount) {
