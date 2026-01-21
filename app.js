@@ -4869,11 +4869,11 @@ return `
 
        <div class="field">
          <label>Attach proof (optional)</label>
-         <div style="display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px;">
+         <div class="proofGrid">
            ${[0, 1, 2, 3, 4]
              .map(
                (i) =>
-                 `<input class="input" id="rev_${esc(formId)}Proof_${i}" type="file" accept="image/*" />`
+                 `<input class="input proofInput" id="rev_${esc(formId)}Proof_${i}" type="file" accept="image/*" />`
              )
              .join("")}
          </div>
