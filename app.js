@@ -761,6 +761,68 @@ const a = p.address || {};
 return norm(`${a.line1 || ""} ${a.unit || ""} ${a.city || ""} ${a.state || ""} ${p.borough || ""}`);
 }
 
+function normalizeSearchText(s) {
+return String(s || "")
+.toLowerCase()
+.trim()
+.replace(/[\s\-_.]+/g, " ")
+.replace(/[^\w\s]/g, "");
+}
+
+function levenshtein(a, b) {
+const s = String(a || "");
+const t = String(b || "");
+if (s === t) return 0;
+const n = s.length;
+const m = t.length;
+if (!n) return m;
+if (!m) return n;
+const dp = Array.from({ length: n + 1 }, () => new Array(m + 1));
+for (let i = 0; i <= n; i += 1) dp[i][0] = i;
+for (let j = 0; j <= m; j += 1) dp[0][j] = j;
+for (let i = 1; i <= n; i += 1) {
+for (let j = 1; j <= m; j += 1) {
+const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+dp[i][j] = Math.min(
+dp[i - 1][j] + 1,
+dp[i][j - 1] + 1,
+dp[i - 1][j - 1] + cost
+);
+}
+}
+return dp[n][m];
+}
+
+function similarity(a, b) {
+const s = String(a || "");
+const t = String(b || "");
+if (!s || !t) return 0;
+const dist = levenshtein(s, t);
+return 1 - dist / Math.max(s.length, t.length);
+}
+
+function fuzzyScore(query, text) {
+const q = normalizeSearchText(query);
+const t = normalizeSearchText(text);
+if (!q) return 1;
+if (!t) return 0;
+if (q.length <= 2) return t.includes(q) ? 1 : 0;
+if (t.includes(q)) return 1;
+let best = similarity(q, t);
+const tTokens = t.split(" ").filter(Boolean);
+const qTokens = q.split(" ").filter(Boolean);
+for (const token of tTokens) {
+best = Math.max(best, similarity(q, token));
+}
+if (qTokens.length > 1 && tTokens.length >= qTokens.length) {
+for (let i = 0; i <= tTokens.length - qTokens.length; i += 1) {
+const phrase = tTokens.slice(i, i + qTokens.length).join(" ");
+best = Math.max(best, similarity(q, phrase));
+}
+}
+return best;
+}
+
 function findExactLandlord(query) {
 const q = norm(query);
 if (!q) return null;
@@ -2684,7 +2746,6 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
-wireCategoryRatingToStars(`landlord_${l.id}`, true);
 
 // Region selector wiring for Search page (wired only through refresh to avoid stacking)
 // (do nothing here)
@@ -2719,25 +2780,6 @@ qEl?.addEventListener("input", () => {
   runSearchAndRender();
 });
 
-function matchesLandlord(l, query) {
-const t = (query || "").toLowerCase();
-const hay = landlordHaystack(l);
-return !t || hay.includes(t);
-}
-function matchesProperty(p, query) {
-const t = (query || "").toLowerCase();
-const hay = propertyHaystack(p);
-return !t || hay.includes(t);
-}
-
-function normalizeName(s) {
-return String(s || "")
-.toLowerCase()
-.trim()
-.replace(/[\s\-_.]+/g, " ")
-.replace(/[^\w\s]/g, "");
-}
-
 function refreshSearchRegionUI() {
 const wrap = document.getElementById("searchRegion");
 if (!wrap) return;
@@ -2755,15 +2797,19 @@ runSearchAndRender();
 function runSearchAndRender() {
 const query = qEl ? qEl.value.trim() : "";
 
-const nq = normalizeName(query);
+const nq = normalizeSearchText(query);
 const exactLandlords = !nq
 ? []
-: DB.landlords.filter((l) => normalizeName(l.name) === nq || (l.entity && normalizeName(l.entity) === nq));
+: DB.landlords.filter(
+(l) =>
+normalizeSearchText(l.name) === nq ||
+(l.entity && normalizeSearchText(l.entity) === nq)
+);
 if (exactLandlords.length === 1) return (location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`);
 
 const exactProps = !nq
 ? []
-: DB.properties.filter((p) => normalizeName((p.address && p.address.line1) || "") === nq);
+: DB.properties.filter((p) => normalizeSearchText((p.address && p.address.line1) || "") === nq);
 if (exactProps.length === 1) return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
 
 // Auto-switch region if user typed a recognized state code (NY/FL/CA/IL/MA)
@@ -2778,9 +2824,22 @@ refreshSearchRegionUI();
 }
 
 const regionKey = getRegionKey();
-const props = filterPropertiesByRegion(DB.properties, regionKey).filter((p) => matchesProperty(p, query));
-const landlordIdsInRegion = new Set(props.map((p) => p.landlordId));
-const landlords = DB.landlords.filter((l) => matchesLandlord(l, query) && landlordIdsInRegion.has(l.id));
+const propsInRegion = filterPropertiesByRegion(DB.properties, regionKey);
+const landlordIdsInRegion = new Set(propsInRegion.map((p) => p.landlordId));
+const minScore = query ? 0.62 : 0;
+
+const props = propsInRegion
+.map((p) => ({ p, score: fuzzyScore(query, propertyHaystack(p)) }))
+.filter((x) => x.score >= minScore)
+.sort((a, b) => b.score - a.score)
+.map((x) => x.p);
+
+const landlords = DB.landlords
+.filter((l) => landlordIdsInRegion.has(l.id))
+.map((l) => ({ l, score: fuzzyScore(query, landlordHaystack(l)) }))
+.filter((x) => x.score >= minScore)
+.sort((a, b) => b.score - a.score)
+.map((x) => x.l);
 
 if (lResEl) lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
 if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
