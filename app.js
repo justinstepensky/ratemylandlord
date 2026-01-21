@@ -4590,10 +4590,6 @@ const content = `
              ${reviewFormHTML("property", p.id)}
            </div>
 
-           <div style="margin-top:14px;">
-             <div class="kicker">Reviews</div>
-             <div class="list" id="propertyReviews" style="margin-top:10px;"></div>
-           </div>
          </div>
 
          <div>
@@ -4608,14 +4604,8 @@ const content = `
 
            <div class="hr"></div>
 
-           <div class="kicker">Tip</div>
-           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
-             <div class="pad">
-               <div class="muted" style="font-weight:900; line-height:1.55;">
-                 Rate the building for conditions. Rate the landlord for management behavior.
-               </div>
-             </div>
-           </div>
+           <div class="kicker">Reviews</div>
+           <div class="list" id="propertyReviews" style="margin-top:10px;"></div>
          </div>
        </div>
 
