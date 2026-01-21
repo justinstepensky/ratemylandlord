@@ -109,17 +109,21 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 }
 .proofInput{
   font-size:11px;
-  padding:6px 8px;
+  padding:6px 0;
+  text-align:center;
 }
 .proofInput::file-selector-button{
-  padding:6px 8px;
-  margin-right:8px;
+  display:block;
+  width:100%;
+  padding:6px 0;
+  margin:0;
   border-radius:10px;
-  border:1px solid rgba(20,16,12,.14);
-  background: rgba(255,255,255,.65);
+  border:0;
+  background: transparent;
   font-weight:800;
   font-size:11px;
   color: rgba(21,17,14,.9);
+  text-align:center;
 }
 @media (max-width: 880px){
   .proofGrid{ grid-template-columns: repeat(3, minmax(0,1fr)); }

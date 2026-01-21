@@ -4626,9 +4626,10 @@ return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${it
 }
 
 function renderEditableProofFiles(files, formId) {
-if (!Array.isArray(files) || !files.length) return "";
-const items = files
+const list = Array.isArray(files) ? files : [];
+const items = list
   .map((f, idx) => {
+    if (!f) return "";
     const preview = f && f.dataUrl
       ? `<img src="${esc(f.dataUrl)}" alt="${esc(f.name || "Proof")}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid rgba(20,16,12,.12);" />`
       : `<span class="tiny" style="padding:6px 8px;border-radius:8px;border:1px solid rgba(20,16,12,.12);background:rgba(255,255,255,.6);">${esc(
@@ -4643,8 +4644,11 @@ const items = files
       </div>
     `.trim();
   })
+  .filter(Boolean)
   .join("");
-return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`;
+return items
+  ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${items}</div>`
+  : "";
 }
 
 function readProofFiles(fileList, maxCount) {
@@ -4694,6 +4698,13 @@ if (f) files.push(f);
 return files;
 }
 
+function normalizeProofList(files) {
+const list = Array.isArray(files) ? files.slice(0, 5) : [];
+const out = new Array(5).fill(null);
+for (let i = 0; i < list.length && i < 5; i += 1) out[i] = list[i];
+return out;
+}
+
 function getProofListFromDOM(formId) {
 const el = document.getElementById(`rev_${formId}ProofList`);
 if (!el) return [];
@@ -4709,7 +4720,7 @@ return [];
 function setProofListToDOM(formId, files) {
 const el = document.getElementById(`rev_${formId}ProofList`);
 if (!el) return;
-const safe = Array.isArray(files) ? files : [];
+const safe = normalizeProofList(files);
 el.setAttribute("data-proof", JSON.stringify(safe));
 el.innerHTML = renderEditableProofFiles(safe, formId);
 }
@@ -4717,12 +4728,33 @@ el.innerHTML = renderEditableProofFiles(safe, formId);
 function wireReviewProofEditor(formId) {
 const root = document.getElementById(`rev_${formId}ProofWrap`);
 if (!root) return;
-const current = getProofListFromDOM(formId);
+const current = normalizeProofList(getProofListFromDOM(formId));
 setProofListToDOM(formId, current);
+
+for (let i = 0; i < 5; i += 1) {
+const input = document.getElementById(`rev_${formId}Proof_${i}`);
+if (!input) continue;
+input.addEventListener("change", async () => {
+const file = input.files && input.files[0] ? input.files[0] : null;
+const list = getProofListFromDOM(formId);
+if (!file) {
+list[i] = null;
+setProofListToDOM(formId, list);
+return;
+}
+const read = await readProofFiles([file], 1);
+list[i] = read.length ? read[0] : null;
+setProofListToDOM(formId, list);
+});
+}
 
 root.querySelectorAll("[data-proof-clear]").forEach((btn) => {
 btn.addEventListener("click", () => {
 setProofListToDOM(formId, []);
+for (let i = 0; i < 5; i += 1) {
+const input = document.getElementById(`rev_${formId}Proof_${i}`);
+if (input) input.value = "";
+}
 });
 });
 
@@ -4732,8 +4764,10 @@ if (!btn) return;
 const idx = Number(btn.getAttribute("data-proof-remove"));
 if (!Number.isFinite(idx)) return;
 const list = getProofListFromDOM(formId);
-list.splice(idx, 1);
+list[idx] = null;
 setProofListToDOM(formId, list);
+const input = document.getElementById(`rev_${formId}Proof_${idx}`);
+if (input) input.value = "";
 });
 }
 
@@ -5425,12 +5459,7 @@ return;
 }
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const existingProof = getProofListFromDOM(formId);
-const proofFilesNew = await readProofFiles(
-  collectProofInputs(formId),
-  Math.max(0, 5 - existingProof.length)
-);
-const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
+const proofFiles = getProofListFromDOM(formId).filter(Boolean);
 
 const categoryStars = {
 responsivenessCommunication: Number($(`#rev_${formId}_respComm`)?.value || 5),
@@ -5446,7 +5475,7 @@ if (existing) {
 existing.stars = overallStars;
 existing.categoryStars = categoryStars;
 existing.text = text;
-if (proofFiles.length) existing.proofFiles = proofFiles;
+existing.proofFiles = proofFiles;
 existing.createdAt = Date.now();
 } else {
 DB.reviews.unshift({
@@ -5673,12 +5702,7 @@ return;
 const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
-const existingProof = getProofListFromDOM(formId);
-const proofFilesNew = await readProofFiles(
-  collectProofInputs(formId),
-  Math.max(0, 5 - existingProof.length)
-);
-const proofFiles = existingProof.concat(proofFilesNew).slice(0, 5);
+const proofFiles = getProofListFromDOM(formId).filter(Boolean);
 
 const categories = {
 comm: Number($(`#rev_${formId}_comm`)?.value || 5),
@@ -5693,7 +5717,7 @@ if (existing) {
 existing.stars = stars;
 existing.categories = categories;
 existing.text = text;
-if (proofFiles.length) existing.proofFiles = proofFiles;
+existing.proofFiles = proofFiles;
 existing.createdAt = Date.now();
 } else {
 DB.reviews.unshift({
