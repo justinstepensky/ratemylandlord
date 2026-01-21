@@ -378,6 +378,9 @@ notifyRequests: [],
 publicInquiries: [],
 blockedSenders: [],
 messageReports: [],
+tenantBlocks: [],
+tenantIssues: [],
+tenantRentals: [],
 landlordUsers: [],
 users: [],
 currentUserId: "",
@@ -402,6 +405,9 @@ notifyRequests: Array.isArray(db.notifyRequests) ? db.notifyRequests : [],
 publicInquiries: Array.isArray(db.publicInquiries) ? db.publicInquiries : [],
 blockedSenders: Array.isArray(db.blockedSenders) ? db.blockedSenders : [],
 messageReports: Array.isArray(db.messageReports) ? db.messageReports : [],
+tenantBlocks: Array.isArray(db.tenantBlocks) ? db.tenantBlocks : [],
+tenantIssues: Array.isArray(db.tenantIssues) ? db.tenantIssues : [],
+tenantRentals: Array.isArray(db.tenantRentals) ? db.tenantRentals : [],
 landlordUsers: Array.isArray(db.landlordUsers) ? db.landlordUsers : [],
 users: Array.isArray(db.users) ? db.users : [],
 currentUserId: typeof db.currentUserId === "string" ? db.currentUserId : "",
@@ -480,6 +486,15 @@ out.users = out.users
 .map((u) => ({
 id: String(u && u.id ? u.id : ""),
 email: String(u && u.email ? u.email : ""),
+name: String(u && u.name ? u.name : ""),
+verifiedEmail: !!(u && u.verifiedEmail),
+verificationStatus: String(u && u.verificationStatus ? u.verificationStatus : "none"),
+verificationDocs: Array.isArray(u && u.verificationDocs) ? u.verificationDocs : [],
+alias: String(u && u.alias ? u.alias : ""),
+hideIdentity: !!(u && u.hideIdentity),
+savedLandlords: Array.isArray(u && u.savedLandlords) ? u.savedLandlords : [],
+savedProperties: Array.isArray(u && u.savedProperties) ? u.savedProperties : [],
+notifications: u && typeof u.notifications === "object" ? u.notifications : {},
 createdAt: Number(u && u.createdAt ? u.createdAt : Date.now()),
 }))
 .filter((u) => u.id && u.email);
@@ -765,6 +780,26 @@ return (DB.threads || []).find(
 );
 }
 
+function getThreadsForTenant(email) {
+return (DB.threads || [])
+  .filter((t) => t && norm(t.tenantEmail) === norm(email))
+  .sort((a, b) => (Number(b.lastMessageAt) || 0) - (Number(a.lastMessageAt) || 0));
+}
+
+function isLandlordBlockedByTenant(userId, landlordId) {
+return (DB.tenantBlocks || []).some(
+  (b) => b && b.userId === userId && b.landlordId === landlordId
+);
+}
+
+function isLandlordSavedByUser(user, landlordId) {
+return !!(user && Array.isArray(user.savedLandlords) && user.savedLandlords.includes(landlordId));
+}
+
+function isPropertySavedByUser(user, propertyId) {
+return !!(user && Array.isArray(user.savedProperties) && user.savedProperties.includes(propertyId));
+}
+
 function getThreadsForLandlord(landlordId) {
 return (DB.threads || [])
   .filter((t) => t && t.landlordId === landlordId)
@@ -782,6 +817,49 @@ const raw = String(text || "");
 if (raw.length < 8) return true;
 const hit = /(viagra|crypto|bitcoin|casino|wire transfer|loan offer|free money)/i;
 return hit.test(raw);
+}
+
+function openThreadExportModal(thread) {
+if (!thread) return;
+const messages = getMessagesForThread(thread.id);
+const header = `Conversation with ${thread.tenantEmail || "Tenant"} — ${fmtDate(thread.createdAt)}\n\n`;
+const body = messages
+  .map((m) => {
+    const who = m.senderType === "landlord" ? "Landlord" : m.senderEmail || "Tenant";
+    return `[${fmtDate(m.createdAt)}] ${who}: ${m.body || ""}`;
+  })
+  .join("\n");
+const text = header + body;
+
+openModal(`
+  <div class="modalHead">
+    <div class="modalTitle">Export conversation</div>
+    <button class="iconBtn" id="exportClose" aria-label="Close" type="button">×</button>
+  </div>
+  <div class="modalBody">
+    <textarea class="textarea" id="exportText" style="min-height:220px;">${esc(text)}</textarea>
+  </div>
+  <div class="modalFoot">
+    <button class="btn" id="exportCopy" type="button">Copy</button>
+    <button class="btn btn--primary" id="exportDone" type="button">Done</button>
+  </div>
+`);
+
+$("#exportClose")?.addEventListener("click", closeModal);
+$("#exportDone")?.addEventListener("click", closeModal);
+$("#exportCopy")?.addEventListener("click", async () => {
+try {
+const val = $("#exportText")?.value || "";
+if (navigator.clipboard && navigator.clipboard.writeText) {
+await navigator.clipboard.writeText(val);
+alert("Copied to clipboard.");
+} else {
+alert("Copy the text manually.");
+}
+} catch {
+alert("Copy failed. You can select and copy manually.");
+}
+});
 }
 
 function idRand(prefix) {
@@ -975,7 +1053,13 @@ return sum / vals.length;
 
 function reviewsFor(targetType, targetId) {
 return DB.reviews
-.filter((r) => r.targetType === targetType && r.targetId === targetId)
+.filter(
+  (r) =>
+    r.targetType === targetType &&
+    r.targetId === targetId &&
+    r.status !== "removed" &&
+    r.status !== "under_review"
+)
 .sort((a, b) => b.createdAt - a.createdAt);
 }
 
@@ -1868,6 +1952,11 @@ if (!canDeliver) {
 openMessageFallbackModal(landlord, property);
 return;
 }
+ if (!isUserSignedIn()) {
+ alert("Sign in to message a landlord.");
+ location.hash = "#/portal?umode=login&role=tenant";
+ return;
+ }
 const title = property
   ? `${property.address?.line1 || "Property"}${property.address?.unit ? `, ${property.address.unit}` : ""}`
   : landlord.name;
@@ -4047,12 +4136,13 @@ if (userMode === "signup") {
 const existing = DB.users.find((u) => u && u.email && norm(u.email) === norm(email));
 if (existing) {
 DB.currentUserId = existing.id;
+existing.verifiedEmail = true;
 persist();
 alert("Demo: account already exists. Signed you in.");
 navigateTo("#/account");
 return;
 }
-const user = { id: idRand("u"), email, createdAt: Date.now() };
+const user = { id: idRand("u"), email, verifiedEmail: true, createdAt: Date.now() };
 DB.users.push(user);
 DB.currentUserId = user.id;
 persist();
@@ -4066,6 +4156,7 @@ if (!match) {
 alert("No account found for that email. Create one first.");
 return;
 }
+match.verifiedEmail = true;
 DB.currentUserId = match.id;
 persist();
 alert("Demo: signed in (no real auth wired).");
@@ -4402,6 +4493,746 @@ renderShell(`
     </section>
   `);
 return;
+}
+
+function renderTenantPortal() {
+setPageTitle("Tenant portal");
+const user = currentUser();
+if (!user) {
+return;
+}
+
+const tab = getQueryParam("tab") || "dashboard";
+const threadId = getQueryParam("thread") || "";
+const filter = getQueryParam("filter") || "all";
+const threads = getThreadsForTenant(user.email || "");
+const filteredThreads = threads.filter((t) => {
+if (filter === "landlord") return !t.propertyId;
+if (filter === "property") return !!t.propertyId;
+if (filter === "closed") return t.status === "closed";
+return true;
+});
+const selectedThread =
+filteredThreads.find((t) => t.id === threadId) || filteredThreads[0] || null;
+if (selectedThread && Number(selectedThread.unreadByTenant || 0) > 0) {
+selectedThread.unreadByTenant = 0;
+persist();
+}
+
+const userReviews = (DB.reviews || []).filter((r) => r && r.userId === user.id);
+const savedLandlords = (user.savedLandlords || [])
+.map((id) => DB.landlords.find((l) => l && l.id === id))
+.filter(Boolean);
+const savedProperties = (user.savedProperties || [])
+.map((id) => DB.properties.find((p) => p && p.id === id))
+.filter(Boolean);
+const rentals = (DB.tenantRentals || []).filter((r) => r && r.userId === user.id);
+const issues = (DB.tenantIssues || []).filter((i) => i && i.userId === user.id);
+
+const accountAgeDays = Math.max(1, Math.floor((Date.now() - (user.createdAt || Date.now())) / (1000 * 60 * 60 * 24)));
+const proofUploaded = userReviews.some((r) => r && Array.isArray(r.proofFiles) && r.proofFiles.length);
+const verificationStatus = user.verificationStatus || "none";
+const credibilityItems = [
+`Verified email: ${user.verifiedEmail ? "Yes" : "No"}`,
+`Proof uploaded: ${proofUploaded ? "Yes" : "No"}`,
+`Account age: ${accountAgeDays} day${accountAgeDays === 1 ? "" : "s"}`,
+`Past reviews: ${userReviews.length}`,
+];
+
+const tabBtn = (key, label) =>
+`<a class="btn ${tab === key ? "btn--primary" : ""}" href="#/account?tab=${key}">${esc(label)}</a>`;
+
+const threadListHTML = filteredThreads.length
+? filteredThreads
+  .map((t) => {
+    const l = DB.landlords.find((x) => x && x.id === t.landlordId);
+    const p = t.propertyId ? DB.properties.find((x) => x && x.id === t.propertyId) : null;
+    const title = p ? buildFullAddress(p) : l ? l.name : "Landlord";
+    const unread = Number(t.unreadByTenant || 0);
+    return `
+      <button class="threadItem ${t.id === (selectedThread && selectedThread.id) ? "isActive" : ""}" data-tenant-thread="${esc(
+        t.id
+      )}" type="button">
+        <div class="threadTitle">${esc(title)}</div>
+        <div class="threadMeta">${esc(l ? l.name : "Landlord")} • ${esc(t.topic || "general")}</div>
+        <div class="threadPreview">${esc(t.lastMessagePreview || "New message")}</div>
+        ${unread ? `<span class="threadBadge">${unread}</span>` : ""}
+      </button>
+    `.trim();
+  })
+  .join("")
+: `<div class="muted">No messages yet.</div>`;
+
+const messages = selectedThread ? getMessagesForThread(selectedThread.id) : [];
+const tenantThreadHTML = selectedThread
+? `
+  <div class="threadHead">
+    <div>
+      <div class="kicker">Conversation</div>
+      <div class="threadTitle">${esc(selectedThread.tenantEmail)}</div>
+      <div class="tiny" style="margin-top:4px;">
+        ${selectedThread.propertyId ? `Property: ${esc(buildFullAddress(DB.properties.find((p) => p && p.id === selectedThread.propertyId) || {}))}` : "Landlord profile"}
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <button class="btn miniBtn" id="tenantBlockBtn" type="button">Block landlord</button>
+      <button class="btn miniBtn" id="tenantReportBtn" type="button">Report harassment</button>
+      <button class="btn miniBtn" id="tenantExportBtn" type="button">Export</button>
+    </div>
+  </div>
+  <div class="threadMessages">
+    ${
+      messages.length
+        ? messages
+            .map((m) => {
+              const isLandlord = m.senderType === "landlord";
+              return `
+                <div class="threadMessage ${isLandlord ? "threadMessage--landlord" : "threadMessage--tenant"}">
+                  <div class="threadBubble">${esc(m.body || "")}</div>
+                  <div class="threadMeta">${esc(isLandlord ? "Landlord" : "You")} • ${esc(
+                    fmtDate(m.createdAt)
+                  )}</div>
+                </div>
+              `.trim();
+            })
+            .join("")
+        : `<div class="muted">No messages yet.</div>`
+    }
+  </div>
+  <div class="hr"></div>
+  <div class="field">
+    <label>Reply</label>
+    <textarea class="textarea" id="tenantReplyText" placeholder="Write a reply..."></textarea>
+  </div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn--primary" id="tenantReplySend" type="button">Send reply</button>
+  </div>
+`
+: `<div class="muted">Select a thread to view messages.</div>`;
+
+const content = `
+  <section class="pageCard card">
+    <div class="pad">
+      <div class="topRow">
+        <div>
+          <div class="kicker">Tenant portal</div>
+          <div class="pageTitle">Welcome back</div>
+          <div class="pageSub">Inbox, reviews, saved items, and documentation.</div>
+        </div>
+        <a class="btn" href="#/">Home</a>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        ${tabBtn("dashboard", "Dashboard")}
+        ${tabBtn("inbox", "Inbox")}
+        ${tabBtn("reviews", "My Reviews")}
+        ${tabBtn("saved", "Saved")}
+        ${tabBtn("rentals", "My Rentals")}
+        ${tabBtn("issues", "Issue Tracker")}
+        ${tabBtn("notifications", "Notifications")}
+        ${tabBtn("settings", "Settings")}
+      </div>
+
+      <div class="hr"></div>
+
+      ${
+        tab === "dashboard"
+          ? `
+            <div class="twoCol">
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Credibility</div>
+                  <div class="tiny" style="margin-top:8px; line-height:1.6;">
+                    ${credibilityItems.map((i) => esc(i)).join("<br/>")}
+                  </div>
+                  <div class="hr"></div>
+                  <div class="kicker">Verification</div>
+                  <div class="tiny" style="margin-top:6px;">Status: <b>${esc(verificationStatus)}</b></div>
+                </div>
+              </div>
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Quick stats</div>
+                  <div class="tiny" style="margin-top:8px;">
+                    Messages: ${threads.length}<br/>
+                    Reviews: ${userReviews.length}<br/>
+                    Saved landlords: ${savedLandlords.length}<br/>
+                    Saved properties: ${savedProperties.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "inbox"
+          ? `
+            <div class="portalFilters">
+              <button class="btn miniBtn ${filter === "all" ? "btn--primary" : ""}" data-tenant-filter="all" type="button">All</button>
+              <button class="btn miniBtn ${filter === "landlord" ? "btn--primary" : ""}" data-tenant-filter="landlord" type="button">Landlord chats</button>
+              <button class="btn miniBtn ${filter === "property" ? "btn--primary" : ""}" data-tenant-filter="property" type="button">Property chats</button>
+              <button class="btn miniBtn ${filter === "closed" ? "btn--primary" : ""}" data-tenant-filter="closed" type="button">Closed threads</button>
+            </div>
+            <div class="portalInbox">
+              <div class="threadList">${threadListHTML}</div>
+              <div class="threadPane">${tenantThreadHTML}</div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "reviews"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">Your reviews</div>
+                <div class="list" style="margin-top:10px;">
+                  ${
+                    userReviews.length
+                      ? userReviews
+                          .map((r) => {
+                            const target =
+                              r.targetType === "property"
+                                ? DB.properties.find((p) => p && p.id === r.targetId)
+                                : DB.landlords.find((l) => l && l.id === r.targetId);
+                            const targetLabel =
+                              r.targetType === "property"
+                                ? target
+                                  ? buildFullAddress(target)
+                                  : "Property"
+                                : target
+                                  ? target.name
+                                  : "Landlord";
+                            const status = r.status || "live";
+                            const lastEdit =
+                              r.editHistory && r.editHistory.length
+                                ? r.editHistory[r.editHistory.length - 1].editedAt
+                                : null;
+                            return `
+                              <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="pad">
+                                  <div style="font-weight:900;">${esc(targetLabel)}</div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    Status: ${esc(status)}${r.statusReason ? ` • ${esc(r.statusReason)}` : ""}
+                                  </div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    Last edited: ${esc(lastEdit ? fmtDate(lastEdit) : fmtDate(r.createdAt))}
+                                  </div>
+                                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                    <a class="btn miniBtn" href="#/${esc(r.targetType)}/${esc(
+                                      r.targetId
+                                    )}">Edit review</a>
+                                    <button class="btn miniBtn" type="button" data-tenant-review-delete="${esc(
+                                      r.id
+                                    )}">Delete</button>
+                                  </div>
+                                </div>
+                              </div>
+                            `.trim();
+                          })
+                          .join("")
+                      : `<div class="muted">No reviews yet.</div>`
+                  }
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "saved"
+          ? `
+            <div class="twoCol">
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Saved landlords</div>
+                  <div class="list" style="margin-top:10px;">
+                    ${
+                      savedLandlords.length
+                        ? savedLandlords
+                            .map(
+                              (l) => `
+                                <div class="card bubble--gray" style="box-shadow:none;">
+                                  <div class="pad">
+                                    <div style="font-weight:900;">${esc(l.name)}</div>
+                                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                      <a class="btn miniBtn" href="#/landlord/${esc(l.id)}">View</a>
+                                      <button class="btn miniBtn" type="button" data-tenant-unsave-landlord="${esc(
+                                        l.id
+                                      )}">Remove</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              `
+                            )
+                            .join("")
+                        : `<div class="muted">No saved landlords.</div>`
+                    }
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Saved properties</div>
+                  <div class="list" style="margin-top:10px;">
+                    ${
+                      savedProperties.length
+                        ? savedProperties
+                            .map(
+                              (p) => `
+                                <div class="card bubble--gray" style="box-shadow:none;">
+                                  <div class="pad">
+                                    <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
+                                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                      <a class="btn miniBtn" href="#/property/${esc(p.id)}">View</a>
+                                      <button class="btn miniBtn" type="button" data-tenant-unsave-property="${esc(
+                                        p.id
+                                      )}">Remove</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              `
+                            )
+                            .join("")
+                        : `<div class="muted">No saved properties.</div>`
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "rentals"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">My rentals</div>
+                <div class="list" style="margin-top:10px;">
+                  ${
+                    rentals.length
+                      ? rentals
+                          .map((r) => {
+                            const p = DB.properties.find((x) => x && x.id === r.propertyId);
+                            return `
+                              <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="pad">
+                                  <div style="font-weight:900;">${esc(p ? buildFullAddress(p) : "Property")}</div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    Move-in: ${esc(r.moveIn || "—")} • Move-out: ${esc(r.moveOut || "—")}
+                                  </div>
+                                  <div class="tiny" style="margin-top:6px;">${esc(r.notes || "")}</div>
+                                </div>
+                              </div>
+                            `.trim();
+                          })
+                          .join("")
+                      : `<div class="muted">No rentals saved.</div>`
+                  }
+                </div>
+                <div class="hr"></div>
+                <div class="kicker">Add rental</div>
+                <form id="tenantRentalForm">
+                  <div class="field">
+                    <label>Property</label>
+                    <select class="input" id="tenantRentalProperty">
+                      <option value="">Select a property</option>
+                      ${DB.properties
+                        .map((p) => `<option value="${esc(p.id)}">${esc(buildFullAddress(p))}</option>`)
+                        .join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Move-in date</label>
+                    <input class="input" id="tenantMoveIn" placeholder="MM/DD/YYYY" />
+                  </div>
+                  <div class="field">
+                    <label>Move-out date</label>
+                    <input class="input" id="tenantMoveOut" placeholder="MM/DD/YYYY" />
+                  </div>
+                  <div class="field">
+                    <label>Notes</label>
+                    <textarea class="textarea" id="tenantRentalNotes" placeholder="Heat issue, repairs, etc."></textarea>
+                  </div>
+                  <div class="field">
+                    <label>Upload documents (private)</label>
+                    <input class="input" id="tenantRentalDocs" type="file" multiple />
+                  </div>
+                  <button class="btn btn--primary" type="submit">Save rental</button>
+                </form>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "issues"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">Issue tracker</div>
+                <div class="list" style="margin-top:10px;">
+                  ${
+                    issues.length
+                      ? issues
+                          .map((i) => {
+                            const p = DB.properties.find((x) => x && x.id === i.propertyId);
+                            return `
+                              <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="pad">
+                                  <div style="font-weight:900;">${esc(i.title || "Issue")}</div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    ${esc(p ? buildFullAddress(p) : "General")} • Status: ${esc(i.status || "open")}
+                                  </div>
+                                  <div class="tiny" style="margin-top:6px;">${esc(i.notes || "")}</div>
+                                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                    <button class="btn miniBtn" type="button" data-tenant-issue-close="${esc(
+                                      i.id
+                                    )}">Mark closed</button>
+                                  </div>
+                                </div>
+                              </div>
+                            `.trim();
+                          })
+                          .join("")
+                      : `<div class="muted">No issues logged.</div>`
+                  }
+                </div>
+                <div class="hr"></div>
+                <div class="kicker">Add issue</div>
+                <form id="tenantIssueForm">
+                  <div class="field">
+                    <label>Issue title</label>
+                    <input class="input" id="tenantIssueTitle" placeholder="Heat not working" />
+                  </div>
+                  <div class="field">
+                    <label>Property (optional)</label>
+                    <select class="input" id="tenantIssueProperty">
+                      <option value="">General</option>
+                      ${DB.properties
+                        .map((p) => `<option value="${esc(p.id)}">${esc(buildFullAddress(p))}</option>`)
+                        .join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Notes</label>
+                    <textarea class="textarea" id="tenantIssueNotes" placeholder="Add details..."></textarea>
+                  </div>
+                  <button class="btn btn--primary" type="submit">Create issue</button>
+                </form>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "notifications"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">Notifications</div>
+                <form id="tenantNotifForm">
+                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" id="tenantNotifMessage" ${user.notifications?.message ? "checked" : ""} />
+                    New message
+                  </label>
+                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" id="tenantNotifReview" ${user.notifications?.review ? "checked" : ""} />
+                    Review got a response
+                  </label>
+                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" id="tenantNotifSaved" ${user.notifications?.saved ? "checked" : ""} />
+                    Saved landlord/property updates
+                  </label>
+                  <div style="margin-top:12px;">
+                    <button class="btn btn--primary" type="submit">Save preferences</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "settings"
+          ? `
+            <div class="twoCol">
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Profile & privacy</div>
+                  <form id="tenantSettingsForm">
+                    <div class="field">
+                      <label>Display name</label>
+                      <input class="input" id="tenantName" value="${esc(user.name || "")}" placeholder="Optional" />
+                    </div>
+                    <div class="field">
+                      <label>Casa alias</label>
+                      <input class="input" id="tenantAlias" value="${esc(user.alias || "")}" placeholder="Anonymous" />
+                    </div>
+                    <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                      <input type="checkbox" id="tenantHideIdentity" ${user.hideIdentity ? "checked" : ""} />
+                      Hide my identity (use alias)
+                    </label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                      <button class="btn btn--primary" type="submit">Save</button>
+                      <button class="btn" id="tenantLogout" type="button">Log out</button>
+                    </div>
+                    <div class="hr"></div>
+                    <button class="btn miniBtn" id="tenantDeleteAccount" type="button">Delete account</button>
+                  </form>
+                </div>
+              </div>
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Tenant verification</div>
+                  <div class="tiny" style="margin-top:6px;">Status: <b>${esc(verificationStatus)}</b></div>
+                  <form id="tenantVerifyForm" style="margin-top:10px;">
+                    <div class="field">
+                      <label>Upload proof (private)</label>
+                      <input class="input" id="tenantVerifyDocs" type="file" multiple />
+                    </div>
+                    <button class="btn btn--primary" type="submit">Submit verification</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+  </section>
+`;
+
+renderShell(content);
+ensureRuntimeStyles();
+
+document.querySelectorAll("[data-tenant-thread]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const tid = btn.getAttribute("data-tenant-thread") || "";
+if (!tid) return;
+const params = new URLSearchParams();
+params.set("tab", "inbox");
+if (filter) params.set("filter", filter);
+params.set("thread", tid);
+location.hash = `#/account?${params.toString()}`;
+});
+});
+
+document.querySelectorAll("[data-tenant-filter]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const f = btn.getAttribute("data-tenant-filter") || "all";
+location.hash = `#/account?tab=inbox&filter=${f}`;
+});
+});
+
+$("#tenantBlockBtn")?.addEventListener("click", () => {
+if (!selectedThread) return;
+if (isLandlordBlockedByTenant(user.id, selectedThread.landlordId)) {
+return alert("Landlord already blocked.");
+}
+DB.tenantBlocks = DB.tenantBlocks || [];
+DB.tenantBlocks.push({
+id: idRand("tb"),
+userId: user.id,
+landlordId: selectedThread.landlordId,
+createdAt: Date.now(),
+});
+selectedThread.status = "closed";
+persist();
+alert("Landlord blocked.");
+});
+
+$("#tenantReportBtn")?.addEventListener("click", () => {
+if (!selectedThread) return;
+DB.messageReports = DB.messageReports || [];
+DB.messageReports.push({
+id: idRand("mr"),
+threadId: selectedThread.id,
+landlordId: selectedThread.landlordId,
+email: user.email,
+createdAt: Date.now(),
+});
+persist();
+alert("Report submitted (demo).");
+});
+
+$("#tenantExportBtn")?.addEventListener("click", () => {
+if (!selectedThread) return;
+openThreadExportModal(selectedThread);
+});
+
+$("#tenantReplySend")?.addEventListener("click", () => {
+if (!selectedThread) return;
+const text = $("#tenantReplyText")?.value ? String($("#tenantReplyText").value).trim() : "";
+if (!text) return alert("Write a reply first.");
+if (hasTenantCooldown(selectedThread.id, user.email)) {
+return alert("Please wait a moment before sending another message.");
+}
+const now = Date.now();
+DB.messages.push({
+id: idRand("m"),
+threadId: selectedThread.id,
+senderType: "tenant",
+senderEmail: user.email,
+body: text,
+createdAt: now,
+});
+selectedThread.lastMessageAt = now;
+selectedThread.lastMessagePreview = text.slice(0, 120);
+selectedThread.unreadByLandlord = Number(selectedThread.unreadByLandlord || 0) + 1;
+persist();
+route();
+});
+
+document.querySelectorAll("[data-tenant-review-delete]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const rid = btn.getAttribute("data-tenant-review-delete") || "";
+if (!rid) return;
+if (!confirm("Delete this review?")) return;
+const rev = (DB.reviews || []).find((r) => r && r.id === rid && r.userId === user.id);
+if (rev) {
+rev.status = "removed";
+rev.statusReason = "User deleted";
+persist();
+route();
+}
+});
+});
+
+document.querySelectorAll("[data-tenant-unsave-landlord]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-tenant-unsave-landlord") || "";
+user.savedLandlords = (user.savedLandlords || []).filter((x) => x !== id);
+persist();
+route();
+});
+});
+
+document.querySelectorAll("[data-tenant-unsave-property]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-tenant-unsave-property") || "";
+user.savedProperties = (user.savedProperties || []).filter((x) => x !== id);
+persist();
+route();
+});
+});
+
+document.querySelectorAll("[data-tenant-issue-close]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-tenant-issue-close") || "";
+const issue = (DB.tenantIssues || []).find((i) => i && i.id === id && i.userId === user.id);
+if (!issue) return;
+issue.status = "closed";
+persist();
+route();
+});
+});
+
+$("#tenantRentalForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const propertyId = $("#tenantRentalProperty")?.value || "";
+if (!propertyId) return alert("Select a property.");
+const moveIn = $("#tenantMoveIn")?.value ? $("#tenantMoveIn").value.trim() : "";
+const moveOut = $("#tenantMoveOut")?.value ? $("#tenantMoveOut").value.trim() : "";
+const notes = $("#tenantRentalNotes")?.value ? String($("#tenantRentalNotes").value).trim() : "";
+const files = Array.from($("#tenantRentalDocs")?.files || []);
+DB.tenantRentals = DB.tenantRentals || [];
+DB.tenantRentals.unshift({
+id: idRand("tr"),
+userId: user.id,
+propertyId,
+moveIn,
+moveOut,
+notes,
+docs: files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() })),
+createdAt: Date.now(),
+});
+persist();
+route();
+});
+
+$("#tenantIssueForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const title = $("#tenantIssueTitle")?.value ? $("#tenantIssueTitle").value.trim() : "";
+if (!title) return alert("Enter an issue title.");
+const propertyId = $("#tenantIssueProperty")?.value || "";
+const notes = $("#tenantIssueNotes")?.value ? String($("#tenantIssueNotes").value).trim() : "";
+DB.tenantIssues = DB.tenantIssues || [];
+DB.tenantIssues.unshift({
+id: idRand("ti"),
+userId: user.id,
+propertyId,
+title,
+notes,
+status: "open",
+createdAt: Date.now(),
+});
+persist();
+route();
+});
+
+$("#tenantNotifForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+user.notifications = user.notifications || {};
+user.notifications.message = !!$("#tenantNotifMessage")?.checked;
+user.notifications.review = !!$("#tenantNotifReview")?.checked;
+user.notifications.saved = !!$("#tenantNotifSaved")?.checked;
+persist();
+alert("Preferences saved.");
+});
+
+$("#tenantSettingsForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+user.name = $("#tenantName")?.value ? $("#tenantName").value.trim() : "";
+user.alias = $("#tenantAlias")?.value ? $("#tenantAlias").value.trim() : "";
+user.hideIdentity = !!$("#tenantHideIdentity")?.checked;
+persist();
+alert("Settings updated.");
+});
+
+$("#tenantLogout")?.addEventListener("click", () => {
+DB.currentUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
+
+$("#tenantDeleteAccount")?.addEventListener("click", () => {
+if (!confirm("Delete your account and wipe your data?")) return;
+DB.users = (DB.users || []).filter((u) => u && u.id !== user.id);
+DB.reviews = (DB.reviews || []).filter((r) => r && r.userId !== user.id);
+DB.tenantRentals = (DB.tenantRentals || []).filter((r) => r && r.userId !== user.id);
+DB.tenantIssues = (DB.tenantIssues || []).filter((i) => i && i.userId !== user.id);
+DB.tenantBlocks = (DB.tenantBlocks || []).filter((b) => b && b.userId !== user.id);
+DB.currentUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
+
+$("#tenantVerifyForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const files = Array.from($("#tenantVerifyDocs")?.files || []);
+if (!files.length) return alert("Upload at least one document.");
+user.verificationDocs = (user.verificationDocs || []).concat(
+files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }))
+);
+user.verificationStatus = "pending";
+persist();
+alert("Verification submitted (demo).");
+});
 }
 
 const landlordRecord = landlordUser.landlordId
@@ -4946,6 +5777,11 @@ renderShell(`
 return;
 }
 
+if (user) {
+renderTenantPortal();
+return;
+}
+
 const content = `
    <section class="pageCard card">
      <div class="pad">
@@ -5254,6 +6090,7 @@ function renderAdmin() {
 setPageTitle("Admin");
 const pendingLandlords = DB.landlords.filter((l) => l.verificationStatus === "pending");
 const pendingBuildings = DB.properties.filter((p) => p.buildingVerificationStatus === "pending");
+const pendingTenants = (DB.users || []).filter((u) => u && u.verificationStatus === "pending");
 
 const content = `
    <section class="pageCard card">
@@ -5293,6 +6130,32 @@ const content = `
                        )
                        .join("")
                    : `<div class="muted">No pending landlords.</div>`
+               }
+             </div>
+
+             <div class="hr"></div>
+
+             <div class="kicker">Pending tenants</div>
+             <div class="list" style="margin-top:10px;">
+               ${
+                 pendingTenants.length
+                   ? pendingTenants
+                       .map(
+                         (u) => `
+                           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.60);">
+                             <div class="pad">
+                               <div style="font-weight:900;">${esc(u.email)}</div>
+                               <div class="tiny" style="margin-top:6px;">Docs: ${esc(String(u.verificationDocs?.length || 0))}</div>
+                               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                 <button class="btn" data-admin-approve-tenant="${esc(u.id)}">Approve</button>
+                                 <button class="btn" data-admin-reject-tenant="${esc(u.id)}">Reject</button>
+                               </div>
+                             </div>
+                           </div>
+                         `
+                       )
+                       .join("")
+                   : `<div class="muted">No pending tenants.</div>`
                }
              </div>
 
@@ -5392,6 +6255,26 @@ const p = DB.properties.find((x) => x.id === id);
 if (!p) return;
 p.buildingVerificationStatus = "rejected";
 p.isVerifiedBuilding = false;
+persist();
+route();
+});
+});
+document.querySelectorAll("[data-admin-approve-tenant]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-approve-tenant") || "";
+const u = (DB.users || []).find((x) => x && x.id === id);
+if (!u) return;
+u.verificationStatus = "verified";
+persist();
+route();
+});
+});
+document.querySelectorAll("[data-admin-reject-tenant]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const id = btn.getAttribute("data-admin-reject-tenant") || "";
+const u = (DB.users || []).find((x) => x && x.id === id);
+if (!u) return;
+u.verificationStatus = "rejected";
 persist();
 route();
 });
@@ -5903,6 +6786,13 @@ reason,
 notes,
 createdAt: Date.now(),
 });
+if (targetType === "review") {
+const rev = (DB.reviews || []).find((r) => r && r.id === targetId);
+if (rev) {
+rev.status = "under_review";
+rev.statusReason = reason;
+}
+}
 persist();
 closeModal();
 alert("Report submitted. Thank you.");
@@ -6000,6 +6890,11 @@ const tintClass =
         : "";
 const date = fmtDate(r.createdAt);
 const isOwnReview = currentUserId && r.userId === currentUserId;
+const reviewUser = (DB.users || []).find((u) => u && u.id === r.userId);
+const badges = [];
+if (reviewUser && reviewUser.verifiedEmail) badges.push("Verified tenant");
+if (reviewUser && reviewUser.verificationStatus === "verified") badges.push("Verified renter");
+if (r.proofFiles && r.proofFiles.length) badges.push("Proof uploaded");
 
 const reply = replyArr.find((x) => x && x.reviewId === r.id);
 const replyHTML = reply
@@ -6051,6 +6946,11 @@ return `
            </div>
 
            <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
+           ${
+             badges.length
+               ? `<div class="tiny" style="margin-top:8px;">${esc(badges.join(" • "))}</div>`
+               : ""
+           }
            ${r.proofFiles && r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofGallery(r.proofFiles, `review_${esc(r.id)}`)}` : ""}
            ${replyHTML}
            ${respondHTML}
@@ -6083,9 +6983,11 @@ const rid = btn.getAttribute("data-delete") || "";
 if (!rid) return;
 if (!confirm("Delete this review?")) return;
 const currentUserId = DB.currentUserId || "";
-DB.reviews = (DB.reviews || []).filter(
-(r) => !(r && r.id === rid && r.userId === currentUserId)
-);
+const rev = (DB.reviews || []).find((r) => r && r.id === rid && r.userId === currentUserId);
+if (rev) {
+rev.status = "removed";
+rev.statusReason = "User deleted";
+}
 persist();
 route();
 });
@@ -6182,6 +7084,8 @@ const landlordInsights = categoryInsights(landlordCats, landlordCatLabels);
 const props = DB.properties.filter((p) => p.landlordId === l.id);
 const rep = reportFor(l.id);
 const credential = casaCredentialForLandlord(l.id);
+const user = currentUser();
+const isSaved = isLandlordSavedByUser(user, l.id);
 
 const showOwnerLink = !isUserSignedIn();
 const ownerLinkHTML = showOwnerLink
@@ -6201,6 +7105,7 @@ const content = `
          </div>
          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
            <button class="btn btn--primary" id="messageLandlordBtn" type="button">Message</button>
+           ${user ? `<button class="btn" id="saveLandlordBtn" type="button">${isSaved ? "Saved" : "Save"}</button>` : ""}
            <a class="btn" href="#/search">Back</a>
            ${ownerLinkHTML}
          </div>
@@ -6344,6 +7249,22 @@ initStarPickers();
 wireReviewProofEditor(`landlord_${l.id}`);
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 $("#messageLandlordBtn")?.addEventListener("click", () => openMessageModal({ landlord: l }));
+$("#saveLandlordBtn")?.addEventListener("click", () => {
+const user = currentUser();
+if (!user) {
+alert("Sign in to save landlords.");
+location.hash = "#/portal?umode=login&role=tenant";
+return;
+}
+user.savedLandlords = Array.isArray(user.savedLandlords) ? user.savedLandlords : [];
+if (user.savedLandlords.includes(l.id)) {
+user.savedLandlords = user.savedLandlords.filter((id) => id !== l.id);
+} else {
+user.savedLandlords.push(l.id);
+}
+persist();
+route();
+});
 
 // Wire dropdown
 $("#moreBtn")?.addEventListener("click", (e) => {
@@ -6396,6 +7317,13 @@ const overallStars = avgFromCategoryStars(categoryStars) ?? 5;
 
 const existing = currentUserReview("landlord", l.id);
 if (existing) {
+existing.editHistory = existing.editHistory || [];
+existing.editHistory.push({
+stars: existing.stars,
+categoryStars: existing.categoryStars,
+text: existing.text,
+editedAt: Date.now(),
+});
 existing.stars = overallStars;
 existing.categoryStars = categoryStars;
 existing.text = text;
@@ -6411,6 +7339,7 @@ stars: overallStars,
 categoryStars,
 text,
 proofFiles,
+status: "live",
 createdAt: Date.now(),
 });
 }
@@ -6479,6 +7408,8 @@ respect: "Respect / fairness",
 deposit: "Deposit return",
 };
 const propertyInsights = categoryInsights(propertyCats, propertyCatLabels);
+const user = currentUser();
+const isSaved = isPropertySavedByUser(user, p.id);
 
 const showOwnerLink = !isUserSignedIn() && !!l;
 const ownerLinkHTML = showOwnerLink
@@ -6498,6 +7429,7 @@ const content = `
          </div>
          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
            ${l ? `<button class="btn btn--primary" id="messagePropertyBtn" type="button">Message</button>` : ""}
+           ${user ? `<button class="btn" id="savePropertyBtn" type="button">${isSaved ? "Saved" : "Save"}</button>` : ""}
            <a class="btn" href="#/search">Back</a>
            ${ownerLinkHTML}
          </div>
@@ -6596,6 +7528,22 @@ $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(null));
 }
 $("#messagePropertyBtn")?.addEventListener("click", () => openMessageModal({ landlord: l, property: p }));
+$("#savePropertyBtn")?.addEventListener("click", () => {
+const user = currentUser();
+if (!user) {
+alert("Sign in to save properties.");
+location.hash = "#/portal?umode=login&role=tenant";
+return;
+}
+user.savedProperties = Array.isArray(user.savedProperties) ? user.savedProperties : [];
+if (user.savedProperties.includes(p.id)) {
+user.savedProperties = user.savedProperties.filter((id) => id !== p.id);
+} else {
+user.savedProperties.push(p.id);
+}
+persist();
+route();
+});
 
 document.querySelectorAll("[data-info]").forEach((btn) => {
 btn.addEventListener("click", () => {
@@ -6640,6 +7588,13 @@ deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
 
 const existing = currentUserReview("property", p.id);
 if (existing) {
+existing.editHistory = existing.editHistory || [];
+existing.editHistory.push({
+stars: existing.stars,
+categories: existing.categories,
+text: existing.text,
+editedAt: Date.now(),
+});
 existing.stars = stars;
 existing.categories = categories;
 existing.text = text;
@@ -6655,6 +7610,7 @@ stars,
 categories,
 text,
 proofFiles,
+status: "live",
 createdAt: Date.now(),
 });
 }
