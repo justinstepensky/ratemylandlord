@@ -4112,6 +4112,7 @@ const rs = reviewsFor(targetType, targetId);
 if (!rs.length) return `<div class="muted">No reviews yet.</div>`;
 
 const replyArr = DB.replies || [];
+const currentUserId = DB.currentUserId || "";
 
 return rs
 .map((r) => {
@@ -4127,6 +4128,7 @@ const tintClass =
         ? "lc--red"
         : "";
 const date = fmtDate(r.createdAt);
+const isOwnReview = currentUserId && r.userId === currentUserId;
 
 const reply = replyArr.find((x) => x && x.reviewId === r.id);
 const replyHTML = reply
@@ -4171,7 +4173,11 @@ return `
                )}</span>
                <span class="muted" style="font-weight:900;">${esc(date)}</span>
              </div>
-             <button class="btn miniBtn" type="button" data-flag="${esc(r.id)}">Report</button>
+             ${
+               isOwnReview
+                 ? `<button class="btn miniBtn" type="button" data-delete="${esc(r.id)}">Delete</button>`
+                 : `<button class="btn miniBtn" type="button" data-flag="${esc(r.id)}">Report</button>`
+             }
            </div>
 
            <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
@@ -4198,6 +4204,20 @@ container.querySelectorAll("[data-flag]").forEach((btn) => {
 btn.addEventListener("click", () =>
 openReportModal("review", btn.getAttribute("data-flag") || "")
 );
+});
+
+container.querySelectorAll("[data-delete]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const rid = btn.getAttribute("data-delete") || "";
+if (!rid) return;
+if (!confirm("Delete this review?")) return;
+const currentUserId = DB.currentUserId || "";
+DB.reviews = (DB.reviews || []).filter(
+(r) => !(r && r.id === rid && r.userId === currentUserId)
+);
+persist();
+route();
+});
 });
 
 container.querySelectorAll("[data-reply-open]").forEach((btn) => {
