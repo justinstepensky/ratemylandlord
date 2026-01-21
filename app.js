@@ -1980,17 +1980,30 @@ attempt();
 }
 
 function handleOwnerClaim(landlordId) {
-const landlord = DB.landlords.find((l) => l && l.id === landlordId);
+if (isUserSignedIn()) return;
+const landlordUser = currentLandlordUser();
+if (!landlordUser) {
+alert("Log in or sign up as a landlord to claim ownership.");
+location.hash = "#/portal?mode=login&umode=signup";
+return;
+}
+const landlord = landlordUser.landlordId
+? DB.landlords.find((l) => l && l.id === landlordUser.landlordId)
+: landlordForCompany(landlordUser.company);
 if (!landlord) {
-alert("No landlord profile found for this address.");
+alert("No landlord profile found. Update your company name first.");
+location.hash = "#/portal?mode=signup&umode=login";
+return;
+}
+if (landlordId && landlord.id !== landlordId) {
+alert("You’re signed in as a different landlord.");
 return;
 }
 if (String(landlord.verificationStatus || "none") !== "verified") {
-alert("Please verify ownership documents before continuing.");
-location.hash = "#/portal?mode=signup&umode=login&verify=1";
+location.hash = "#/verify";
 return;
 }
-location.hash = "#/portal?mode=login&umode=login";
+location.hash = "#/account";
 }
 
 /* -----------------------------
@@ -2018,6 +2031,7 @@ if (base === "trust") return renderTrust();
 if (base === "portal") return renderPortal();
 if (base === "account") return renderAccount();
 if (base === "toolkit") return renderToolkit();
+if (base === "verify") return renderVerify();
 if (base === "admin") return renderAdmin();
 if (base === "landlord" && param) return renderLandlord(param);
 if (base === "property" && param) return renderProperty(param);
@@ -3520,6 +3534,160 @@ document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smoo
 }, 0);
 }
 
+/* -----------------------------
+  OWNER VERIFICATION (Landlords only)
+------------------------------ */
+function renderVerify() {
+setPageTitle("Verify ownership");
+
+const landlordUser = currentLandlordUser();
+if (!landlordUser) {
+renderShell(`
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Verification</div>
+            <div class="pageTitle">Landlord verification</div>
+            <div class="pageSub">Sign in to submit ownership documents.</div>
+          </div>
+          <a class="btn" href="#/">Home</a>
+        </div>
+        <div class="hr"></div>
+        <a class="btn btn--primary" href="#/portal?mode=login&umode=signup">Log in or sign up</a>
+      </div>
+    </section>
+`);
+return;
+}
+
+const landlord = landlordUser.landlordId
+  ? DB.landlords.find((l) => l && l.id === landlordUser.landlordId)
+  : landlordForCompany(landlordUser.company);
+if (!landlord) {
+renderShell(`
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Verification</div>
+            <div class="pageTitle">Landlord profile not found</div>
+            <div class="pageSub">Update your company name, then try again.</div>
+          </div>
+          <a class="btn" href="#/account">Back</a>
+        </div>
+      </div>
+    </section>
+  `);
+return;
+}
+
+const landlordProps = DB.properties.filter((p) => p.landlordId === landlord.id);
+const status = landlord.verificationStatus || "none";
+
+const content = `
+  <section class="pageCard card">
+    <div class="pad">
+      <div class="topRow">
+        <div>
+          <div class="kicker">Verification</div>
+          <div class="pageTitle">Verify ownership documents</div>
+          <div class="pageSub">Required before claiming a landlord profile.</div>
+        </div>
+        <a class="btn" href="#/account">Back</a>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="card" style="box-shadow:none;">
+        <div class="pad">
+          <div class="kicker">Document types</div>
+          <div class="tiny" style="margin-top:6px;">Select at least one document type.</div>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+            <label class="tiny"><input type="checkbox" id="ownerDocDeed" /> Property Deed or Title</label>
+            <label class="tiny"><input type="checkbox" id="ownerDocTax" /> Property Tax Bill</label>
+            <label class="tiny"><input type="checkbox" id="ownerDocMortgage" /> Mortgage Statement</label>
+            <label class="tiny"><input type="checkbox" id="ownerDocOther" /> Other Ownership Proof</label>
+          </div>
+
+          <div class="field" style="margin-top:12px;">
+            <label>Upload documents</label>
+            <input class="input" id="ownerVerifyDocs" type="file" multiple />
+          </div>
+
+          <div class="field">
+            <label>Apply to building (optional)</label>
+            <select class="input" id="ownerVerifyProperty">
+              ${
+                landlordProps.length
+                  ? landlordProps
+                      .map(
+                        (p) =>
+                          `<option value="${esc(p.id)}">${esc(
+                            `${p.address?.line1 || "Address"}${p.address?.unit ? `, ${p.address.unit}` : ""}`
+                          )}</option>`
+                      )
+                      .join("")
+                  : `<option value="">No properties linked</option>`
+              }
+            </select>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn" id="ownerVerifySubmit" type="button">Submit for verification</button>
+            <span class="tiny" id="ownerVerifyStatus">Status: ${esc(status)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+`;
+
+renderShell(content);
+ensureRuntimeStyles();
+
+$("#ownerVerifySubmit")?.addEventListener("click", () => {
+const hasType =
+  $("#ownerDocDeed")?.checked ||
+  $("#ownerDocTax")?.checked ||
+  $("#ownerDocMortgage")?.checked ||
+  $("#ownerDocOther")?.checked;
+if (!hasType) return alert("Select at least one document type.");
+
+const files = Array.from($("#ownerVerifyDocs")?.files || []);
+if (!files.length) return alert("Upload at least one document.");
+
+const types = [];
+if ($("#ownerDocDeed")?.checked) types.push("deed");
+if ($("#ownerDocTax")?.checked) types.push("tax");
+if ($("#ownerDocMortgage")?.checked) types.push("mortgage");
+if ($("#ownerDocOther")?.checked) types.push("other");
+
+const docs = files.map((f) => ({
+name: f.name,
+size: f.size,
+uploadedAt: Date.now(),
+types,
+}));
+
+landlord.verificationDocs = (landlord.verificationDocs || []).concat(docs);
+landlord.verificationStatus = "pending";
+landlord.isVerified = false;
+
+const propId = $("#ownerVerifyProperty")?.value || "";
+const prop = propId ? DB.properties.find((p) => p.id === propId) : null;
+if (prop) {
+prop.buildingVerificationDocs = (prop.buildingVerificationDocs || []).concat(docs);
+prop.buildingVerificationStatus = "pending";
+prop.isVerifiedBuilding = false;
+}
+
+persist();
+$("#ownerVerifyStatus") && ($("#ownerVerifyStatus").textContent = "Status: pending");
+alert("Verification submitted (demo).");
+});
+}
+
 // SSO buttons demo
 document.querySelectorAll("[data-sso]").forEach((btn) => {
 btn.addEventListener("click", () => {
@@ -4602,6 +4770,11 @@ const props = DB.properties.filter((p) => p.landlordId === l.id);
 const rep = reportFor(l.id);
 const credential = casaCredentialForLandlord(l.id);
 
+const showOwnerLink = !isUserSignedIn();
+const ownerLinkHTML = showOwnerLink
+? `<button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>`
+: "";
+
 const content = `
    <section class="pageCard card">
      <div class="pad">
@@ -4615,7 +4788,7 @@ const content = `
          </div>
          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
            <a class="btn" href="#/search">Back</a>
-           <button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>
+           ${ownerLinkHTML}
          </div>
        </div>
 
@@ -4888,6 +5061,11 @@ deposit: "Deposit return",
 };
 const propertyInsights = categoryInsights(propertyCats, propertyCatLabels);
 
+const showOwnerLink = !isUserSignedIn() && !!l;
+const ownerLinkHTML = showOwnerLink
+? `<button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>`
+: "";
+
 const content = `
    <section class="pageCard card">
      <div class="pad">
@@ -4901,7 +5079,7 @@ const content = `
          </div>
          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
            <a class="btn" href="#/search">Back</a>
-           <button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>
+           ${ownerLinkHTML}
          </div>
        </div>
 
