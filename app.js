@@ -1979,6 +1979,20 @@ if (typeof onReady === "function") onReady(map);
 attempt();
 }
 
+function handleOwnerClaim(landlordId) {
+const landlord = DB.landlords.find((l) => l && l.id === landlordId);
+if (!landlord) {
+alert("No landlord profile found for this address.");
+return;
+}
+if (String(landlord.verificationStatus || "none") !== "verified") {
+alert("Please verify ownership documents before continuing.");
+location.hash = "#/portal?mode=signup&umode=login&verify=1";
+return;
+}
+location.hash = "#/portal?mode=login&umode=login";
+}
+
 /* -----------------------------
    Router
    Router (Hardened for mobile/iOS)
@@ -3319,6 +3333,7 @@ setPageTitle("Sign in");
 
 const landlordMode = getQueryParam("mode") === "signup" ? "signup" : "login";
 const userMode = getQueryParam("umode") === "login" ? "login" : "signup";
+const wantsVerify = getQueryParam("verify") === "1";
 const landlordUser = currentLandlordUser();
 const landlordRecord = landlordUser ? landlordForCompany(landlordUser.company) : null;
 const landlordProps = landlordRecord
@@ -3402,8 +3417,12 @@ const content = `
 
              <div class="hr"></div>
 
-             <div class="kicker">Verification</div>
-             <div class="tiny" style="margin-top:6px;">Upload ownership documents (demo).</div>
+             <div id="verificationSection">
+               <div class="kicker">Verification</div>
+               <div class="tiny" style="margin-top:6px;">
+                 ${wantsVerify ? "Please verify ownership documents before continuing." : "Upload ownership documents (demo)."}
+               </div>
+             </div>
 
              <div class="field" style="margin-top:10px;">
                <label>Document types (select at least one)</label>
@@ -3495,6 +3514,11 @@ const content = `
 
 renderShell(content);
 ensureRuntimeStyles();
+if (wantsVerify) {
+setTimeout(() => {
+document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}, 0);
+}
 
 // SSO buttons demo
 document.querySelectorAll("[data-sso]").forEach((btn) => {
@@ -4591,7 +4615,7 @@ const content = `
          </div>
          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
            <a class="btn" href="#/search">Back</a>
-           <a class="tiny" href="#/portal?mode=login&umode=signup">Are you the owner?</a>
+           <button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>
          </div>
        </div>
 
@@ -4730,6 +4754,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
+$("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 
 // Wire dropdown
 $("#moreBtn")?.addEventListener("click", (e) => {
@@ -4874,7 +4899,10 @@ const content = `
              ${esc(`${a.city || ""} • ${a.state || ""}`)} ${l ? `• Landlord: <a href="#/landlord/${esc(l.id)}">${esc(l.name)}</a>` : ""}
            </div>
          </div>
-         <a class="btn" href="#/search">Back</a>
+         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+           <a class="btn" href="#/search">Back</a>
+           <button class="tiny" id="ownerClaimBtn" type="button">Are you the owner?</button>
+         </div>
        </div>
 
        <div class="hr"></div>
@@ -4963,6 +4991,11 @@ ensureRuntimeStyles();
 initPropertyMediaEmbed();
 initStarPickers();
 wireCategoryRatingToStars(`property_${p.id}`, false);
+if (l) {
+$("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
+} else {
+$("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(null));
+}
 
 document.querySelectorAll("[data-info]").forEach((btn) => {
 btn.addEventListener("click", () => {
