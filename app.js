@@ -2797,6 +2797,10 @@ function renderSearch() {
 setPageTitle("Search");
 const q = getQueryParam("q");
 
+let searchMode = "landlords";
+let alphaFilter = "all";
+let addressSort = "alpha";
+
 const content = `
    <section class="pageCard card">
      <div class="pad">
@@ -2813,8 +2817,13 @@ const content = `
          <input class="input" id="searchQ" placeholder="Search landlord name, management company, or address..." value="${esc(q)}"/>
          <button class="btn btn--primary" id="doSearch" type="button">Search</button>
        </div>
+
+       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+         <button class="btn miniBtn btn--primary" id="toggleLandlords" type="button">Landlords</button>
+         <button class="btn miniBtn" id="toggleAddresses" type="button">Addresses</button>
+       </div>
        
-              <div id="searchRegion" style="margin-top:12px;">
+        <div id="searchRegion" style="margin-top:12px;">
          ${regionSelectorHTML(getRegionKey())}
        </div>
        <div class="mapBox" style="margin-top:14px;">
@@ -2823,15 +2832,25 @@ const content = `
 
        <div class="hr"></div>
 
-       <div class="splitRow" style="margin-top:0;">
-         <div>
-           <div class="kicker">Landlords</div>
-           <div class="list" id="landlordResults" style="margin-top:10px;"></div>
-         </div>
-         <div>
+       <div id="landlordControls" style="margin-top:0;">
+         <div class="kicker">Landlords</div>
+         <div id="alphaFilter" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"></div>
+         <div class="list" id="landlordResults" style="margin-top:10px;"></div>
+       </div>
+
+       <div id="addressControls" style="margin-top:0; display:none;">
+         <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
            <div class="kicker">Addresses</div>
-           <div class="list" id="propertyResults" style="margin-top:10px;"></div>
+           <label class="tiny" style="display:flex; gap:8px; align-items:center;">
+             Sort
+             <select class="input" id="addressSort" style="height:34px;">
+               <option value="alpha">Alphabetical</option>
+               <option value="rating-desc">Rating: Highest - Lowest</option>
+               <option value="rating-asc">Rating: Lowest - Highest</option>
+             </select>
+           </label>
          </div>
+         <div class="list" id="propertyResults" style="margin-top:10px;"></div>
        </div>
 
        <div class="hr"></div>
@@ -2852,6 +2871,12 @@ const qEl = $("#searchQ");
 const lResEl = $("#landlordResults");
 const pResEl = $("#propertyResults");
 const doBtn = $("#doSearch");
+const landToggle = $("#toggleLandlords");
+const addrToggle = $("#toggleAddresses");
+const alphaWrap = $("#alphaFilter");
+const landlordControls = $("#landlordControls");
+const addressControls = $("#addressControls");
+const addressSortEl = $("#addressSort");
 
 qEl?.addEventListener("keydown", (e) => {
 if (e.key === "Enter") doBtn?.click();
@@ -2940,8 +2965,38 @@ const landlords = DB.landlords
 .sort((a, b) => b.score - a.score)
 .map((x) => x.l);
 
-if (lResEl) lResEl.innerHTML = landlords.length ? landlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
-if (pResEl) pResEl.innerHTML = props.length ? props.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
+const filteredLandlords =
+alphaFilter === "all"
+? landlords
+: landlords.filter((l) => {
+const ch = String(l.name || "").trim().charAt(0).toUpperCase();
+return ch === alphaFilter.toUpperCase();
+});
+
+let sortedProps = props.slice();
+if (addressSort === "alpha") {
+sortedProps.sort((a, b) => {
+const aName = String((a.address && a.address.line1) || "").toLowerCase();
+const bName = String((b.address && b.address.line1) || "").toLowerCase();
+return aName.localeCompare(bName);
+});
+} else {
+sortedProps.sort((a, b) => {
+const aStats = ratingStats("property", a.id);
+const bStats = ratingStats("property", b.id);
+const aVal = aStats.avgRounded == null ? -1 : aStats.avgRounded;
+const bVal = bStats.avgRounded == null ? -1 : bStats.avgRounded;
+if (aVal === bVal) {
+const aName = String((a.address && a.address.line1) || "").toLowerCase();
+const bName = String((b.address && b.address.line1) || "").toLowerCase();
+return aName.localeCompare(bName);
+}
+return addressSort === "rating-asc" ? aVal - bVal : bVal - aVal;
+});
+}
+
+if (lResEl) lResEl.innerHTML = filteredLandlords.length ? filteredLandlords.map((l) => landlordCardHTML(l)).join("") : `<div class="muted">No landlords found.</div>`;
+if (pResEl) pResEl.innerHTML = sortedProps.length ? sortedProps.map((p) => propertyCardHTML(p)).join("") : `<div class="muted">No addresses found.</div>`;
 
 const mapEl = $("#searchMap");
 if (mapEl) mapEl.innerHTML = "";
@@ -2968,7 +3023,61 @@ const query = qEl ? qEl.value.trim() : "";
 location.hash = `#/search?q=${encodeURIComponent(query)}`;
 });
 
+function renderAlphaFilter() {
+if (!alphaWrap) return;
+const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const items = ["all", ...letters];
+alphaWrap.innerHTML = items
+.map((l) => {
+const label = l === "all" ? "All" : l;
+const isOn = alphaFilter === l;
+return `<button type="button" class="btn miniBtn ${isOn ? "btn--primary" : ""}" data-alpha="${esc(l)}">${esc(label)}</button>`;
+})
+.join("");
+alphaWrap.querySelectorAll("[data-alpha]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const v = btn.getAttribute("data-alpha");
+alphaFilter = v || "all";
+renderAlphaFilter();
+runSearchAndRender();
+});
+});
+}
+
+function syncSearchMode() {
+if (searchMode === "landlords") {
+landToggle?.classList.add("btn--primary");
+addrToggle?.classList.remove("btn--primary");
+if (landlordControls) landlordControls.style.display = "";
+if (addressControls) addressControls.style.display = "none";
+} else {
+addrToggle?.classList.add("btn--primary");
+landToggle?.classList.remove("btn--primary");
+if (addressControls) addressControls.style.display = "";
+if (landlordControls) landlordControls.style.display = "none";
+}
+}
+
+landToggle?.addEventListener("click", () => {
+searchMode = "landlords";
+syncSearchMode();
+runSearchAndRender();
+});
+
+addrToggle?.addEventListener("click", () => {
+searchMode = "addresses";
+syncSearchMode();
+runSearchAndRender();
+});
+
+addressSortEl?.addEventListener("change", () => {
+addressSort = addressSortEl.value || "alpha";
+runSearchAndRender();
+});
+
 refreshSearchRegionUI();
+renderAlphaFilter();
+syncSearchMode();
 runSearchAndRender();
 }
 
