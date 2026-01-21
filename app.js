@@ -3883,9 +3883,10 @@ inputs.forEach((el) => el.addEventListener("change", sync));
 sync();
 }
 
-function renderCategoryPicker(id, label) {
+function renderCategoryPicker(id, label, defaultVal = 5) {
+const def = Math.max(1, Math.min(5, Math.round(Number(defaultVal) || 5)));
 const opts = [5, 4, 3, 2, 1]
-.map((v) => `<option value="${v}">${v}</option>`)
+.map((v) => `<option value="${v}"${v === def ? " selected" : ""}>${v}</option>`)
 .join("");
 return `
    <div class="field">
@@ -3897,8 +3898,19 @@ return `
  `.trim();
 }
 
-function renderLandlordCategoryPicker(id, label) {
-return renderCategoryPicker(id, label);
+function renderLandlordCategoryPicker(id, label, defaultVal = 5) {
+return renderCategoryPicker(id, label, defaultVal);
+}
+
+function currentUserReview(targetType, targetId) {
+const uid = DB.currentUserId || "";
+if (!uid) return null;
+const tid = String(targetId ?? "");
+return (
+(DB.reviews || []).find(
+(r) => r && r.userId === uid && r.targetType === targetType && String(r.targetId) === tid
+) || null
+);
 }
 
 function reviewFormHTML(targetType, targetId) {
@@ -3935,25 +3947,52 @@ return `
    </div>
  `.trim();
 }
+const existing = currentUserReview(targetType, targetId);
+const isEditing = !!existing;
+const titleText = isEditing ? "Modify your review" : "Leave a review";
+const existingStars = Number(existing && existing.stars);
+const defaultStars = Number.isFinite(existingStars) ? existingStars : 5;
+const existingText = existing && existing.text ? String(existing.text) : "";
+const cat = existing && (existing.categoryStars || existing.categories) ? (existing.categoryStars || existing.categories) : {};
 return `
    <div class="card bubble--white" style="box-shadow:none;">
      <div class="pad">
-       <div class="kicker">Leave a review</div>
+       <div class="kicker">${esc(titleText)}</div>
 
        <div class="field" style="margin-top:10px;">
          <label>Rating</label>
-         ${renderStarsPicker(`rev_${formId}`, 5)}
+         ${renderStarsPicker(`rev_${formId}`, defaultStars)}
        </div>
        ${
          targetType === "landlord"
            ? `
              <div class="hr" style="margin:12px 0;"></div>
              <div class="kicker">Category ratings</div>
-             ${renderLandlordCategoryPicker(`rev_${formId}_respComm`, "Responsiveness &amp; Communication")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_maintRepairs`, "Maintenance &amp; Repairs")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_respectProf`, "Respect &amp; Professionalism")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_fairnessTrans`, "Fairness &amp; Transparency")}
-             ${renderLandlordCategoryPicker(`rev_${formId}_depositReturn`, "Deposit Return")}
+             ${renderLandlordCategoryPicker(
+               `rev_${formId}_respComm`,
+               "Responsiveness &amp; Communication",
+               Number(cat.responsivenessCommunication ?? cat.comm ?? 5)
+             )}
+             ${renderLandlordCategoryPicker(
+               `rev_${formId}_maintRepairs`,
+               "Maintenance &amp; Repairs",
+               Number(cat.maintenanceRepairs ?? cat.repairs ?? cat.maint ?? 5)
+             )}
+             ${renderLandlordCategoryPicker(
+               `rev_${formId}_respectProf`,
+               "Respect &amp; Professionalism",
+               Number(cat.respectProfessionalism ?? cat.respect ?? 5)
+             )}
+             ${renderLandlordCategoryPicker(
+               `rev_${formId}_fairnessTrans`,
+               "Fairness &amp; Transparency",
+               Number(cat.fairnessTransparency ?? cat.fairness ?? 5)
+             )}
+             ${renderLandlordCategoryPicker(
+               `rev_${formId}_depositReturn`,
+               "Deposit Return",
+               Number(cat.depositReturn ?? cat.deposit ?? 5)
+             )}
            `
            : ""
        }
@@ -3962,18 +4001,30 @@ return `
            ? `
              <div class="hr" style="margin:12px 0;"></div>
              <div class="kicker">Category ratings</div>
-             ${renderCategoryPicker(`rev_${formId}_comm`, "Communication")}
-             ${renderCategoryPicker(`rev_${formId}_repairs`, "Repairs / Maintenance speed")}
-             ${renderCategoryPicker(`rev_${formId}_clean`, "Cleanliness / building conditions")}
-             ${renderCategoryPicker(`rev_${formId}_respect`, "Respect / fairness")}
-             ${renderCategoryPicker(`rev_${formId}_deposit`, "Deposit return")}
+             ${renderCategoryPicker(`rev_${formId}_comm`, "Communication", Number(cat.comm ?? 5))}
+             ${renderCategoryPicker(
+               `rev_${formId}_repairs`,
+               "Repairs / Maintenance speed",
+               Number(cat.repairs ?? 5)
+             )}
+             ${renderCategoryPicker(
+               `rev_${formId}_clean`,
+               "Cleanliness / building conditions",
+               Number(cat.clean ?? 5)
+             )}
+             ${renderCategoryPicker(`rev_${formId}_respect`, "Respect / fairness", Number(cat.respect ?? 5))}
+             ${renderCategoryPicker(`rev_${formId}_deposit`, "Deposit return", Number(cat.deposit ?? 5))}
            `
            : ""
        }
 
        <div class="field">
          <label>Review</label>
-         <textarea class="textarea" id="rev_${esc(formId)}Text" placeholder="What was good? What was bad? (No personal info.)"></textarea>
+         <textarea class="textarea" id="rev_${esc(
+           formId
+         )}Text" placeholder="What was good? What was bad? (No personal info.)">${esc(
+           existingText
+         )}</textarea>
        </div>
 
        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
@@ -4442,6 +4493,13 @@ depositReturn: Number($(`#rev_${formId}_depositReturn`)?.value || 5),
 };
 const overallStars = avgFromCategoryStars(categoryStars) ?? 5;
 
+const existing = currentUserReview("landlord", l.id);
+if (existing) {
+existing.stars = overallStars;
+existing.categoryStars = categoryStars;
+existing.text = text;
+existing.createdAt = Date.now();
+} else {
 DB.reviews.unshift({
 id: idRand("r"),
 targetType: "landlord",
@@ -4452,6 +4510,7 @@ categoryStars,
 text,
 createdAt: Date.now(),
 });
+}
 persist();
 route();
 });
@@ -4659,6 +4718,13 @@ respect: Number($(`#rev_${formId}_respect`)?.value || 5),
 deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
 };
 
+const existing = currentUserReview("property", p.id);
+if (existing) {
+existing.stars = stars;
+existing.categories = categories;
+existing.text = text;
+existing.createdAt = Date.now();
+} else {
 DB.reviews.unshift({
 id: idRand("r"),
 targetType: "property",
@@ -4669,6 +4735,7 @@ categories,
 text,
 createdAt: Date.now(),
 });
+}
 persist();
 route();
 });
