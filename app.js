@@ -894,11 +894,6 @@ const a = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : nul
 if (!a) return;
 const href = a.getAttribute("href");
 if (!href) return;
-if (href === "#/add" && !isAnySignedIn()) {
-e.preventDefault();
-openSignInGateModal();
-return;
-}
 e.preventDefault();
 navigateTo(href);
 });
@@ -1889,7 +1884,6 @@ function openSignInGateModal() {
 openModal(`
   <div class="modalHead">
     <div class="modalTitle">Sign in required</div>
-    <button class="iconBtn" id="gateClose" aria-label="Close" type="button">×</button>
   </div>
   <div class="modalBody">
     <div class="smallNote">You must sign in to add a landlord.</div>
@@ -1899,8 +1893,6 @@ openModal(`
     <a class="tiny" href="#/portal?umode=login&role=tenant" id="gateLogin">I already have an account</a>
   </div>
 `);
-
-$("#gateClose")?.addEventListener("click", closeModal);
 }
 
 function openMessageFallbackModal(landlord, property) {
@@ -2903,6 +2895,7 @@ navigateTo(target);
 function renderShell(content) {
 const app = $("#app");
 if (!app) return;
+closeModal();
 
 const accountHref = isAnySignedIn() ? "#/account" : "#/portal";
 const landlordSignedIn = isLandlordSignedIn();
@@ -3581,30 +3574,6 @@ runSearchAndRender();
   ADD (✅ borough removed entirely)
 ------------------------------ */
 function renderAdd() {
-if (!isAnySignedIn()) {
-setPageTitle("Add a landlord");
-renderShell(`
-    <section class="pageCard card">
-      <div class="pad">
-        <div class="topRow">
-          <div>
-            <div class="kicker">Add</div>
-            <div class="pageTitle">Sign in to add a landlord</div>
-            <div class="pageSub">Create an account to submit new listings.</div>
-          </div>
-          <a class="btn" href="#/">Home</a>
-        </div>
-        <div class="hr"></div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <a class="btn btn--primary" href="#/portal?umode=signup&role=tenant">Sign up</a>
-          <a class="btn" href="#/portal?umode=login&role=tenant">I already have an account</a>
-        </div>
-      </div>
-    </section>
-  `);
-openSignInGateModal();
-return;
-}
 setPageTitle("Add a landlord");
 
 const content = `
@@ -3720,6 +3689,10 @@ addMarker = window.L.marker([picked.lat, picked.lng]).addTo(addMap);
 }, 0);
 
 $("#addBtn")?.addEventListener("click", () => {
+if (!isAnySignedIn()) {
+openSignInGateModal();
+return;
+}
 const name = $("#ln")?.value ? $("#ln").value.trim() : "";
 const entity = $("#le")?.value ? $("#le").value.trim() : "";
 
@@ -3845,7 +3818,11 @@ renderShell(`
        </div>
      </div>
    </section>
- `);
+`);
+
+if (!isAnySignedIn()) {
+openSignInGateModal();
+}
 }
 
 function renderTrust() {
