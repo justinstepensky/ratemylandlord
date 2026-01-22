@@ -88,6 +88,11 @@ a{color:inherit}
 .btn--block{width:100%}
 .miniBtn{padding:9px 12px;border-radius: 12px}
 
+body.modalBlur header,
+body.modalBlur #app{
+  filter: blur(4px);
+}
+
 .input,.textarea,select.input{
   width:100%;
   padding:12px 12px;

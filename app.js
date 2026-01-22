@@ -894,6 +894,11 @@ const a = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : nul
 if (!a) return;
 const href = a.getAttribute("href");
 if (!href) return;
+if (href === "#/add" && !isAnySignedIn()) {
+e.preventDefault();
+openSignInGateModal();
+return;
+}
 e.preventDefault();
 navigateTo(href);
 });
@@ -1863,6 +1868,7 @@ overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerH
 overlay.classList.add("isOpen");
 overlay.setAttribute("aria-hidden", "false");
 document.body.style.overflow = "hidden";
+document.body.classList.add("modalBlur");
 
 const handler = (e) => {
 if (e.target === overlay) closeModal();
@@ -1876,6 +1882,25 @@ overlay.classList.remove("isOpen");
 overlay.setAttribute("aria-hidden", "true");
 overlay.innerHTML = "";
 document.body.style.overflow = "";
+document.body.classList.remove("modalBlur");
+}
+
+function openSignInGateModal() {
+openModal(`
+  <div class="modalHead">
+    <div class="modalTitle">Sign in required</div>
+    <button class="iconBtn" id="gateClose" aria-label="Close" type="button">×</button>
+  </div>
+  <div class="modalBody">
+    <div class="smallNote">You must sign in to add a landlord.</div>
+  </div>
+  <div class="modalFoot" style="justify-content:space-between; flex-wrap:wrap;">
+    <a class="btn btn--primary" href="#/portal?umode=signup&role=tenant" id="gateSignup">Sign up</a>
+    <a class="tiny" href="#/portal?umode=login&role=tenant" id="gateLogin">I already have an account</a>
+  </div>
+`);
+
+$("#gateClose")?.addEventListener("click", closeModal);
 }
 
 function openMessageFallbackModal(landlord, property) {
@@ -2930,7 +2955,7 @@ const content = `
        <div class="heroSearch">
          <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
          <button class="btn btn--primary" id="homeSearch" type="button">Search</button>
-         <a class="btn" href="#/add">Add a landlord</a>
+         ${isAnySignedIn() ? `<a class="btn" href="#/add">Add a landlord</a>` : ""}
        </div>
 
        <div class="muted" style="text-align:center;margin-top:10px;font-size:13px;">
@@ -3556,6 +3581,30 @@ runSearchAndRender();
   ADD (✅ borough removed entirely)
 ------------------------------ */
 function renderAdd() {
+if (!isAnySignedIn()) {
+setPageTitle("Add a landlord");
+renderShell(`
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Add</div>
+            <div class="pageTitle">Sign in to add a landlord</div>
+            <div class="pageSub">Create an account to submit new listings.</div>
+          </div>
+          <a class="btn" href="#/">Home</a>
+        </div>
+        <div class="hr"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <a class="btn btn--primary" href="#/portal?umode=signup&role=tenant">Sign up</a>
+          <a class="btn" href="#/portal?umode=login&role=tenant">I already have an account</a>
+        </div>
+      </div>
+    </section>
+  `);
+openSignInGateModal();
+return;
+}
 setPageTitle("Add a landlord");
 
 const content = `
