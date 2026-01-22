@@ -2434,6 +2434,22 @@ return `
  `.trim();
 }
 
+function regionSelectHTML(activeKey) {
+const keys = Object.keys(REGIONS);
+return `
+   <select class="input" id="homeRegionSelect" aria-label="Choose your city">
+     ${keys
+       .map((k) => {
+         const cfg = REGIONS[k];
+         const state = (cfg.states && cfg.states[0]) ? cfg.states[0] : "";
+         const label = `${cfg.label}${state ? `, ${state}` : ""}`;
+         return `<option value="${esc(k)}"${k === activeKey ? " selected" : ""}>${esc(label)}</option>`;
+       })
+       .join("")}
+   </select>
+ `.trim();
+}
+
 function wireRegionSelector(rootEl, onChange) {
 if (!rootEl) return;
 rootEl.querySelectorAll("[data-region-btn]").forEach((btn) => {
@@ -3151,6 +3167,10 @@ const content = `
          <button class="btn miniBtn" id="homeToggleLandlords" type="button">Landlords</button>
          <button class="btn miniBtn" id="homeToggleProperties" type="button">Properties</button>
        </div>
+       <div class="heroRegionSelect">
+         <label class="tiny" for="homeRegionSelect">Choose your city</label>
+         ${regionSelectHTML(getRegionKey())}
+       </div>
 
        <div class="heroNote">
          Create an account to rate. Verified landlords can respond.
@@ -3213,6 +3233,7 @@ const homeSearch = $("#homeSearch");
 const homeQ = $("#homeQ");
 const homeLandToggle = $("#homeToggleLandlords");
 const homePropToggle = $("#homeToggleProperties");
+const homeRegionSelect = $("#homeRegionSelect");
 let homeSearchMode = "";
 
 const setHomeSearchMode = (mode) => {
@@ -3224,6 +3245,13 @@ if (homePropToggle) homePropToggle.classList.toggle("btn--primary", mode === "ad
 
 homeLandToggle?.addEventListener("click", () => setHomeSearchMode("landlords"));
 homePropToggle?.addEventListener("click", () => setHomeSearchMode("addresses"));
+
+homeRegionSelect?.addEventListener("change", (e) => {
+const val = e.target && e.target.value ? String(e.target.value) : "";
+if (!val) return;
+setRegionKey(val);
+renderHome();
+});
 
 homeSearch?.addEventListener("click", () => {
 if (!homeSearchMode) {

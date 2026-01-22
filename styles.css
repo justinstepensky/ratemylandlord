@@ -308,6 +308,13 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   align-items:center;
   margin-top:10px;
 }
+.heroRegionSelect{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:10px;
+  max-width:260px;
+}
 .heroNote{
   text-align:center;
   margin-top:10px;
