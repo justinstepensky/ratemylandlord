@@ -265,6 +265,27 @@ createdAt: now - 1000 * 60 * 60 * 24 * 20,
 },
 ];
 
+const units = [
+{
+id: "u1",
+propertyId: "p1",
+label: "2A",
+createdAt: now - 1000 * 60 * 60 * 24 * 10,
+},
+{
+id: "u2",
+propertyId: "p1",
+label: "3B",
+createdAt: now - 1000 * 60 * 60 * 24 * 9,
+},
+{
+id: "u3",
+propertyId: "p3",
+label: "5C",
+createdAt: now - 1000 * 60 * 60 * 24 * 12,
+},
+];
+
 const reviews = [
 // landlord reviews
 {
@@ -368,6 +389,7 @@ notes: "Data is demo only. Production: pull from city datasets + add sources.",
 const db = {
 landlords,
 properties,
+units,
 reviews,
 reports,
 flags: [],
@@ -395,6 +417,7 @@ function normalizeDB(db) {
 const out = {
 landlords: Array.isArray(db.landlords) ? db.landlords : [],
 properties: Array.isArray(db.properties) ? db.properties : [],
+units: Array.isArray(db.units) ? db.units : [],
 reviews: Array.isArray(db.reviews) ? db.reviews : [],
 reports: Array.isArray(db.reports) ? db.reports : [],
 flags: Array.isArray(db.flags) ? db.flags : [],
@@ -480,6 +503,16 @@ lng: typeof (p && p.lng) === "number" ? p.lng : null,
 createdAt: Number(p && p.createdAt ? p.createdAt : Date.now()),
 }))
 .filter((p) => p.id && p.address && p.address.line1);
+
+// ensure every unit has core fields
+out.units = out.units
+.map((u) => ({
+id: String(u && u.id ? u.id : ""),
+propertyId: String(u && u.propertyId ? u.propertyId : ""),
+label: String(u && u.label ? u.label : ""),
+createdAt: Number(u && u.createdAt ? u.createdAt : Date.now()),
+}))
+.filter((u) => u.id && u.propertyId && u.label);
 
 // ensure every user has core fields
 out.users = out.users
@@ -670,6 +703,48 @@ function norm(s) {
 return String(s || "").trim().toLowerCase();
 }
 
+function parseUnitsInput(raw) {
+const pieces = String(raw || "")
+.split(/[\n,;]+/)
+.map((v) => v.trim())
+.filter(Boolean);
+if (!pieces.length) return [];
+const seen = new Set();
+const out = [];
+pieces.forEach((label) => {
+const key = norm(label);
+if (!key || seen.has(key)) return;
+seen.add(key);
+out.push(label);
+});
+return out;
+}
+
+function addUnitsForProperty(propertyId, unitLabels) {
+if (!propertyId) return;
+const labels = Array.isArray(unitLabels) ? unitLabels : [];
+if (!labels.length) return;
+DB.units = DB.units || [];
+labels.forEach((label) => {
+const exists = DB.units.find(
+  (u) => u && u.propertyId === propertyId && norm(u.label) === norm(label)
+);
+if (exists) return;
+DB.units.unshift({
+  id: idRand("u"),
+  propertyId,
+  label: String(label || "").trim(),
+  createdAt: Date.now(),
+});
+});
+}
+
+function unitsForProperty(propertyId) {
+return (DB.units || [])
+.filter((u) => u && u.propertyId === propertyId)
+.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+
 function landlordForCompany(company) {
 const c = norm(company);
 if (!c) return null;
@@ -717,6 +792,11 @@ if (!canLandlordRespond(landlordId)) return false;
 if (targetType === "landlord") return true;
 if (targetType === "property") {
 const p = DB.properties.find((x) => x && x.id === targetId);
+return !!(p && String(p.buildingVerificationStatus || "none") === "verified");
+}
+if (targetType === "unit") {
+const u = (DB.units || []).find((x) => x && x.id === targetId);
+const p = u ? DB.properties.find((x) => x && x.id === u.propertyId) : null;
 return !!(p && String(p.buildingVerificationStatus || "none") === "verified");
 }
 return false;
@@ -2475,7 +2555,9 @@ if (base === "toolkit") return renderToolkit();
 if (base === "verify") return renderVerify();
 if (base === "admin") return renderAdmin();
 if (base === "landlord" && param) return renderLandlord(param);
+if (base === "property" && param && parts[2] === "units") return renderPropertyUnits(param);
 if (base === "property" && param) return renderProperty(param);
+if (base === "unit" && param) return renderUnit(param);
 
 renderHome();
 }
@@ -2722,6 +2804,50 @@ return `
  `.trim();
 }
 
+function unitCardHTML(u, opts = {}) {
+const showView = opts && opts.showView === false ? false : true;
+const st = ratingStats("unit", u.id);
+const avg = st.avgRounded;
+const count = st.count;
+const tier = cardTier(avg ?? 0, count);
+const tintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
+
+const avgText = avg == null ? "—" : avg.toFixed(1);
+const stars = starVisFromAvg(avg);
+const p = DB.properties.find((x) => x && x.id === u.propertyId);
+const a = p && p.address ? p.address : {};
+const subtitle = `${a.line1 || "Address"} • ${a.city || ""} ${a.state || ""}`.replace(/\s{2,}/g, " ");
+
+return `
+   <div class="lc ${tintClass}">
+     <div class="lcLeft">
+       <div class="lcName">
+         <span>${esc(u.label || "Unit")}</span>
+       </div>
+       <div class="lcStars">
+         <span class="stars">${esc(stars)}</span>
+         <span class="ratingNum">${esc(avgText)}</span>
+         <span class="muted">(${count} review${count === 1 ? "" : "s"})</span>
+       </div>
+       <div class="tiny" style="margin-top:8px;">
+         ${esc(subtitle)}
+       </div>
+     </div>
+     <div class="lcRight">
+       ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
+       ${showView ? `<a class="btn btn--primary miniBtn" href="#/unit/${encodeURIComponent(u.id)}">View</a>` : ``}
+     </div>
+   </div>
+ `.trim();
+}
+
 /* -----------------------------
   Highlights carousel (latest 5 across landlord+property)
 ------------------------------ */
@@ -2751,6 +2877,20 @@ if (!p) return null;
 const a = p.address || {};
 const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
 return { r, kind: "property", title, href: `#/property/${encodeURIComponent(p.id)}`, badgeHTML: "" };
+}
+if (r.targetType === "unit") {
+const u = (DB.units || []).find((x) => x && x.id === r.targetId);
+if (!u) return null;
+const p = DB.properties.find((x) => x && x.id === u.propertyId);
+const a = p && p.address ? p.address : {};
+const title = `${u.label || "Unit"} • ${a.line1 || "Address"}`;
+return {
+  r,
+  kind: "unit",
+  title,
+  href: `#/unit/${encodeURIComponent(u.id)}`,
+  badgeHTML: "",
+};
 }
 return null;
 })
@@ -3617,6 +3757,12 @@ const content = `
              </div>
 
              <div class="field">
+               <label>Units in building (optional)</label>
+               <input class="input" id="unitsList" placeholder="e.g., 1A, 1B, 2A" />
+               <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
+             </div>
+
+             <div class="field">
                <label>City <span style="color:#b91c1c">*</span></label>
                <input class="input" id="city" placeholder="City" />
              </div>
@@ -3701,6 +3847,7 @@ const entity = $("#le")?.value ? $("#le").value.trim() : "";
 
 const line1 = $("#a1")?.value ? $("#a1").value.trim() : "";
 const unit = $("#unit")?.value ? $("#unit").value.trim() : "";
+const unitsList = parseUnitsInput($("#unitsList")?.value);
 const city = $("#city")?.value ? $("#city").value.trim() : "";
 const state = $("#state")?.value ? $("#state").value.trim() : "";
 const rk = regionFromState(state);
@@ -3750,6 +3897,8 @@ lat: picked && typeof picked.lat === "number" ? picked.lat : 40.73,
 lng: picked && typeof picked.lng === "number" ? picked.lng : -73.95,
 createdAt: Date.now(),
 });
+
+addUnitsForProperty(propertyId, unitsList);
 
 persist();
 location.hash = `#/property/${propertyId}`;
@@ -4928,6 +5077,11 @@ const content = `
                     <input class="input" id="portalAddrUnit" placeholder="Apt / Unit (optional)" />
                   </div>
                   <div class="field">
+                    <label>Units in building (optional)</label>
+                    <input class="input" id="portalUnitsList" placeholder="e.g., 1A, 1B, 2A" />
+                    <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
+                  </div>
+                  <div class="field">
                     <label>City</label>
                     <input class="input" id="portalAddrCity" placeholder="City" />
                   </div>
@@ -5151,12 +5305,14 @@ $("#portalAddPropertyForm")?.addEventListener("submit", (e) => {
 e.preventDefault();
 const line1 = $("#portalAddrLine1")?.value ? $("#portalAddrLine1").value.trim() : "";
 const unit = $("#portalAddrUnit")?.value ? $("#portalAddrUnit").value.trim() : "";
+const unitsList = parseUnitsInput($("#portalUnitsList")?.value);
 const city = $("#portalAddrCity")?.value ? $("#portalAddrCity").value.trim() : "";
 const state = $("#portalAddrState")?.value ? $("#portalAddrState").value.trim() : "";
 const zip = $("#portalAddrZip")?.value ? $("#portalAddrZip").value.trim() : "";
 if (!line1 || !city || !state) return alert("Address, city, and state are required.");
+const propertyId = idRand("p");
 DB.properties.unshift({
-id: idRand("p"),
+id: propertyId,
 landlordId: landlordRecord.id,
 address: { line1, unit, city, state, zip },
 buildingVerificationStatus: "none",
@@ -5165,6 +5321,7 @@ claimedByLandlordId: landlordRecord.id,
 claimedAt: Date.now(),
 createdAt: Date.now(),
 });
+addUnitsForProperty(propertyId, unitsList);
 persist();
 route();
 });
@@ -7619,6 +7776,8 @@ deposit: "Deposit return",
 const propertyInsights = categoryInsights(propertyCats, propertyCatLabels);
 const user = currentUser();
 const isSaved = isPropertySavedByUser(user, p.id);
+const units = unitsForProperty(p.id);
+const hasUnits = units.length > 0;
 
 const showOwnerLink = !isUserSignedIn() && !!l;
 const ownerLinkHTML = showOwnerLink
@@ -7673,6 +7832,16 @@ const content = `
                  <div class="muted" style="font-weight:900;">Landlord Score</div>
                  <div class="ratingNum" style="font-weight:950;">${esc(landlordAvgText)}</div>
                </div>
+
+               ${
+                 hasUnits
+                   ? `
+                     <div style="margin-top:12px;">
+                       <a class="pill" href="#/property/${encodeURIComponent(p.id)}/units">See Rated Units</a>
+                     </div>
+                   `
+                   : ""
+               }
 
                ${
                  propertyCats
@@ -7833,6 +8002,240 @@ route();
 });
 
 $(`#rev_${formId}Report`)?.addEventListener("click", () => openReportModal("property", p.id));
+}
+
+/* -----------------------------
+  PROPERTY UNITS
+------------------------------ */
+function renderPropertyUnits(id) {
+const propertyId = parseId(id);
+const p = DB.properties.find((x) => x && x.id === propertyId);
+if (!p) {
+setPageTitle("Not found");
+renderShell(`
+     <section class="pageCard card">
+       <div class="pad">
+         <div class="topRow">
+           <div>
+             <div class="kicker">Units</div>
+             <div class="pageTitle">Not found</div>
+             <div class="pageSub">That address doesn’t exist yet.</div>
+           </div>
+           <a class="btn" href="#/search">Search</a>
+         </div>
+       </div>
+     </section>
+   `);
+return;
+}
+
+const a = p.address || {};
+const title = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+setPageTitle(`Units • ${title}`);
+
+const units = unitsForProperty(p.id);
+const content = `
+   <section class="pageCard card">
+     <div class="pad">
+       <div class="topRow">
+         <div>
+           <div class="kicker">Units</div>
+           <div class="pageTitle">Rated units at ${esc(title)}</div>
+           <div class="pageSub">Unit ratings are separate from building and landlord ratings.</div>
+         </div>
+         <a class="btn" href="#/property/${encodeURIComponent(p.id)}">Back to building</a>
+       </div>
+
+       <div class="hr"></div>
+
+       <div class="list" style="margin-top:10px;">
+         ${
+           units.length
+             ? units.map((u) => unitCardHTML(u)).join("")
+             : `<div class="muted">No units listed yet.</div>`
+         }
+       </div>
+     </div>
+   </section>
+ `.trim();
+
+renderShell(content);
+ensureRuntimeStyles();
+}
+
+/* -----------------------------
+  UNIT PAGE
+------------------------------ */
+function renderUnit(id) {
+const unitId = parseId(id);
+const u = (DB.units || []).find((x) => x && x.id === unitId);
+if (!u) {
+setPageTitle("Not found");
+renderShell(`
+     <section class="pageCard card">
+       <div class="pad">
+         <div class="topRow">
+           <div>
+             <div class="kicker">Unit</div>
+             <div class="pageTitle">Not found</div>
+             <div class="pageSub">That unit doesn’t exist yet.</div>
+           </div>
+           <a class="btn" href="#/search">Search</a>
+         </div>
+       </div>
+     </section>
+   `);
+return;
+}
+
+const p = DB.properties.find((x) => x && x.id === u.propertyId);
+const a = p && p.address ? p.address : {};
+const l = p ? DB.landlords.find((x) => x && x.id === p.landlordId) : null;
+const unitTitle = u.label || "Unit";
+const addressTitle = `${a.line1 || "Address"}${a.unit ? `, ${a.unit}` : ""}`;
+setPageTitle(`${unitTitle} • ${addressTitle}`);
+
+const st = ratingStats("unit", u.id);
+const tier = cardTier(st.avgRounded ?? 0, st.count);
+const ratingTintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
+const avgText = st.avgRounded == null ? "—" : st.avgRounded.toFixed(1);
+const starVis = starVisFromAvg(st.avgRounded);
+const propertyStats = p ? ratingStats("property", p.id) : null;
+const landlordStats = l ? ratingStats("landlord", l.id) : null;
+const propertyAvgText =
+  propertyStats && propertyStats.avgRounded != null ? propertyStats.avgRounded.toFixed(1) : "—";
+const landlordAvgText =
+  landlordStats && landlordStats.avgRounded != null ? landlordStats.avgRounded.toFixed(1) : "—";
+
+const content = `
+   <section class="pageCard card">
+     <div class="pad">
+       <div class="topRow topRow--profile">
+         <div class="profileHeadLeft">
+           <div class="kicker">Unit</div>
+           <div class="pageTitle">${esc(unitTitle)}</div>
+           <div class="pageSub">
+             ${esc(addressTitle)} ${
+               l ? `• Landlord: <a href="#/landlord/${esc(l.id)}">${esc(l.name)}</a>` : ""
+             }
+           </div>
+         </div>
+         <div class="profileHeadActions">
+           <div class="profileActionRow">
+             ${p ? `<a class="btn" href="#/property/${encodeURIComponent(p.id)}">Back</a>` : `<a class="btn" href="#/search">Back</a>`}
+           </div>
+         </div>
+       </div>
+
+       <div class="hr"></div>
+
+       <div class="splitRow" style="margin-top:0;">
+         <div>
+           <div class="card ${ratingTintClass}" style="box-shadow:none;">
+             <div class="pad">
+               <div class="kicker">Rating</div>
+               <div class="lcRow" style="margin-top:10px;">
+                 <div style="display:flex; gap:12px; align-items:center;">
+                   <span class="stars" style="font-size:16px;">${esc(starVis)}</span>
+                   <span class="ratingNum" style="font-weight:950;">${esc(avgText)}</span>
+                   <span class="muted">(${st.count} review${st.count === 1 ? "" : "s"})</span>
+                 </div>
+                 ${st.count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
+               </div>
+
+               <div class="hr" style="margin:14px 0;"></div>
+
+               <div class="kicker">Scores</div>
+               <div class="lcRow" style="margin-top:8px;">
+                 <div class="muted" style="font-weight:900;">Unit Score</div>
+                 <div class="ratingNum" style="font-weight:950;">${esc(avgText)}</div>
+               </div>
+               <div class="lcRow" style="margin-top:6px;">
+                 <div class="muted" style="font-weight:900;">Building Score</div>
+                 <div class="ratingNum" style="font-weight:950;">${esc(propertyAvgText)}</div>
+               </div>
+               <div class="lcRow" style="margin-top:6px;">
+                 <div class="muted" style="font-weight:900;">Landlord Score</div>
+                 <div class="ratingNum" style="font-weight:950;">${esc(landlordAvgText)}</div>
+               </div>
+             </div>
+           </div>
+
+           <div style="margin-top:14px;">
+             ${reviewFormHTML("unit", u.id)}
+           </div>
+         </div>
+
+         <div>
+           <div class="kicker">Reviews</div>
+           <div class="list" id="unitReviews" style="margin-top:10px;"></div>
+         </div>
+       </div>
+     </div>
+   </section>
+ `.trim();
+
+renderShell(content);
+ensureRuntimeStyles();
+initStarPickers();
+wireReviewProofEditor(`unit_${u.id}`);
+
+const listEl = $("#unitReviews");
+if (listEl) {
+const landlordIdForReply = l ? l.id : null;
+listEl.innerHTML = renderReviewList("unit", u.id, landlordIdForReply);
+wireReviewListInteractions(listEl, landlordIdForReply, "unit", u.id);
+}
+
+const formId = `unit_${u.id}`;
+$(`#rev_${formId}Submit`)?.addEventListener("click", async () => {
+if (!isUserSignedIn()) {
+alert("Sign in to post a review.");
+location.hash = "#/portal?umode=signup";
+return;
+}
+const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
+const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
+if (!text) return alert("Write a review first.");
+const proofFiles = getProofListFromDOM(formId).filter(Boolean);
+
+const existing = currentUserReview("unit", u.id);
+if (existing) {
+  existing.editHistory = existing.editHistory || [];
+  existing.editHistory.push({
+    stars: existing.stars,
+    text: existing.text,
+    editedAt: Date.now(),
+  });
+  existing.stars = stars;
+  existing.text = text;
+  existing.proofFiles = proofFiles;
+  existing.createdAt = Date.now();
+} else {
+  DB.reviews.unshift({
+    id: idRand("r"),
+    targetType: "unit",
+    targetId: u.id,
+    userId: DB.currentUserId || "",
+    stars,
+    text,
+    proofFiles,
+    status: "live",
+    createdAt: Date.now(),
+  });
+}
+persist();
+route();
+});
+
+$(`#rev_${formId}Report`)?.addEventListener("click", () => openReportModal("unit", u.id));
 }
 
 /* -----------------------------
