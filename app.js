@@ -1193,6 +1193,33 @@ avg[k] = Math.round((sums[k] / n) * 10) / 10;
 return avg;
 }
 
+function categoryAveragesForUnit(unitId) {
+const rs = reviewsFor("unit", unitId).filter((r) => r && r.categories);
+if (!rs.length) return null;
+const sums = { clean: 0, wifi: 0, water: 0, noise: 0, heat: 0 };
+let n = 0;
+rs.forEach((r) => {
+const c = r.categories || {};
+const vals = {
+clean: Number(c.clean),
+wifi: Number(c.wifi),
+water: Number(c.water),
+noise: Number(c.noise),
+heat: Number(c.heat),
+};
+Object.keys(sums).forEach((k) => {
+if (Number.isFinite(vals[k])) sums[k] += vals[k];
+});
+n += 1;
+});
+if (!n) return null;
+const avg = {};
+Object.keys(sums).forEach((k) => {
+avg[k] = Math.round((sums[k] / n) * 10) / 10;
+});
+return avg;
+}
+
 function categoryAveragesForLandlord(landlordId) {
 const rs = reviewsFor("landlord", landlordId).filter(
 (r) => r && (r.categoryStars || r.categories)
@@ -2806,6 +2833,7 @@ return `
 
 function unitCardHTML(u, opts = {}) {
 const showView = opts && opts.showView === false ? false : true;
+const showReportCard = opts && opts.showReportCard ? true : false;
 const st = ratingStats("unit", u.id);
 const avg = st.avgRounded;
 const count = st.count;
@@ -2824,6 +2852,14 @@ const stars = starVisFromAvg(avg);
 const p = DB.properties.find((x) => x && x.id === u.propertyId);
 const a = p && p.address ? p.address : {};
 const subtitle = `${a.line1 || "Address"} • ${a.city || ""} ${a.state || ""}`.replace(/\s{2,}/g, " ");
+const report = showReportCard ? categoryAveragesForUnit(u.id) : null;
+const reportLabels = {
+clean: "Cleanliness",
+wifi: "Wi‑Fi",
+water: "Water",
+noise: "Noise",
+heat: "Heat",
+};
 
 return `
    <div class="lc ${tintClass}">
@@ -2839,6 +2875,23 @@ return `
        <div class="tiny" style="margin-top:8px;">
          ${esc(subtitle)}
        </div>
+       ${
+         report
+           ? `
+             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+               ${Object.keys(reportLabels)
+                 .map((k) =>
+                   Number.isFinite(report[k])
+                     ? `<span class="pill pill--report">${esc(reportLabels[k])}: ${esc(
+                         String(report[k])
+                       )}</span>`
+                     : ""
+                 )
+                 .join("")}
+             </div>
+           `
+           : ""
+       }
      </div>
      <div class="lcRight">
        ${count ? `<span class="pill ${esc(tier.pillClass)}">${esc(tier.label)}</span>` : `<span class="pill">Unrated</span>`}
@@ -7057,6 +7110,19 @@ return `
            `
            : ""
        }
+       ${
+         targetType === "unit"
+           ? `
+             <div class="hr" style="margin:12px 0;"></div>
+             <div class="kicker">Category ratings</div>
+             ${renderCategoryPicker(`rev_${formId}_clean`, "Cleanliness", Number(cat.clean ?? 5))}
+             ${renderCategoryPicker(`rev_${formId}_wifi`, "Wi‑Fi", Number(cat.wifi ?? 5))}
+             ${renderCategoryPicker(`rev_${formId}_water`, "Water", Number(cat.water ?? 5))}
+             ${renderCategoryPicker(`rev_${formId}_noise`, "Noise", Number(cat.noise ?? 5))}
+             ${renderCategoryPicker(`rev_${formId}_heat`, "Heat", Number(cat.heat ?? 5))}
+           `
+           : ""
+       }
 
        <div class="field">
          <label>Review</label>
@@ -7315,6 +7381,51 @@ return `
            ${r.proofFiles && r.proofFiles.length ? `<div class="tiny" style="margin-top:8px;">Proof attached</div>${renderProofGallery(r.proofFiles, `review_${esc(r.id)}`)}` : ""}
            ${replyHTML}
            ${respondHTML}
+         </div>
+       </div>
+     `.trim();
+})
+.join("\n");
+}
+
+function renderUnitReviewFeedForProperty(propertyId) {
+const units = unitsForProperty(propertyId);
+if (!units.length) return `<div class="muted">No unit reviews yet.</div>`;
+const entries = [];
+units.forEach((u) => {
+reviewsFor("unit", u.id).forEach((r) => entries.push({ r, u }));
+});
+if (!entries.length) return `<div class="muted">No unit reviews yet.</div>`;
+entries.sort((a, b) => b.r.createdAt - a.r.createdAt);
+
+return entries
+.map(({ r, u }) => {
+const stars = renderFractionalStars(r.stars, 14, 3);
+const starText = Number(r.stars);
+const tier = cardTier(Number.isFinite(starText) ? starText : 0, 1);
+const tintClass =
+  tier.tier === "green"
+    ? "lc--green"
+    : tier.tier === "yellow"
+      ? "lc--yellow"
+      : tier.tier === "red"
+        ? "lc--red"
+        : "";
+const date = fmtDate(r.createdAt);
+return `
+       <div class="card ${tintClass}" style="box-shadow:none;">
+         <div class="pad">
+           <div class="lcRow" style="justify-content:space-between;">
+             <div style="display:flex; gap:10px; align-items:center;">
+               ${stars}
+               <span class="ratingNum">${esc(
+                 Number.isFinite(starText) ? starText.toFixed(1) : "—"
+               )}</span>
+               <span class="muted" style="font-weight:900;">${esc(date)}</span>
+             </div>
+             <span class="pill">${esc(u.label || "Unit")}</span>
+           </div>
+           <div class="smallNote" style="margin-top:10px;">${esc(r.text)}</div>
          </div>
        </div>
      `.trim();
@@ -7776,8 +7887,17 @@ deposit: "Deposit return",
 const propertyInsights = categoryInsights(propertyCats, propertyCatLabels);
 const user = currentUser();
 const isSaved = isPropertySavedByUser(user, p.id);
-const units = unitsForProperty(p.id);
-const hasUnits = units.length > 0;
+const landlordUser = currentLandlordUser();
+const tenantUser = currentUser();
+const landlordOwnsProfile =
+  !!(
+    landlordUser &&
+    l &&
+    ((landlordUser.landlordId && landlordUser.landlordId === l.id) ||
+      (!landlordUser.landlordId && landlordForCompany(landlordUser.company)?.id === l.id))
+  );
+const canAddUnits = landlordOwnsProfile && isPropertyClaimedByLandlord(p, l?.id || "");
+const canAddUnitsAny = !!tenantUser || canAddUnits;
 
 const showOwnerLink = !isUserSignedIn() && !!l;
 const ownerLinkHTML = showOwnerLink
@@ -7833,15 +7953,9 @@ const content = `
                  <div class="ratingNum" style="font-weight:950;">${esc(landlordAvgText)}</div>
                </div>
 
-               ${
-                 hasUnits
-                   ? `
-                     <div style="margin-top:12px;">
-                       <a class="pill" href="#/property/${encodeURIComponent(p.id)}/units">See Rated Units</a>
-                     </div>
-                   `
-                   : ""
-               }
+               <div style="margin-top:12px;">
+                 <a class="pill pill--blur" href="#/property/${encodeURIComponent(p.id)}/units">See Unit Reviews</a>
+               </div>
 
                ${
                  propertyCats
@@ -7885,6 +7999,30 @@ const content = `
              ${l ? landlordCardHTML(l) : `<div class="muted">No landlord listed.</div>`}
            </div>
 
+           ${
+             landlordUser || tenantUser
+               ? `
+                 <div class="card bubble--white" style="box-shadow:none; margin-top:14px;">
+                   <div class="pad">
+                     <div class="kicker">Units</div>
+                     ${
+                       canAddUnitsAny
+                         ? `
+                           <div class="field" style="margin-top:10px;">
+                             <label>Add units to this building</label>
+                             <input class="input" id="propertyUnitsAddInput" placeholder="e.g., 1A, 1B, 2A" />
+                             <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
+                           </div>
+                           <button class="btn btn--primary" id="propertyUnitsAddBtn" type="button">Add units</button>
+                         `
+                         : `<div class="muted" style="margin-top:8px; font-weight:800;">Claim this property to add units.</div>`
+                     }
+                   </div>
+                 </div>
+               `
+               : ""
+           }
+
            <div class="hr"></div>
 
            <div class="kicker">Reviews</div>
@@ -7926,6 +8064,17 @@ route();
 });
 if ($("#ownerClaimBtn") && $("#ownerClaimBtn").textContent) {
 $("#ownerClaimBtn").textContent = "Owner?";
+}
+
+if (canAddUnitsAny) {
+$("#propertyUnitsAddBtn")?.addEventListener("click", () => {
+const raw = $("#propertyUnitsAddInput")?.value || "";
+const list = parseUnitsInput(raw);
+if (!list.length) return alert("Add at least one unit.");
+addUnitsForProperty(p.id, list);
+persist();
+route();
+});
 }
 
 document.querySelectorAll("[data-info]").forEach((btn) => {
@@ -8051,9 +8200,16 @@ const content = `
        <div class="list" style="margin-top:10px;">
          ${
            units.length
-             ? units.map((u) => unitCardHTML(u)).join("")
+             ? units.map((u) => unitCardHTML(u, { showReportCard: true })).join("")
              : `<div class="muted">No units listed yet.</div>`
          }
+       </div>
+
+       <div class="hr" style="margin-top:16px;"></div>
+
+       <div class="kicker">Unit reviews</div>
+       <div class="list" style="margin-top:10px;">
+         ${renderUnitReviewFeedForProperty(p.id)}
        </div>
      </div>
    </section>
@@ -8205,16 +8361,25 @@ const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 const proofFiles = getProofListFromDOM(formId).filter(Boolean);
+const categories = {
+clean: Number($(`#rev_${formId}_clean`)?.value || 5),
+wifi: Number($(`#rev_${formId}_wifi`)?.value || 5),
+water: Number($(`#rev_${formId}_water`)?.value || 5),
+noise: Number($(`#rev_${formId}_noise`)?.value || 5),
+heat: Number($(`#rev_${formId}_heat`)?.value || 5),
+};
 
 const existing = currentUserReview("unit", u.id);
 if (existing) {
   existing.editHistory = existing.editHistory || [];
   existing.editHistory.push({
     stars: existing.stars,
+    categories: existing.categories,
     text: existing.text,
     editedAt: Date.now(),
   });
   existing.stars = stars;
+  existing.categories = categories;
   existing.text = text;
   existing.proofFiles = proofFiles;
   existing.createdAt = Date.now();
@@ -8225,6 +8390,7 @@ if (existing) {
     targetId: u.id,
     userId: DB.currentUserId || "",
     stars,
+    categories,
     text,
     proofFiles,
     status: "live",
