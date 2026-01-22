@@ -2937,22 +2937,6 @@ const content = `
          Create an account to rate. Verified landlords can respond.
        </div>
 
-       <div class="tileRow">
-         <div class="tile" data-home-tile="search">
-           <div class="tile__icon">⌕</div>
-           <div><div class="tile__label">Search</div></div>
-         </div>
-         <div class="tile" data-home-tile="review">
-           <div class="tile__icon">★</div>
-           <div><div class="tile__label">Review</div></div>
-         </div>
-         <div class="tile tile--disabled">
-           <div class="tile__icon">⌂</div>
-           <div><div class="tile__label">Rent</div></div>
-         </div>
-       </div>
-
-       <div class="tilePanel" id="tilePanel" style="display:none"></div>
      </div>
    </section>
 
@@ -3004,19 +2988,7 @@ renderShell(content);
 // Minimal CSS injection to FORCE 50/50 banner without touching theme files
 ensureRuntimeStyles();
 
-const tilePanel = $("#tilePanel");
-document.querySelectorAll("[data-home-tile]").forEach((el) => {
-el.addEventListener("click", () => {
-const k = el.dataset.homeTile;
-if (!tilePanel) return;
-tilePanel.style.display = "block";
-if (k === "search") {
-location.hash = "#/search";
-return;
-}
-if (k === "review") tilePanel.textContent = "Sign in to leave a public star rating.";
-});
-});
+// removed home tiles
 
 const homeSearch = $("#homeSearch");
 const homeQ = $("#homeQ");
