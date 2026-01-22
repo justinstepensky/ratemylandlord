@@ -3928,11 +3928,6 @@ const content = `
                        <label>Company / Landlord name</label>
                        <input class="input" id="lpCompany" placeholder="Exact name as shown on CASA" />
                      </div>
-                     <div class="field">
-                       <label>Verification document (demo)</label>
-                       <input class="input" id="lpDoc" type="file" />
-                       <div class="fileChips" id="lpDocChips"></div>
-                     </div>
                    `
                    : ""
                }
@@ -4065,7 +4060,6 @@ document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smoo
 }
 const goNextOrHome = () => navigateTo("#/account");
 const uploadState = (window.__casaPortalUploads = window.__casaPortalUploads || {
-lpDoc: [],
 verifyDocs: [],
 });
 const renderFileChips = (list, wrapId, inputId) => {
@@ -4090,14 +4084,6 @@ renderFileChips(list, wrapId, inputId);
 });
 });
 };
-
-const lpDocInput = $("#lpDoc");
-if (lpDocInput) {
-lpDocInput.addEventListener("change", () => {
-uploadState.lpDoc = Array.from(lpDocInput.files || []);
-renderFileChips(uploadState.lpDoc, "lpDocChips", "lpDoc");
-});
-}
 
 const verifyDocsInput = $("#verifyDocs");
 if (verifyDocsInput) {
