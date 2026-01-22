@@ -4508,6 +4508,517 @@ renderShell(`
 return;
 }
 
+
+
+const landlordRecord = landlordUser.landlordId
+  ? DB.landlords.find((l) => l && l.id === landlordUser.landlordId)
+  : landlordForCompany(landlordUser.company);
+if (!landlordRecord) {
+renderShell(`
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">Landlord portal</div>
+            <div class="pageTitle">Landlord profile not found</div>
+            <div class="pageSub">Update your company name and try again.</div>
+          </div>
+          <a class="btn" href="#/">Home</a>
+        </div>
+      </div>
+    </section>
+  `);
+return;
+}
+
+const tab = getQueryParam("tab") || "inbox";
+const threadId = getQueryParam("thread") || "";
+const propFilter = getQueryParam("prop") || "";
+const unreadOnly = getQueryParam("unread") === "1";
+
+const props = DB.properties.filter((p) => p && p.landlordId === landlordRecord.id);
+const threads = getThreadsForLandlord(landlordRecord.id);
+const filteredThreads = threads.filter((t) => {
+if (propFilter && t.propertyId !== propFilter) return false;
+if (unreadOnly && !(Number(t.unreadByLandlord || 0) > 0)) return false;
+return true;
+});
+const selectedThread =
+filteredThreads.find((t) => t.id === threadId) || filteredThreads[0] || null;
+if (selectedThread && Number(selectedThread.unreadByLandlord || 0) > 0) {
+selectedThread.unreadByLandlord = 0;
+persist();
+}
+
+const tabBtn = (key, label) =>
+`<a class="btn ${tab === key ? "btn--primary" : ""}" href="#/account?tab=${key}">${esc(label)}</a>`;
+
+const threadListHTML = filteredThreads.length
+? filteredThreads
+  .map((t) => {
+    const p = t.propertyId ? DB.properties.find((x) => x && x.id === t.propertyId) : null;
+    const propTitle = p ? buildFullAddress(p) : "Landlord profile";
+    const unread = Number(t.unreadByLandlord || 0);
+    return `
+      <button class="threadItem ${t.id === (selectedThread && selectedThread.id) ? "isActive" : ""}" data-thread="${esc(
+        t.id
+      )}" type="button">
+        <div class="threadTitle">${esc(propTitle)}</div>
+        <div class="threadMeta">${esc(t.tenantEmail)} • ${esc(t.topic || "general")}</div>
+        <div class="threadPreview">${esc(t.lastMessagePreview || "New message")}</div>
+        ${unread ? `<span class="threadBadge">${unread}</span>` : ""}
+      </button>
+    `.trim();
+  })
+  .join("")
+: `<div class="muted">No messages yet.</div>`;
+
+const messages = selectedThread ? getMessagesForThread(selectedThread.id) : [];
+const messageHTML = selectedThread
+? `
+  <div class="threadHead">
+    <div>
+      <div class="kicker">Conversation</div>
+      <div class="threadTitle">${esc(selectedThread.tenantEmail)}</div>
+      <div class="tiny" style="margin-top:4px;">
+        ${selectedThread.propertyId ? `Property: ${esc(buildFullAddress(DB.properties.find((p) => p && p.id === selectedThread.propertyId) || {}))}` : "Landlord profile"}
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <button class="btn miniBtn" id="threadBlockBtn" type="button">Block sender</button>
+      <button class="btn miniBtn" id="threadReportBtn" type="button">Report abuse</button>
+    </div>
+  </div>
+  ${
+    selectedThread.status === "held"
+      ? `<div class="pill" style="margin-top:8px;">Held for review</div>`
+      : ""
+  }
+  <div class="threadMessages">
+    ${
+      messages.length
+        ? messages
+            .map((m) => {
+              const isLandlord = m.senderType === "landlord";
+              return `
+                <div class="threadMessage ${isLandlord ? "threadMessage--landlord" : "threadMessage--tenant"}">
+                  <div class="threadBubble">${esc(m.body || "")}</div>
+                  <div class="threadMeta">${esc(isLandlord ? "Landlord" : m.senderEmail)} • ${esc(
+                    fmtDate(m.createdAt)
+                  )}</div>
+                </div>
+              `.trim();
+            })
+            .join("")
+        : `<div class="muted">No messages yet.</div>`
+    }
+  </div>
+  <div class="hr"></div>
+  <div class="field">
+    <label>Reply</label>
+    <textarea class="textarea" id="threadReplyText" placeholder="Write a reply..."></textarea>
+  </div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn--primary" id="threadReplySend" type="button">Send reply</button>
+  </div>
+`
+: `<div class="muted">Select a thread to view messages.</div>`;
+
+const content = `
+  <section class="pageCard card">
+    <div class="pad">
+      <div class="topRow">
+        <div>
+          <div class="kicker">Landlord portal</div>
+          <div class="pageTitle">Welcome, ${esc(landlordRecord.name)}</div>
+          <div class="pageSub">Inbox, properties, and verification tools.</div>
+        </div>
+        <a class="btn" href="#/">Home</a>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        ${tabBtn("inbox", "Inbox")}
+        ${tabBtn("profile", "Profile")}
+        ${tabBtn("properties", "Properties")}
+        ${tabBtn("verification", "Verification")}
+        ${tabBtn("notifications", "Notifications")}
+      </div>
+
+      <div class="hr"></div>
+
+      ${
+        tab === "inbox"
+          ? `
+            <div class="portalFilters">
+              <select class="input" id="portalPropFilter" style="max-width:260px;">
+                <option value="">All properties</option>
+                ${props
+                  .map(
+                    (p) =>
+                      `<option value="${esc(p.id)}"${p.id === propFilter ? " selected" : ""}>${esc(
+                        buildFullAddress(p)
+                      )}</option>`
+                  )
+                  .join("")}
+              </select>
+              <button class="btn miniBtn ${unreadOnly ? "btn--primary" : ""}" id="portalUnreadToggle" type="button">
+                Unread
+              </button>
+            </div>
+            <div class="portalInbox">
+              <div class="threadList">${threadListHTML}</div>
+              <div class="threadPane">${messageHTML}</div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "profile"
+          ? `
+            <div class="twoCol">
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Profile</div>
+                  <form id="portalProfileForm">
+                    <div class="field">
+                      <label>Display name</label>
+                      <input class="input" id="portalDisplayName" value="${esc(landlordRecord.name || "")}" />
+                    </div>
+                    <div class="field">
+                      <label>Company</label>
+                      <input class="input" id="portalCompany" value="${esc(landlordUser.company || "")}" />
+                    </div>
+                    <div class="field">
+                      <label>Description</label>
+                      <textarea class="textarea" id="portalDesc">${esc(landlordRecord.description || "")}</textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                      <button class="btn btn--primary" type="submit">Save</button>
+                      <button class="btn" id="portalLogout" type="button">Log out</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="card" style="box-shadow:none;">
+                <div class="pad">
+                  <div class="kicker">Access</div>
+                  <div class="tiny" style="margin-top:6px;">
+                    Verification status: <b>${esc(landlordRecord.verificationStatus || "none")}</b>
+                  </div>
+                  <div class="tiny" style="margin-top:6px;">
+                    Claimed: <b>${isLandlordClaimed(landlordRecord) ? "Yes" : "No"}</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "properties"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">My properties</div>
+                <div class="list" style="margin-top:10px;">
+                  ${
+                    props.length
+                      ? props
+                          .map((p) => {
+                            const claimed = isPropertyClaimedByLandlord(p, landlordRecord.id);
+                            return `
+                              <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="pad">
+                                  <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    Claimed: ${claimed ? "Yes" : "No"} • Status: ${esc(
+                                      p.buildingVerificationStatus || "none"
+                                    )}
+                                  </div>
+                                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                    ${
+                                      claimed
+                                        ? ""
+                                        : `<button class="btn miniBtn" type="button" data-claim-property="${esc(
+                                            p.id
+                                          )}">Claim property</button>`
+                                    }
+                                    <a class="btn miniBtn" href="#/property/${esc(p.id)}">View</a>
+                                  </div>
+                                </div>
+                              </div>
+                            `.trim();
+                          })
+                          .join("")
+                      : `<div class="muted">No properties yet.</div>`
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="box-shadow:none; margin-top:14px;">
+              <div class="pad">
+                <div class="kicker">Add property</div>
+                <form id="portalAddPropertyForm">
+                  <div class="field">
+                    <label>Address</label>
+                    <input class="input" id="portalAddrLine1" placeholder="123 Main St" />
+                  </div>
+                  <div class="field">
+                    <label>Unit</label>
+                    <input class="input" id="portalAddrUnit" placeholder="Apt / Unit (optional)" />
+                  </div>
+                  <div class="field">
+                    <label>City</label>
+                    <input class="input" id="portalAddrCity" placeholder="City" />
+                  </div>
+                  <div class="field">
+                    <label>State</label>
+                    <input class="input" id="portalAddrState" placeholder="NY" />
+                  </div>
+                  <div class="field">
+                    <label>Zip (optional)</label>
+                    <input class="input" id="portalAddrZip" placeholder="Zip" />
+                  </div>
+                  <button class="btn btn--primary" type="submit">Create property</button>
+                </form>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "verification"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">Verification</div>
+                <div class="tiny" style="margin-top:6px;">
+                  Status: <b>${esc(landlordRecord.verificationStatus || "none")}</b>
+                </div>
+                <div class="tiny" style="margin-top:6px;">
+                  Documents: ${esc(String((landlordRecord.verificationDocs || []).length))}
+                </div>
+                <div style="margin-top:10px;">
+                  <a class="btn miniBtn" href="#/verify">Manage verification</a>
+                </div>
+                <div class="hr"></div>
+                <div class="kicker">Property verification</div>
+                <div class="list" style="margin-top:10px;">
+                  ${
+                    props.length
+                      ? props
+                          .map(
+                            (p) => `
+                              <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="pad">
+                                  <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
+                                  <div class="tiny" style="margin-top:6px;">
+                                    Status: ${esc(p.buildingVerificationStatus || "none")}
+                                  </div>
+                                </div>
+                              </div>
+                            `
+                          )
+                          .join("")
+                      : `<div class="muted">No properties yet.</div>`
+                  }
+                </div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        tab === "notifications"
+          ? `
+            <div class="card" style="box-shadow:none;">
+              <div class="pad">
+                <div class="kicker">Notification preferences</div>
+                <form id="portalNotifForm">
+                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" id="portalNotifEmail" ${landlordUser.notifications?.email ? "checked" : ""} />
+                    Email me about new messages
+                  </label>
+                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+                    <input type="checkbox" id="portalNotifDigest" ${landlordUser.notifications?.digest ? "checked" : ""} />
+                    Weekly summary digest
+                  </label>
+                  <div style="margin-top:12px;">
+                    <button class="btn btn--primary" type="submit">Save preferences</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+  </section>
+`;
+
+renderShell(content);
+ensureRuntimeStyles();
+
+document.querySelectorAll("[data-thread]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const tid = btn.getAttribute("data-thread") || "";
+if (!tid) return;
+const params = new URLSearchParams();
+params.set("tab", "inbox");
+params.set("thread", tid);
+if (propFilter) params.set("prop", propFilter);
+if (unreadOnly) params.set("unread", "1");
+location.hash = `#/account?${params.toString()}`;
+});
+});
+
+$("#portalPropFilter")?.addEventListener("change", (e) => {
+const val = e.target.value || "";
+const params = new URLSearchParams();
+params.set("tab", "inbox");
+if (val) params.set("prop", val);
+if (unreadOnly) params.set("unread", "1");
+location.hash = `#/account?${params.toString()}`;
+});
+
+$("#portalUnreadToggle")?.addEventListener("click", () => {
+const params = new URLSearchParams();
+params.set("tab", "inbox");
+if (propFilter) params.set("prop", propFilter);
+if (!unreadOnly) params.set("unread", "1");
+location.hash = `#/account?${params.toString()}`;
+});
+
+$("#threadReplySend")?.addEventListener("click", () => {
+if (!selectedThread) return;
+const text = $("#threadReplyText")?.value ? String($("#threadReplyText").value).trim() : "";
+if (!text) return alert("Write a reply first.");
+if (!canDeliverLandlordMessage(landlordRecord)) {
+return alert("Verify and claim your profile before replying.");
+}
+if (selectedThread.propertyId) {
+const prop = DB.properties.find((p) => p && p.id === selectedThread.propertyId);
+if (!isPropertyClaimedByLandlord(prop, landlordRecord.id)) {
+return alert("Claim this property before replying.");
+}
+}
+const now = Date.now();
+DB.messages.push({
+id: idRand("m"),
+threadId: selectedThread.id,
+senderType: "landlord",
+senderEmail: landlordUser.email || "",
+body: text,
+createdAt: now,
+});
+selectedThread.lastMessageAt = now;
+selectedThread.lastMessagePreview = text.slice(0, 120);
+selectedThread.unreadByTenant = Number(selectedThread.unreadByTenant || 0) + 1;
+persist();
+route();
+});
+
+$("#threadBlockBtn")?.addEventListener("click", () => {
+if (!selectedThread) return;
+DB.blockedSenders = DB.blockedSenders || [];
+DB.blockedSenders.push({
+id: idRand("blk"),
+landlordId: landlordRecord.id,
+email: selectedThread.tenantEmail,
+createdAt: Date.now(),
+});
+persist();
+alert("Sender blocked.");
+});
+
+$("#threadReportBtn")?.addEventListener("click", () => {
+if (!selectedThread) return;
+DB.messageReports = DB.messageReports || [];
+DB.messageReports.push({
+id: idRand("mr"),
+threadId: selectedThread.id,
+landlordId: landlordRecord.id,
+email: selectedThread.tenantEmail,
+createdAt: Date.now(),
+});
+persist();
+alert("Report submitted (demo).");
+});
+
+$("#portalProfileForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const name = $("#portalDisplayName")?.value ? $("#portalDisplayName").value.trim() : "";
+const company = $("#portalCompany")?.value ? $("#portalCompany").value.trim() : "";
+const desc = $("#portalDesc")?.value ? String($("#portalDesc").value).trim() : "";
+if (!name || !company) return alert("Name and company are required.");
+landlordRecord.name = name;
+landlordUser.company = company;
+landlordRecord.description = desc;
+persist();
+updateAccountLinks();
+alert("Profile updated.");
+});
+
+$("#portalLogout")?.addEventListener("click", () => {
+DB.currentLandlordUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
+
+document.querySelectorAll("[data-claim-property]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const pid = btn.getAttribute("data-claim-property") || "";
+const prop = DB.properties.find((p) => p && p.id === pid);
+if (!prop) return;
+prop.claimedByLandlordId = landlordRecord.id;
+prop.claimedAt = Date.now();
+persist();
+route();
+});
+});
+
+$("#portalAddPropertyForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+const line1 = $("#portalAddrLine1")?.value ? $("#portalAddrLine1").value.trim() : "";
+const unit = $("#portalAddrUnit")?.value ? $("#portalAddrUnit").value.trim() : "";
+const city = $("#portalAddrCity")?.value ? $("#portalAddrCity").value.trim() : "";
+const state = $("#portalAddrState")?.value ? $("#portalAddrState").value.trim() : "";
+const zip = $("#portalAddrZip")?.value ? $("#portalAddrZip").value.trim() : "";
+if (!line1 || !city || !state) return alert("Address, city, and state are required.");
+DB.properties.unshift({
+id: idRand("p"),
+landlordId: landlordRecord.id,
+address: { line1, unit, city, state, zip },
+buildingVerificationStatus: "none",
+buildingVerificationDocs: [],
+claimedByLandlordId: landlordRecord.id,
+claimedAt: Date.now(),
+createdAt: Date.now(),
+});
+persist();
+route();
+});
+
+$("#portalNotifForm")?.addEventListener("submit", (e) => {
+e.preventDefault();
+landlordUser.notifications = landlordUser.notifications || {};
+landlordUser.notifications.email = !!$("#portalNotifEmail")?.checked;
+landlordUser.notifications.digest = !!$("#portalNotifDigest")?.checked;
+persist();
+alert("Preferences saved.");
+});
+}
+
+
 function renderTenantPortal() {
 setPageTitle("Tenant portal");
 const user = currentUser();
@@ -5246,514 +5757,6 @@ files.map((f) => ({ name: f.name, size: f.size, uploadedAt: Date.now() }))
 user.verificationStatus = "pending";
 persist();
 alert("Verification submitted (demo).");
-});
-}
-
-const landlordRecord = landlordUser.landlordId
-  ? DB.landlords.find((l) => l && l.id === landlordUser.landlordId)
-  : landlordForCompany(landlordUser.company);
-if (!landlordRecord) {
-renderShell(`
-    <section class="pageCard card">
-      <div class="pad">
-        <div class="topRow">
-          <div>
-            <div class="kicker">Landlord portal</div>
-            <div class="pageTitle">Landlord profile not found</div>
-            <div class="pageSub">Update your company name and try again.</div>
-          </div>
-          <a class="btn" href="#/">Home</a>
-        </div>
-      </div>
-    </section>
-  `);
-return;
-}
-
-const tab = getQueryParam("tab") || "inbox";
-const threadId = getQueryParam("thread") || "";
-const propFilter = getQueryParam("prop") || "";
-const unreadOnly = getQueryParam("unread") === "1";
-
-const props = DB.properties.filter((p) => p && p.landlordId === landlordRecord.id);
-const threads = getThreadsForLandlord(landlordRecord.id);
-const filteredThreads = threads.filter((t) => {
-if (propFilter && t.propertyId !== propFilter) return false;
-if (unreadOnly && !(Number(t.unreadByLandlord || 0) > 0)) return false;
-return true;
-});
-const selectedThread =
-filteredThreads.find((t) => t.id === threadId) || filteredThreads[0] || null;
-if (selectedThread && Number(selectedThread.unreadByLandlord || 0) > 0) {
-selectedThread.unreadByLandlord = 0;
-persist();
-}
-
-const tabBtn = (key, label) =>
-`<a class="btn ${tab === key ? "btn--primary" : ""}" href="#/account?tab=${key}">${esc(label)}</a>`;
-
-const threadListHTML = filteredThreads.length
-? filteredThreads
-  .map((t) => {
-    const p = t.propertyId ? DB.properties.find((x) => x && x.id === t.propertyId) : null;
-    const propTitle = p ? buildFullAddress(p) : "Landlord profile";
-    const unread = Number(t.unreadByLandlord || 0);
-    return `
-      <button class="threadItem ${t.id === (selectedThread && selectedThread.id) ? "isActive" : ""}" data-thread="${esc(
-        t.id
-      )}" type="button">
-        <div class="threadTitle">${esc(propTitle)}</div>
-        <div class="threadMeta">${esc(t.tenantEmail)} • ${esc(t.topic || "general")}</div>
-        <div class="threadPreview">${esc(t.lastMessagePreview || "New message")}</div>
-        ${unread ? `<span class="threadBadge">${unread}</span>` : ""}
-      </button>
-    `.trim();
-  })
-  .join("")
-: `<div class="muted">No messages yet.</div>`;
-
-const messages = selectedThread ? getMessagesForThread(selectedThread.id) : [];
-const messageHTML = selectedThread
-? `
-  <div class="threadHead">
-    <div>
-      <div class="kicker">Conversation</div>
-      <div class="threadTitle">${esc(selectedThread.tenantEmail)}</div>
-      <div class="tiny" style="margin-top:4px;">
-        ${selectedThread.propertyId ? `Property: ${esc(buildFullAddress(DB.properties.find((p) => p && p.id === selectedThread.propertyId) || {}))}` : "Landlord profile"}
-      </div>
-    </div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <button class="btn miniBtn" id="threadBlockBtn" type="button">Block sender</button>
-      <button class="btn miniBtn" id="threadReportBtn" type="button">Report abuse</button>
-    </div>
-  </div>
-  ${
-    selectedThread.status === "held"
-      ? `<div class="pill" style="margin-top:8px;">Held for review</div>`
-      : ""
-  }
-  <div class="threadMessages">
-    ${
-      messages.length
-        ? messages
-            .map((m) => {
-              const isLandlord = m.senderType === "landlord";
-              return `
-                <div class="threadMessage ${isLandlord ? "threadMessage--landlord" : "threadMessage--tenant"}">
-                  <div class="threadBubble">${esc(m.body || "")}</div>
-                  <div class="threadMeta">${esc(isLandlord ? "Landlord" : m.senderEmail)} • ${esc(
-                    fmtDate(m.createdAt)
-                  )}</div>
-                </div>
-              `.trim();
-            })
-            .join("")
-        : `<div class="muted">No messages yet.</div>`
-    }
-  </div>
-  <div class="hr"></div>
-  <div class="field">
-    <label>Reply</label>
-    <textarea class="textarea" id="threadReplyText" placeholder="Write a reply..."></textarea>
-  </div>
-  <div style="display:flex; gap:10px; flex-wrap:wrap;">
-    <button class="btn btn--primary" id="threadReplySend" type="button">Send reply</button>
-  </div>
-`
-: `<div class="muted">Select a thread to view messages.</div>`;
-
-const content = `
-  <section class="pageCard card">
-    <div class="pad">
-      <div class="topRow">
-        <div>
-          <div class="kicker">Landlord portal</div>
-          <div class="pageTitle">Welcome, ${esc(landlordRecord.name)}</div>
-          <div class="pageSub">Inbox, properties, and verification tools.</div>
-        </div>
-        <a class="btn" href="#/">Home</a>
-      </div>
-
-      <div class="hr"></div>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        ${tabBtn("inbox", "Inbox")}
-        ${tabBtn("profile", "Profile")}
-        ${tabBtn("properties", "Properties")}
-        ${tabBtn("verification", "Verification")}
-        ${tabBtn("notifications", "Notifications")}
-      </div>
-
-      <div class="hr"></div>
-
-      ${
-        tab === "inbox"
-          ? `
-            <div class="portalFilters">
-              <select class="input" id="portalPropFilter" style="max-width:260px;">
-                <option value="">All properties</option>
-                ${props
-                  .map(
-                    (p) =>
-                      `<option value="${esc(p.id)}"${p.id === propFilter ? " selected" : ""}>${esc(
-                        buildFullAddress(p)
-                      )}</option>`
-                  )
-                  .join("")}
-              </select>
-              <button class="btn miniBtn ${unreadOnly ? "btn--primary" : ""}" id="portalUnreadToggle" type="button">
-                Unread
-              </button>
-            </div>
-            <div class="portalInbox">
-              <div class="threadList">${threadListHTML}</div>
-              <div class="threadPane">${messageHTML}</div>
-            </div>
-          `
-          : ""
-      }
-
-      ${
-        tab === "profile"
-          ? `
-            <div class="twoCol">
-              <div class="card" style="box-shadow:none;">
-                <div class="pad">
-                  <div class="kicker">Profile</div>
-                  <form id="portalProfileForm">
-                    <div class="field">
-                      <label>Display name</label>
-                      <input class="input" id="portalDisplayName" value="${esc(landlordRecord.name || "")}" />
-                    </div>
-                    <div class="field">
-                      <label>Company</label>
-                      <input class="input" id="portalCompany" value="${esc(landlordUser.company || "")}" />
-                    </div>
-                    <div class="field">
-                      <label>Description</label>
-                      <textarea class="textarea" id="portalDesc">${esc(landlordRecord.description || "")}</textarea>
-                    </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                      <button class="btn btn--primary" type="submit">Save</button>
-                      <button class="btn" id="portalLogout" type="button">Log out</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-              <div class="card" style="box-shadow:none;">
-                <div class="pad">
-                  <div class="kicker">Access</div>
-                  <div class="tiny" style="margin-top:6px;">
-                    Verification status: <b>${esc(landlordRecord.verificationStatus || "none")}</b>
-                  </div>
-                  <div class="tiny" style="margin-top:6px;">
-                    Claimed: <b>${isLandlordClaimed(landlordRecord) ? "Yes" : "No"}</b>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `
-          : ""
-      }
-
-      ${
-        tab === "properties"
-          ? `
-            <div class="card" style="box-shadow:none;">
-              <div class="pad">
-                <div class="kicker">My properties</div>
-                <div class="list" style="margin-top:10px;">
-                  ${
-                    props.length
-                      ? props
-                          .map((p) => {
-                            const claimed = isPropertyClaimedByLandlord(p, landlordRecord.id);
-                            return `
-                              <div class="card bubble--gray" style="box-shadow:none;">
-                                <div class="pad">
-                                  <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
-                                  <div class="tiny" style="margin-top:6px;">
-                                    Claimed: ${claimed ? "Yes" : "No"} • Status: ${esc(
-                                      p.buildingVerificationStatus || "none"
-                                    )}
-                                  </div>
-                                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-                                    ${
-                                      claimed
-                                        ? ""
-                                        : `<button class="btn miniBtn" type="button" data-claim-property="${esc(
-                                            p.id
-                                          )}">Claim property</button>`
-                                    }
-                                    <a class="btn miniBtn" href="#/property/${esc(p.id)}">View</a>
-                                  </div>
-                                </div>
-                              </div>
-                            `.trim();
-                          })
-                          .join("")
-                      : `<div class="muted">No properties yet.</div>`
-                  }
-                </div>
-              </div>
-            </div>
-
-            <div class="card" style="box-shadow:none; margin-top:14px;">
-              <div class="pad">
-                <div class="kicker">Add property</div>
-                <form id="portalAddPropertyForm">
-                  <div class="field">
-                    <label>Address</label>
-                    <input class="input" id="portalAddrLine1" placeholder="123 Main St" />
-                  </div>
-                  <div class="field">
-                    <label>Unit</label>
-                    <input class="input" id="portalAddrUnit" placeholder="Apt / Unit (optional)" />
-                  </div>
-                  <div class="field">
-                    <label>City</label>
-                    <input class="input" id="portalAddrCity" placeholder="City" />
-                  </div>
-                  <div class="field">
-                    <label>State</label>
-                    <input class="input" id="portalAddrState" placeholder="NY" />
-                  </div>
-                  <div class="field">
-                    <label>Zip (optional)</label>
-                    <input class="input" id="portalAddrZip" placeholder="Zip" />
-                  </div>
-                  <button class="btn btn--primary" type="submit">Create property</button>
-                </form>
-              </div>
-            </div>
-          `
-          : ""
-      }
-
-      ${
-        tab === "verification"
-          ? `
-            <div class="card" style="box-shadow:none;">
-              <div class="pad">
-                <div class="kicker">Verification</div>
-                <div class="tiny" style="margin-top:6px;">
-                  Status: <b>${esc(landlordRecord.verificationStatus || "none")}</b>
-                </div>
-                <div class="tiny" style="margin-top:6px;">
-                  Documents: ${esc(String((landlordRecord.verificationDocs || []).length))}
-                </div>
-                <div style="margin-top:10px;">
-                  <a class="btn miniBtn" href="#/verify">Manage verification</a>
-                </div>
-                <div class="hr"></div>
-                <div class="kicker">Property verification</div>
-                <div class="list" style="margin-top:10px;">
-                  ${
-                    props.length
-                      ? props
-                          .map(
-                            (p) => `
-                              <div class="card bubble--gray" style="box-shadow:none;">
-                                <div class="pad">
-                                  <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
-                                  <div class="tiny" style="margin-top:6px;">
-                                    Status: ${esc(p.buildingVerificationStatus || "none")}
-                                  </div>
-                                </div>
-                              </div>
-                            `
-                          )
-                          .join("")
-                      : `<div class="muted">No properties yet.</div>`
-                  }
-                </div>
-              </div>
-            </div>
-          `
-          : ""
-      }
-
-      ${
-        tab === "notifications"
-          ? `
-            <div class="card" style="box-shadow:none;">
-              <div class="pad">
-                <div class="kicker">Notification preferences</div>
-                <form id="portalNotifForm">
-                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
-                    <input type="checkbox" id="portalNotifEmail" ${landlordUser.notifications?.email ? "checked" : ""} />
-                    Email me about new messages
-                  </label>
-                  <label class="tiny" style="display:flex; gap:8px; align-items:center; margin-top:10px;">
-                    <input type="checkbox" id="portalNotifDigest" ${landlordUser.notifications?.digest ? "checked" : ""} />
-                    Weekly summary digest
-                  </label>
-                  <div style="margin-top:12px;">
-                    <button class="btn btn--primary" type="submit">Save preferences</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          `
-          : ""
-      }
-
-    </div>
-  </section>
-`;
-
-renderShell(content);
-ensureRuntimeStyles();
-
-document.querySelectorAll("[data-thread]").forEach((btn) => {
-btn.addEventListener("click", () => {
-const tid = btn.getAttribute("data-thread") || "";
-if (!tid) return;
-const params = new URLSearchParams();
-params.set("tab", "inbox");
-params.set("thread", tid);
-if (propFilter) params.set("prop", propFilter);
-if (unreadOnly) params.set("unread", "1");
-location.hash = `#/account?${params.toString()}`;
-});
-});
-
-$("#portalPropFilter")?.addEventListener("change", (e) => {
-const val = e.target.value || "";
-const params = new URLSearchParams();
-params.set("tab", "inbox");
-if (val) params.set("prop", val);
-if (unreadOnly) params.set("unread", "1");
-location.hash = `#/account?${params.toString()}`;
-});
-
-$("#portalUnreadToggle")?.addEventListener("click", () => {
-const params = new URLSearchParams();
-params.set("tab", "inbox");
-if (propFilter) params.set("prop", propFilter);
-if (!unreadOnly) params.set("unread", "1");
-location.hash = `#/account?${params.toString()}`;
-});
-
-$("#threadReplySend")?.addEventListener("click", () => {
-if (!selectedThread) return;
-const text = $("#threadReplyText")?.value ? String($("#threadReplyText").value).trim() : "";
-if (!text) return alert("Write a reply first.");
-if (!canDeliverLandlordMessage(landlordRecord)) {
-return alert("Verify and claim your profile before replying.");
-}
-if (selectedThread.propertyId) {
-const prop = DB.properties.find((p) => p && p.id === selectedThread.propertyId);
-if (!isPropertyClaimedByLandlord(prop, landlordRecord.id)) {
-return alert("Claim this property before replying.");
-}
-}
-const now = Date.now();
-DB.messages.push({
-id: idRand("m"),
-threadId: selectedThread.id,
-senderType: "landlord",
-senderEmail: landlordUser.email || "",
-body: text,
-createdAt: now,
-});
-selectedThread.lastMessageAt = now;
-selectedThread.lastMessagePreview = text.slice(0, 120);
-selectedThread.unreadByTenant = Number(selectedThread.unreadByTenant || 0) + 1;
-persist();
-route();
-});
-
-$("#threadBlockBtn")?.addEventListener("click", () => {
-if (!selectedThread) return;
-DB.blockedSenders = DB.blockedSenders || [];
-DB.blockedSenders.push({
-id: idRand("blk"),
-landlordId: landlordRecord.id,
-email: selectedThread.tenantEmail,
-createdAt: Date.now(),
-});
-persist();
-alert("Sender blocked.");
-});
-
-$("#threadReportBtn")?.addEventListener("click", () => {
-if (!selectedThread) return;
-DB.messageReports = DB.messageReports || [];
-DB.messageReports.push({
-id: idRand("mr"),
-threadId: selectedThread.id,
-landlordId: landlordRecord.id,
-email: selectedThread.tenantEmail,
-createdAt: Date.now(),
-});
-persist();
-alert("Report submitted (demo).");
-});
-
-$("#portalProfileForm")?.addEventListener("submit", (e) => {
-e.preventDefault();
-const name = $("#portalDisplayName")?.value ? $("#portalDisplayName").value.trim() : "";
-const company = $("#portalCompany")?.value ? $("#portalCompany").value.trim() : "";
-const desc = $("#portalDesc")?.value ? String($("#portalDesc").value).trim() : "";
-if (!name || !company) return alert("Name and company are required.");
-landlordRecord.name = name;
-landlordUser.company = company;
-landlordRecord.description = desc;
-persist();
-updateAccountLinks();
-alert("Profile updated.");
-});
-
-$("#portalLogout")?.addEventListener("click", () => {
-DB.currentLandlordUserId = "";
-persist();
-updateAccountLinks();
-route();
-});
-
-document.querySelectorAll("[data-claim-property]").forEach((btn) => {
-btn.addEventListener("click", () => {
-const pid = btn.getAttribute("data-claim-property") || "";
-const prop = DB.properties.find((p) => p && p.id === pid);
-if (!prop) return;
-prop.claimedByLandlordId = landlordRecord.id;
-prop.claimedAt = Date.now();
-persist();
-route();
-});
-});
-
-$("#portalAddPropertyForm")?.addEventListener("submit", (e) => {
-e.preventDefault();
-const line1 = $("#portalAddrLine1")?.value ? $("#portalAddrLine1").value.trim() : "";
-const unit = $("#portalAddrUnit")?.value ? $("#portalAddrUnit").value.trim() : "";
-const city = $("#portalAddrCity")?.value ? $("#portalAddrCity").value.trim() : "";
-const state = $("#portalAddrState")?.value ? $("#portalAddrState").value.trim() : "";
-const zip = $("#portalAddrZip")?.value ? $("#portalAddrZip").value.trim() : "";
-if (!line1 || !city || !state) return alert("Address, city, and state are required.");
-DB.properties.unshift({
-id: idRand("p"),
-landlordId: landlordRecord.id,
-address: { line1, unit, city, state, zip },
-buildingVerificationStatus: "none",
-buildingVerificationDocs: [],
-claimedByLandlordId: landlordRecord.id,
-claimedAt: Date.now(),
-createdAt: Date.now(),
-});
-persist();
-route();
-});
-
-$("#portalNotifForm")?.addEventListener("submit", (e) => {
-e.preventDefault();
-landlordUser.notifications = landlordUser.notifications || {};
-landlordUser.notifications.email = !!$("#portalNotifEmail")?.checked;
-landlordUser.notifications.digest = !!$("#portalNotifDigest")?.checked;
-persist();
-alert("Preferences saved.");
 });
 }
 
