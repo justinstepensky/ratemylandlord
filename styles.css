@@ -95,11 +95,27 @@ a{color:inherit}
    background: rgba(255,255,255,.75);
    font-weight:800;font-size:12px;color:rgba(21,17,14,.75);
  }
- .fileChip button{
-   border:0;background:rgba(21,17,14,.08);
-   width:18px;height:18px;border-radius:999px;
-   font-weight:900;cursor:pointer;line-height:1;
- }
+.fileChip button{
+  border:0;background:rgba(21,17,14,.08);
+  width:18px;height:18px;border-radius:999px;
+  font-weight:900;cursor:pointer;line-height:1;
+}
+.docTypeList{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.docType{padding:10px 12px;border-radius:12px;border:1px solid rgba(20,16,12,.10);background:rgba(255,255,255,.70)}
+.docType__label{display:flex;align-items:center;gap:8px;font-weight:850}
+.docUpload{
+  max-height:0;
+  opacity:0;
+  overflow:hidden;
+  transition:max-height .25s ease, opacity .25s ease;
+}
+.docUpload.isOpen{
+  max-height:120px;
+  opacity:1;
+  margin-top:8px;
+}
+.fileNames{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.fileName{font-size:12px;font-weight:800;color:rgba(21,17,14,.7)}
 
 body.modalBlur header,
 body.modalBlur #app{

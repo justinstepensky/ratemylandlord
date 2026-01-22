@@ -3961,18 +3961,44 @@ const content = `
 
                    <div class="field" style="margin-top:10px;">
                      <label>Document types (select at least one)</label>
-                     <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
-                       <label class="tiny"><input type="checkbox" id="docDeed" /> Property Deed or Title</label>
-                       <label class="tiny"><input type="checkbox" id="docTax" /> Property Tax Bill</label>
-                       <label class="tiny"><input type="checkbox" id="docMortgage" /> Mortgage Statement</label>
-                       <label class="tiny"><input type="checkbox" id="docOther" /> Other Ownership Proof</label>
+                     <div class="docTypeList">
+                       <div class="docType">
+                         <label class="tiny docType__label">
+                           <input type="checkbox" id="docDeed" /> Property Deed or Title
+                         </label>
+                         <div class="docUpload" id="docUploadDeed">
+                           <input class="input" id="verifyFileDeed" type="file" />
+                           <div class="fileNames" id="verifyNamesDeed"></div>
+                         </div>
+                       </div>
+                       <div class="docType">
+                         <label class="tiny docType__label">
+                           <input type="checkbox" id="docTax" /> Property Tax Bill
+                         </label>
+                         <div class="docUpload" id="docUploadTax">
+                           <input class="input" id="verifyFileTax" type="file" />
+                           <div class="fileNames" id="verifyNamesTax"></div>
+                         </div>
+                       </div>
+                       <div class="docType">
+                         <label class="tiny docType__label">
+                           <input type="checkbox" id="docMortgage" /> Mortgage Statement
+                         </label>
+                         <div class="docUpload" id="docUploadMortgage">
+                           <input class="input" id="verifyFileMortgage" type="file" />
+                           <div class="fileNames" id="verifyNamesMortgage"></div>
+                         </div>
+                       </div>
+                       <div class="docType">
+                         <label class="tiny docType__label">
+                           <input type="checkbox" id="docOther" /> Other Ownership Proof
+                         </label>
+                         <div class="docUpload" id="docUploadOther">
+                           <input class="input" id="verifyFileOther" type="file" multiple />
+                           <div class="fileNames" id="verifyNamesOther"></div>
+                         </div>
+                       </div>
                      </div>
-                   </div>
-
-                   <div class="field">
-                     <label>Upload documents</label>
-                     <input class="input" id="verifyDocs" type="file" multiple />
-                     <div class="fileChips" id="verifyDocsChips"></div>
                    </div>
 
                    <div class="field">
@@ -4062,45 +4088,52 @@ document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smoo
 }
 const goNextOrHome = () => navigateTo("#/account");
 const uploadState = (window.__casaPortalUploads = window.__casaPortalUploads || {
-verifyDocs: [],
+verifyDocsByType: {
+  deed: [],
+  tax: [],
+  mortgage: [],
+  other: [],
+},
 });
-const renderFileChips = (list, wrapId, inputId) => {
+const renderFileNames = (list, wrapId) => {
 const wrap = document.getElementById(wrapId);
-const input = document.getElementById(inputId);
 if (!wrap) return;
-if (list.length > 5) {
-list.splice(5);
-}
 wrap.innerHTML = list
-  .map(
-    (f, i) =>
-      `<span class="fileChip">${esc(f && f.name ? f.name : "File")}<button type="button" data-chip-remove="${esc(
-        wrapId
-      )}" data-chip-idx="${i}">×</button></span>`
-  )
+  .map((f) => `<span class="fileName">${esc(f && f.name ? f.name : "File")}</span>`)
   .join("");
-wrap.querySelectorAll("[data-chip-remove]").forEach((btn) => {
-btn.addEventListener("click", () => {
-const idx = Number(btn.getAttribute("data-chip-idx") || 0);
-if (!Number.isFinite(idx)) return;
-list.splice(idx, 1);
-if (input) input.value = "";
-renderFileChips(list, wrapId, inputId);
-});
+};
+const bindDocToggle = (checkboxId, uploadId) => {
+const cb = document.getElementById(checkboxId);
+const block = document.getElementById(uploadId);
+if (!cb || !block) return;
+const sync = () => {
+block.classList.toggle("isOpen", !!cb.checked);
+};
+cb.addEventListener("change", sync);
+sync();
+};
+bindDocToggle("docDeed", "docUploadDeed");
+bindDocToggle("docTax", "docUploadTax");
+bindDocToggle("docMortgage", "docUploadMortgage");
+bindDocToggle("docOther", "docUploadOther");
+
+const bindFileInput = (inputId, typeKey, namesId, limit = 1) => {
+const input = document.getElementById(inputId);
+if (!input) return;
+input.addEventListener("change", () => {
+let files = Array.from(input.files || []);
+if (limit && files.length > limit) {
+alert(`Upload up to ${limit} document${limit === 1 ? "" : "s"}.`);
+files = files.slice(0, limit);
+}
+uploadState.verifyDocsByType[typeKey] = files;
+renderFileNames(files, namesId);
 });
 };
-
-const verifyDocsInput = $("#verifyDocs");
-if (verifyDocsInput) {
-verifyDocsInput.addEventListener("change", () => {
-const files = Array.from(verifyDocsInput.files || []);
-if (files.length > 5) {
-alert("Upload up to 5 documents.");
-}
-uploadState.verifyDocs = files.slice(0, 5);
-renderFileChips(uploadState.verifyDocs, "verifyDocsChips", "verifyDocs");
-});
-}
+bindFileInput("verifyFileDeed", "deed", "verifyNamesDeed", 1);
+bindFileInput("verifyFileTax", "tax", "verifyNamesTax", 1);
+bindFileInput("verifyFileMortgage", "mortgage", "verifyNamesMortgage", 1);
+bindFileInput("verifyFileOther", "other", "verifyNamesOther", 5);
 const setPortalRole = (role) => {
 const panels = Array.from(document.querySelectorAll("[data-portal-panel]"));
 panels.forEach((panel) => {
@@ -4181,30 +4214,33 @@ const landlord = user.landlordId
 : landlordForCompany(user.company);
 if (!landlord) return alert("No matching landlord profile found.");
 
-const hasType =
-  $("#docDeed")?.checked ||
-  $("#docTax")?.checked ||
-  $("#docMortgage")?.checked ||
-  $("#docOther")?.checked;
-if (!hasType) return alert("Select at least one document type.");
+const checkedTypes = [
+  { key: "deed", label: "Property Deed or Title", checked: $("#docDeed")?.checked },
+  { key: "tax", label: "Property Tax Bill", checked: $("#docTax")?.checked },
+  { key: "mortgage", label: "Mortgage Statement", checked: $("#docMortgage")?.checked },
+  { key: "other", label: "Other Ownership Proof", checked: $("#docOther")?.checked },
+].filter((t) => t.checked);
+if (!checkedTypes.length) return alert("Select at least one document type.");
 
-const files = Array.from(
-  (window.__casaPortalUploads && window.__casaPortalUploads.verifyDocs) || $("#verifyDocs")?.files || []
-).slice(0, 5);
-if (!files.length) return alert("Upload at least one document.");
-
-const types = [];
-if ($("#docDeed")?.checked) types.push("deed");
-if ($("#docTax")?.checked) types.push("tax");
-if ($("#docMortgage")?.checked) types.push("mortgage");
-if ($("#docOther")?.checked) types.push("other");
-
-const docs = files.map((f) => ({
+const docs = [];
+for (const t of checkedTypes) {
+const files =
+  (window.__casaPortalUploads &&
+    window.__casaPortalUploads.verifyDocsByType &&
+    window.__casaPortalUploads.verifyDocsByType[t.key]) ||
+  [];
+if (!files.length) {
+return alert(`Upload a document for: ${t.label}.`);
+}
+files.forEach((f) => {
+docs.push({
 name: f.name,
 size: f.size,
 uploadedAt: Date.now(),
-types,
-}));
+types: [t.key],
+});
+});
+}
 landlord.verificationDocs = (landlord.verificationDocs || []).concat(docs);
 landlord.verificationStatus = "pending";
 landlord.isVerified = false;
