@@ -3931,6 +3931,7 @@ const content = `
                      <div class="field">
                        <label>Verification document (demo)</label>
                        <input class="input" id="lpDoc" type="file" />
+                       <div class="fileChips" id="lpDocChips"></div>
                      </div>
                    `
                    : ""
@@ -3949,52 +3950,61 @@ const content = `
              }
              </div>
 
-             <div class="hr"></div>
+             ${
+               landlordMode === "signup"
+                 ? `
+                   <div class="hr"></div>
 
-             <div id="verificationSection">
-               <div class="kicker">Verification</div>
-               <div class="tiny" style="margin-top:6px;">
-                 ${wantsVerify ? "Please verify ownership documents before continuing." : "Upload ownership documents (demo)."}
-               </div>
-             </div>
+                   <div id="verificationSection">
+                     <div class="kicker">Verification</div>
+                     <div class="tiny" style="margin-top:6px;">
+                       ${wantsVerify ? "Please verify ownership documents before continuing." : "Upload ownership documents (demo)."}
+                     </div>
+                   </div>
 
-             <div class="field" style="margin-top:10px;">
-               <label>Document types (select at least one)</label>
-               <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
-                 <label class="tiny"><input type="checkbox" id="docDeed" /> Property Deed or Title</label>
-                 <label class="tiny"><input type="checkbox" id="docTax" /> Property Tax Bill</label>
-                 <label class="tiny"><input type="checkbox" id="docMortgage" /> Mortgage Statement</label>
-                 <label class="tiny"><input type="checkbox" id="docOther" /> Other Ownership Proof</label>
-               </div>
-             </div>
+                   <div class="field" style="margin-top:10px;">
+                     <label>Document types (select at least one)</label>
+                     <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                       <label class="tiny"><input type="checkbox" id="docDeed" /> Property Deed or Title</label>
+                       <label class="tiny"><input type="checkbox" id="docTax" /> Property Tax Bill</label>
+                       <label class="tiny"><input type="checkbox" id="docMortgage" /> Mortgage Statement</label>
+                       <label class="tiny"><input type="checkbox" id="docOther" /> Other Ownership Proof</label>
+                     </div>
+                   </div>
 
-             <div class="field">
-               <label>Upload documents</label>
-               <input class="input" id="verifyDocs" type="file" multiple />
-             </div>
+                   <div class="field">
+                     <label>Upload documents</label>
+                     <input class="input" id="verifyDocs" type="file" multiple />
+                     <div class="fileChips" id="verifyDocsChips"></div>
+                   </div>
 
-             <div class="field">
-               <label>Apply to building (optional)</label>
-               <select class="input" id="verifyProperty">
-                 ${
-                   landlordProps.length
-                     ? landlordProps
-                         .map(
-                           (p) =>
-                             `<option value="${esc(p.id)}">${esc(
-                               `${p.address?.line1 || "Address"}${p.address?.unit ? `, ${p.address.unit}` : ""}`
-                             )}</option>`
-                         )
-                         .join("")
-                     : `<option value="">No properties linked</option>`
-                 }
-               </select>
-             </div>
+                   <div class="field">
+                     <label>Apply to building (optional)</label>
+                     <select class="input" id="verifyProperty">
+                       ${
+                         landlordProps.length
+                           ? landlordProps
+                               .map(
+                                 (p) =>
+                                   `<option value="${esc(p.id)}">${esc(
+                                     `${p.address?.line1 || "Address"}${p.address?.unit ? `, ${p.address.unit}` : ""}`
+                                   )}</option>`
+                               )
+                               .join("")
+                           : `<option value="">No properties linked</option>`
+                       }
+                     </select>
+                   </div>
 
-             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-               <button class="btn" id="verifySubmit" type="button">Submit for verification</button>
-               <span class="tiny" id="verifyStatus">Status: ${esc(landlordRecord ? landlordRecord.verificationStatus : "none")}</span>
-             </div>
+                   <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                     <button class="btn" id="verifySubmit" type="button">Submit for verification</button>
+                     <span class="tiny" id="verifyStatus">Status: ${esc(
+                       landlordRecord ? landlordRecord.verificationStatus : "none"
+                     )}</span>
+                   </div>
+                 `
+                 : ""
+             }
            </div>
          </div>
 
@@ -4054,6 +4064,48 @@ document.getElementById("verificationSection")?.scrollIntoView({ behavior: "smoo
 }, 0);
 }
 const goNextOrHome = () => navigateTo("#/account");
+const uploadState = (window.__casaPortalUploads = window.__casaPortalUploads || {
+lpDoc: [],
+verifyDocs: [],
+});
+const renderFileChips = (list, wrapId, inputId) => {
+const wrap = document.getElementById(wrapId);
+const input = document.getElementById(inputId);
+if (!wrap) return;
+wrap.innerHTML = list
+  .map(
+    (f, i) =>
+      `<span class="fileChip">${esc(f && f.name ? f.name : "File")}<button type="button" data-chip-remove="${esc(
+        wrapId
+      )}" data-chip-idx="${i}">×</button></span>`
+  )
+  .join("");
+wrap.querySelectorAll("[data-chip-remove]").forEach((btn) => {
+btn.addEventListener("click", () => {
+const idx = Number(btn.getAttribute("data-chip-idx") || 0);
+if (!Number.isFinite(idx)) return;
+list.splice(idx, 1);
+if (input) input.value = "";
+renderFileChips(list, wrapId, inputId);
+});
+});
+};
+
+const lpDocInput = $("#lpDoc");
+if (lpDocInput) {
+lpDocInput.addEventListener("change", () => {
+uploadState.lpDoc = Array.from(lpDocInput.files || []);
+renderFileChips(uploadState.lpDoc, "lpDocChips", "lpDoc");
+});
+}
+
+const verifyDocsInput = $("#verifyDocs");
+if (verifyDocsInput) {
+verifyDocsInput.addEventListener("change", () => {
+uploadState.verifyDocs = Array.from(verifyDocsInput.files || []);
+renderFileChips(uploadState.verifyDocs, "verifyDocsChips", "verifyDocs");
+});
+}
 const setPortalRole = (role) => {
 const panels = Array.from(document.querySelectorAll("[data-portal-panel]"));
 panels.forEach((panel) => {
@@ -4141,7 +4193,7 @@ const hasType =
   $("#docOther")?.checked;
 if (!hasType) return alert("Select at least one document type.");
 
-const files = Array.from($("#verifyDocs")?.files || []);
+const files = Array.from((window.__casaPortalUploads && window.__casaPortalUploads.verifyDocs) || $("#verifyDocs")?.files || []);
 if (!files.length) return alert("Upload at least one document.");
 
 const types = [];
