@@ -6764,7 +6764,6 @@ const ids = mode === "landlord"
 `rev_${formId}_fairnessTrans`,
 `rev_${formId}_depositReturn`,
 ]
-]
 : mode === "unit"
 ? [
 `rev_${formId}_clean`,
