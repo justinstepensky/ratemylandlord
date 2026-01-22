@@ -4516,6 +4516,9 @@ if (!user) {
 return;
 }
 
+// Ensure portal is always reachable off window for route dispatch.
+try { window.renderTenantPortal = renderTenantPortal; } catch {}
+
 const tab = getQueryParam("tab") || "dashboard";
 const threadId = getQueryParam("thread") || "";
 const filter = getQueryParam("filter") || "all";
@@ -5792,8 +5795,9 @@ return;
 }
 
 if (user) {
-if (typeof renderTenantPortal === "function") {
-renderTenantPortal();
+const tenantPortal = typeof window !== "undefined" ? window.renderTenantPortal : null;
+if (typeof tenantPortal === "function") {
+tenantPortal();
 } else {
 renderShell(`
     <section class="pageCard card">
