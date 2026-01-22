@@ -3104,7 +3104,26 @@ style.textContent = `
        gap: 10px !important;
      }
      .splitRow--banner .homePaneCard{
-       min-height: 300px;
+       min-height: 340px;
+     }
+     .splitRow--banner #highCarousel{
+       padding-bottom: 4px;
+     }
+     .splitRow--banner .carouselSlide{
+       padding: 2px 0;
+     }
+     .splitRow--banner .lc{
+       padding:12px !important;
+       gap:10px !important;
+     }
+     .splitRow--banner .lcName > span{
+       white-space:normal !important;
+     }
+     .splitRow--banner .smallNote{
+       display:-webkit-box !important;
+       -webkit-line-clamp:3 !important;
+       -webkit-box-orient:vertical !important;
+       overflow:hidden !important;
      }
    }
 
@@ -7170,19 +7189,21 @@ const ownerLinkHTML = showOwnerLink
 const content = `
    <section class="pageCard card">
      <div class="pad">
-       <div class="topRow">
-         <div>
+       <div class="topRow topRow--profile">
+         <div class="profileHeadLeft">
            <div class="kicker">Landlord</div>
            <div class="pageTitle">${esc(l.name)} ${renderBadges(l)}</div>
            <div class="pageSub landlordDesc">${
              l.description ? sanitizeDescription(l.description) : esc(l.entity || "—")
            }</div>
          </div>
-         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-           <button class="btn btn--primary" id="messageLandlordBtn" type="button">Message</button>
+         <div class="profileHeadActions">
+           <div class="profileActionRow">
+             <button class="btn btn--primary" id="messageLandlordBtn" type="button">Message</button>
+             <a class="btn" href="#/search">Back</a>
+           </div>
            ${user ? `<button class="btn" id="saveLandlordBtn" type="button">${isSaved ? "Saved" : "Save"}</button>` : ""}
-           <a class="btn" href="#/search">Back</a>
-           ${ownerLinkHTML}
+           <div class="ownerCorner">${ownerLinkHTML}</div>
          </div>
        </div>
 
@@ -7340,6 +7361,9 @@ user.savedLandlords.push(l.id);
 persist();
 route();
 });
+if ($("#ownerClaimBtn") && $("#ownerClaimBtn").textContent) {
+$("#ownerClaimBtn").textContent = "Owner?";
+}
 
 // Wire dropdown
 $("#moreBtn")?.addEventListener("click", (e) => {
@@ -7494,19 +7518,21 @@ const ownerLinkHTML = showOwnerLink
 const content = `
    <section class="pageCard card">
      <div class="pad">
-       <div class="topRow">
-         <div>
+       <div class="topRow topRow--profile">
+         <div class="profileHeadLeft">
            <div class="kicker">Address</div>
            <div class="pageTitle">${esc(title)} ${renderPropertyBadges(p)}</div>
            <div class="pageSub">
              ${esc(`${a.city || ""} • ${a.state || ""}`)} ${l ? `• Landlord: <a href="#/landlord/${esc(l.id)}">${esc(l.name)}</a>` : ""}
            </div>
          </div>
-         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-           ${l ? `<button class="btn btn--primary" id="messagePropertyBtn" type="button">Message</button>` : ""}
+         <div class="profileHeadActions">
+           <div class="profileActionRow">
+             ${l ? `<button class="btn btn--primary" id="messagePropertyBtn" type="button">Message</button>` : ""}
+             <a class="btn" href="#/search">Back</a>
+           </div>
            ${user ? `<button class="btn" id="savePropertyBtn" type="button">${isSaved ? "Saved" : "Save"}</button>` : ""}
-           <a class="btn" href="#/search">Back</a>
-           ${ownerLinkHTML}
+           <div class="ownerCorner">${ownerLinkHTML}</div>
          </div>
        </div>
 
@@ -7619,6 +7645,9 @@ user.savedProperties.push(p.id);
 persist();
 route();
 });
+if ($("#ownerClaimBtn") && $("#ownerClaimBtn").textContent) {
+$("#ownerClaimBtn").textContent = "Owner?";
+}
 
 document.querySelectorAll("[data-info]").forEach((btn) => {
 btn.addEventListener("click", () => {

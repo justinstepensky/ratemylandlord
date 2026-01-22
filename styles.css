@@ -353,7 +353,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   display:flex;transition: transform .45s ease;
   will-change: transform;
 }
-.carouselSlide{min-width:100%}
+.carouselSlide{min-width:100%;flex:0 0 100%}
 .dots{
   display:flex;gap:8px;justify-content:center;
   margin-top:12px;
@@ -373,6 +373,11 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .profileStats{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .addrLine{margin-top:10px;color:rgba(21,17,14,.65);font-weight:800}
 .twoCol{display:grid;grid-template-columns: 1.05fr .95fr;gap:14px}
+.topRow--profile{align-items:flex-start}
+.profileHeadLeft{min-width:0}
+.profileHeadActions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;position:relative}
+.profileActionRow{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.ownerCorner{align-self:flex-end}
 
 /* Rating distribution */
 .histo{margin-top:16px}
@@ -692,6 +697,20 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .lcRight{align-items:flex-start;width:100%}
   .map{height:240px}
   .modal{width:min(720px, 100%)}
+  .carousel{border-radius:14px}
+  .carouselTrack{transition: transform .35s ease}
+  .carouselSlide .lc{padding:12px}
+  .carouselSlide .smallNote{font-size:12px}
+  .card{border-radius:14px}
+  .card .pad{padding:12px}
+  .ratingNum{font-size:16px}
+  .stars{font-size:14px}
+  .pill{padding:4px 8px;font-size:11px}
+  .list{gap:10px}
+  .topRow--profile{flex-direction:column;align-items:flex-start;gap:10px}
+  .profileHeadActions{align-items:flex-start;width:100%}
+  .profileActionRow{justify-content:flex-start}
+  .ownerCorner{position:absolute;top:0;right:0}
 }
 @media (max-width:520px){
   .nav__inner{padding:10px 0}
@@ -703,4 +722,12 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .modalBody{padding:12px}
   .modalHead{padding:12px}
   .modalFoot{padding:12px}
+  .topRow--profile .pageTitle{font-size:18px}
+  .topRow--profile .pageSub{font-size:12px}
+  .topRow--profile .kicker{font-size:11px;letter-spacing:.12em}
+  .profileActionRow .btn{padding:8px 10px;font-size:12px}
+  .card .pad{padding:10px}
+  .ratingNum{font-size:15px}
+  .pill{padding:3px 7px;font-size:10px}
+  .list{gap:8px}
 }
