@@ -124,6 +124,7 @@ showOverlayError("Unhandled promise rejection (handler failed)", err);
 const LS_KEY = "casa_demo_v2";
 const LEGACY_LS_KEY = "casa_demo_v1";
 const BADGE_VER = "1";
+const APP_VERSION = "tenant-portal-v1";
 const ASSET_BASE = location.pathname.includes("/ratemylandlord") ? "/ratemylandlord/" : "/";
 
 function safeParseJSON(raw) {
@@ -2887,7 +2888,7 @@ const accountLabel = landlordSignedIn ? "Landlord Portal" : isAnySignedIn() ? "M
 app.innerHTML = `
    ${content}
        <div class="footer">
-         <div>© ${new Date().getFullYear()} casa</div>
+         <div>© ${new Date().getFullYear()} casa · ${esc(APP_VERSION)}</div>
          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
            <a href="#/trust">Trust &amp; Safety</a>
            <a href="#/how">How it works</a>
