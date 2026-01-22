@@ -401,6 +401,53 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 
 /* Portal */
 .portalGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.howHero{
+  padding:18px;
+  border-radius:18px;
+  border:1px solid rgba(20,16,12,.10);
+  background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(250,245,238,.85));
+  box-shadow: 0 18px 50px rgba(20,16,12,.10);
+}
+.howHero__title{font-size:20px;font-weight:950;letter-spacing:-.01em}
+.howHero__sub{margin-top:8px;color:rgba(21,17,14,.65);font-weight:800}
+.howGrid{
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.howTile{
+  border-radius:16px;
+  border:1px solid rgba(20,16,12,.10);
+  background: rgba(255,255,255,.72);
+  padding:12px 14px;
+}
+.howTile summary{
+  list-style:none;
+  cursor:pointer;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+  align-items:center;
+}
+.howTile summary::-webkit-details-marker{display:none}
+.howTile__kicker{
+  text-transform:uppercase;
+  font-size:11px;
+  letter-spacing:.12em;
+  color:rgba(21,17,14,.55);
+  font-weight:900;
+}
+.howTile__title{font-size:16px;font-weight:950;margin-top:4px}
+.howTile__chev{
+  width:26px;height:26px;border-radius:999px;
+  border:1px solid rgba(20,16,12,.12);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;
+  background: rgba(255,255,255,.80);
+}
+.howTile[open] .howTile__chev{transform:rotate(45deg)}
+.howTile__body{margin-top:10px;color:rgba(21,17,14,.70);font-weight:750;line-height:1.55}
 .portalToggle{
   display:none;
   align-items:center;
@@ -613,6 +660,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .portalToggle{display:flex}
   .portalPanel{display:none}
   .portalPanel.isActive{display:block}
+  .howGrid{grid-template-columns:1fr}
 }
 @media (max-width:720px){
   .wrap{padding:0 14px}

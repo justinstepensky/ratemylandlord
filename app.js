@@ -3740,17 +3740,61 @@ renderShell(`
        <div class="topRow">
          <div>
            <div class="kicker">How it works</div>
-           <div class="pageTitle">Simple, fast, and public</div>
-           <div class="pageSub">Reviews require accounts. Landlords can respond after signing in.</div>
+           <div class="pageTitle">A clear, trusted view of who runs your home.</div>
+           <div class="pageSub">Rate landlords and buildings, message responsibly, and keep your housing history in one place.</div>
          </div>
          <a class="btn" href="#/">Home</a>
        </div>
        <div class="hr"></div>
-       <div class="muted" style="font-weight:700;line-height:1.5">
-         <div><b>Search</b><br/>Look up a landlord or an address.</div>
-         <div style="margin-top:10px"><b>Review</b><br/>Post after creating a quick account.</div>
-         <div style="margin-top:10px"><b>Choose target</b><br/>Rate the <b>landlord</b> or the <b>building</b> separately.</div>
-         <div style="margin-top:10px"><b>Report</b><br/>Spam, harassment, and personal info can be reported for moderation.</div>
+       <div class="howHero">
+         <div class="howHero__title">Casa makes housing accountability visible.</div>
+         <div class="howHero__sub">One place to review, message, and track rentals—without exposing personal contact info.</div>
+       </div>
+
+       <div class="howGrid">
+         <details class="howTile">
+           <summary>
+             <div class="howTile__kicker">Rating Landlords</div>
+             <div class="howTile__title">Hold management accountable</div>
+             <div class="howTile__chev">+</div>
+           </summary>
+           <div class="howTile__body">
+             Rate communication, maintenance, professionalism, fairness, and deposit return. Reviews can be updated and include optional proof. Landlords can respond after verified sign-in.
+           </div>
+         </details>
+
+         <details class="howTile">
+           <summary>
+             <div class="howTile__kicker">Rating Properties</div>
+             <div class="howTile__title">Separate the building from the brand</div>
+             <div class="howTile__chev">+</div>
+           </summary>
+           <div class="howTile__body">
+             Review the address itself—cleanliness, repairs, safety, and building conditions. Property ratings stay distinct from landlord ratings so you can compare accurately.
+           </div>
+         </details>
+
+         <details class="howTile">
+           <summary>
+             <div class="howTile__kicker">Landlord Portal</div>
+             <div class="howTile__title">Manage claims, replies, and inbox</div>
+             <div class="howTile__chev">+</div>
+           </summary>
+           <div class="howTile__body">
+             Verified landlords can claim profiles and properties, receive messages in one inbox, respond to reviews, and manage verification documents and notification preferences.
+           </div>
+         </details>
+
+         <details class="howTile">
+           <summary>
+             <div class="howTile__kicker">Tenant Portal</div>
+             <div class="howTile__title">Inbox, reviews, and records</div>
+             <div class="howTile__chev">+</div>
+           </summary>
+           <div class="howTile__body">
+             Tenants keep conversations, reviews, saved landlords/properties, rental notes, and issue tracking in one place. Privacy settings let you use an alias and control visibility.
+           </div>
+         </details>
        </div>
      </div>
    </section>
