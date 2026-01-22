@@ -415,13 +415,17 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:12px;
+  align-items:start;
 }
 .howTile{
   border-radius:16px;
   border:1px solid rgba(20,16,12,.10);
   background: rgba(255,255,255,.72);
   padding:12px 14px;
+  box-shadow: 0 14px 28px rgba(20,16,12,.12);
+  transition: transform .25s ease, box-shadow .25s ease;
 }
+.howTile:hover{transform:translateY(-3px);box-shadow: 0 20px 36px rgba(20,16,12,.16)}
 .howTile summary{
   list-style:none;
   cursor:pointer;
@@ -438,16 +442,27 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   color:rgba(21,17,14,.55);
   font-weight:900;
 }
-.howTile__title{font-size:16px;font-weight:950;margin-top:4px}
+.howTile__title{font-size:16px;font-weight:950;margin-top:4px;color:rgba(21,17,14,.95)}
 .howTile__chev{
   width:26px;height:26px;border-radius:999px;
   border:1px solid rgba(20,16,12,.12);
   display:flex;align-items:center;justify-content:center;
   font-weight:900;
   background: rgba(255,255,255,.80);
+  transition: transform .25s ease;
 }
 .howTile[open] .howTile__chev{transform:rotate(45deg)}
-.howTile__body{margin-top:10px;color:rgba(21,17,14,.70);font-weight:750;line-height:1.55}
+.howTile__body{
+  margin-top:10px;
+  color:rgba(21,17,14,.70);
+  font-weight:750;
+  line-height:1.55;
+  animation: howFade .25s ease;
+}
+@keyframes howFade{
+  from{opacity:0;transform:translateY(-4px)}
+  to{opacity:1;transform:translateY(0)}
+}
 .portalToggle{
   display:none;
   align-items:center;

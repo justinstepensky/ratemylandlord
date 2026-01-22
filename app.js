@@ -3754,8 +3754,7 @@ renderShell(`
        <div class="howGrid">
          <details class="howTile">
            <summary>
-             <div class="howTile__kicker">Rating Landlords</div>
-             <div class="howTile__title">Hold management accountable</div>
+             <div class="howTile__title">Rating Landlords</div>
              <div class="howTile__chev">+</div>
            </summary>
            <div class="howTile__body">
@@ -3765,8 +3764,7 @@ renderShell(`
 
          <details class="howTile">
            <summary>
-             <div class="howTile__kicker">Rating Properties</div>
-             <div class="howTile__title">Separate the building from the brand</div>
+             <div class="howTile__title">Rating Properties</div>
              <div class="howTile__chev">+</div>
            </summary>
            <div class="howTile__body">
@@ -3776,8 +3774,7 @@ renderShell(`
 
          <details class="howTile">
            <summary>
-             <div class="howTile__kicker">Landlord Portal</div>
-             <div class="howTile__title">Manage claims, replies, and inbox</div>
+             <div class="howTile__title">Landlord Portal</div>
              <div class="howTile__chev">+</div>
            </summary>
            <div class="howTile__body">
@@ -3787,8 +3784,7 @@ renderShell(`
 
          <details class="howTile">
            <summary>
-             <div class="howTile__kicker">Tenant Portal</div>
-             <div class="howTile__title">Inbox, reviews, and records</div>
+             <div class="howTile__title">Tenant Portal</div>
              <div class="howTile__chev">+</div>
            </summary>
            <div class="howTile__body">
