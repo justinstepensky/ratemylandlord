@@ -253,6 +253,55 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 }
 .pageCard{margin-top:18px}
 .pad{padding:18px}
+.heroCard{
+  position:relative;
+  overflow:hidden;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(248,241,232,.92));
+  box-shadow: 0 24px 60px rgba(20,16,12,.14);
+}
+.heroCard:before{
+  content:"";
+  position:absolute;
+  inset:-40% auto auto -30%;
+  width:280px;height:280px;border-radius:999px;
+  background: radial-gradient(circle, rgba(21,17,14,.08), rgba(21,17,14,0));
+}
+.heroCard .pad{position:relative;z-index:1}
+.heroKicker{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 10px;border-radius:999px;
+  background: rgba(255,255,255,.75);
+  border:1px solid rgba(20,16,12,.10);
+  box-shadow: 0 8px 20px rgba(20,16,12,.08);
+}
+.heroTitle{
+  font-size:46px;
+  letter-spacing:-0.03em;
+  margin:14px 0 10px;
+  font-weight: 950;
+  line-height:1.02;
+}
+.heroSub{
+  margin:0;
+  color:rgba(21,17,14,.70);
+  font-weight:800;
+  line-height:1.55;
+  max-width:640px;
+}
+.heroSearch{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:16px;
+}
+.heroNote{
+  text-align:center;
+  margin-top:10px;
+  font-size:13px;
+  color:rgba(21,17,14,.65);
+  font-weight:800;
+}
 .kicker{
   font-weight: 950;
   letter-spacing: .14em;
@@ -721,6 +770,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   .wrap{padding:0 14px}
   .pad{padding:14px}
   .h1{font-size:30px}
+  .heroTitle{font-size:32px}
   .pageTitle{font-size:20px}
   .heroSearch{flex-direction:column}
   .heroSearch .input{min-width:0;width:100%}

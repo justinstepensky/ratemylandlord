@@ -2939,11 +2939,14 @@ function renderHome() {
 setPageTitle("Know your landlord");
 
 const content = `
-   <section class="pageCard card">
+   <section class="pageCard card heroCard">
      <div class="pad">
-       <div class="kicker">CASA</div>
-       <div class="h1">Know your landlord<br/>before you sign.</div>
-       <p class="sub">Search landlords, read tenant reviews, and add your building in minutes.</p>
+       <div class="heroKicker">
+         <span class="kicker">CASA</span>
+         <span class="tiny">Housing accountability</span>
+       </div>
+       <div class="heroTitle">Know your landlord<br/>before you sign.</div>
+       <p class="heroSub">Search landlords, read tenant reviews, and add your building in minutes.</p>
 
        <div class="heroSearch">
          <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
@@ -2951,7 +2954,7 @@ const content = `
          ${isAnySignedIn() ? `<a class="btn" href="#/add">Add a landlord</a>` : ""}
        </div>
 
-       <div class="muted" style="text-align:center;margin-top:10px;font-size:13px;">
+       <div class="heroNote">
          Create an account to rate. Verified landlords can respond.
        </div>
 
