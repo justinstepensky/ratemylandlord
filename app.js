@@ -2864,6 +2864,14 @@ drawerPrimary.setAttribute("href", href);
 document.querySelectorAll("[data-account-link]").forEach((link) => {
 link.textContent = label;
 link.setAttribute("href", href);
+if (link.dataset.boundAccountLink === "1") return;
+link.dataset.boundAccountLink = "1";
+link.addEventListener("click", (e) => {
+const target = link.getAttribute("href") || href;
+if (!target || !target.startsWith("#/")) return;
+e.preventDefault();
+navigateTo(target);
+});
 });
 }
 
