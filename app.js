@@ -6745,19 +6745,33 @@ el.classList.toggle("isOn", starVal <= v);
 });
 }
 
-function wireCategoryRatingToStars(formId, isLandlord) {
+function wireCategoryRatingToStars(formId, modeOrIsLandlord) {
 const starPicker = document.querySelector(
 `[data-stars-input="rev_${formId}Stars"]`
 );
 if (!starPicker) return;
 
-const ids = isLandlord
+let mode = modeOrIsLandlord;
+if (typeof modeOrIsLandlord === "boolean") {
+mode = modeOrIsLandlord ? "landlord" : "property";
+}
+
+const ids = mode === "landlord"
 ? [
 `rev_${formId}_respComm`,
 `rev_${formId}_maintRepairs`,
 `rev_${formId}_respectProf`,
 `rev_${formId}_fairnessTrans`,
 `rev_${formId}_depositReturn`,
+]
+]
+: mode === "unit"
+? [
+`rev_${formId}_clean`,
+`rev_${formId}_wifi`,
+`rev_${formId}_water`,
+`rev_${formId}_noise`,
+`rev_${formId}_heat`,
 ]
 : [
 `rev_${formId}_comm`,
@@ -7008,19 +7022,7 @@ return (
 function reviewFormHTML(targetType, targetId) {
 const formId = `${targetType}_${targetId}`;
 if (isLandlordSignedIn() && !isUserSignedIn()) {
-return `
-   <div class="card bubble--white" style="box-shadow:none;">
-     <div class="pad">
-       <div class="kicker">Leave a review</div>
-       <div class="muted" style="margin-top:8px; font-weight:800;">
-         You’re signed in as a landlord.
-       </div>
-       <div class="tiny" style="margin-top:8px; line-height:1.45;">
-         Switch to a tenant account in My account to post reviews.
-       </div>
-     </div>
-   </div>
- `.trim();
+return "";
 }
 if (!isUserSignedIn()) {
 return `
@@ -7720,6 +7722,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
+wireCategoryRatingToStars(`landlord_${l.id}`, "landlord");
 wireReviewProofEditor(`landlord_${l.id}`);
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
 $("#messageLandlordBtn")?.addEventListener("click", () => openMessageModal({ landlord: l }));
@@ -8038,7 +8041,7 @@ renderShell(content);
 ensureRuntimeStyles();
 initPropertyMediaEmbed();
 initStarPickers();
-wireCategoryRatingToStars(`property_${p.id}`, false);
+wireCategoryRatingToStars(`property_${p.id}`, "property");
 wireReviewProofEditor(`property_${p.id}`);
 if (l) {
 $("#ownerClaimBtn")?.addEventListener("click", () => handleOwnerClaim(l.id));
@@ -8105,7 +8108,6 @@ alert("Sign in to post a review.");
 location.hash = "#/portal?umode=signup";
 return;
 }
-const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 const proofFiles = getProofListFromDOM(formId).filter(Boolean);
@@ -8117,6 +8119,8 @@ clean: Number($(`#rev_${formId}_clean`)?.value || 5),
 respect: Number($(`#rev_${formId}_respect`)?.value || 5),
 deposit: Number($(`#rev_${formId}_deposit`)?.value || 5),
 };
+const computedStars = avgFromCategoryStars(categories);
+const stars = Number.isFinite(computedStars) ? round1(computedStars) : clampStars($(`#rev_${formId}Stars`)?.value || 5);
 
 const existing = currentUserReview("property", p.id);
 if (existing) {
@@ -8341,6 +8345,7 @@ const content = `
 renderShell(content);
 ensureRuntimeStyles();
 initStarPickers();
+wireCategoryRatingToStars(`unit_${u.id}`, "unit");
 wireReviewProofEditor(`unit_${u.id}`);
 
 const listEl = $("#unitReviews");
@@ -8357,7 +8362,6 @@ alert("Sign in to post a review.");
 location.hash = "#/portal?umode=signup";
 return;
 }
-const stars = clampStars($(`#rev_${formId}Stars`)?.value || 5);
 const text = $(`#rev_${formId}Text`)?.value ? String($(`#rev_${formId}Text`).value).trim() : "";
 if (!text) return alert("Write a review first.");
 const proofFiles = getProofListFromDOM(formId).filter(Boolean);
@@ -8368,6 +8372,8 @@ water: Number($(`#rev_${formId}_water`)?.value || 5),
 noise: Number($(`#rev_${formId}_noise`)?.value || 5),
 heat: Number($(`#rev_${formId}_heat`)?.value || 5),
 };
+const computedStars = avgFromCategoryStars(categories);
+const stars = Number.isFinite(computedStars) ? round1(computedStars) : clampStars($(`#rev_${formId}Stars`)?.value || 5);
 
 const existing = currentUserReview("unit", u.id);
 if (existing) {
