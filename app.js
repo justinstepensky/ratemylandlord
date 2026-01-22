@@ -745,6 +745,27 @@ return (DB.units || [])
 .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
 
+function pseudoGeocodeAddress({ line1, city, state }, regionKey) {
+const base = REGIONS[regionKey] || REGIONS.NYC;
+const seedStr = `${line1 || ""}|${city || ""}|${state || ""}`.toLowerCase();
+let hash = 0;
+for (let i = 0; i < seedStr.length; i += 1) {
+hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
+}
+const rand = (n) => {
+const x = Math.sin(n) * 10000;
+return x - Math.floor(x);
+};
+const r1 = rand(hash + 1);
+const r2 = rand(hash + 2);
+const latJitter = (r1 - 0.5) * 0.08;
+const lngJitter = (r2 - 0.5) * 0.1;
+return {
+lat: base.center[0] + latJitter,
+lng: base.center[1] + lngJitter,
+};
+}
+
 function landlordForCompany(company) {
 const c = norm(company);
 if (!c) return null;
@@ -2377,7 +2398,7 @@ return leafletLoadPromise;
 const REGION_KEY = "casa_region_v1";
 
 const REGIONS = {
-NYC: { label: "NYC", center: [40.73, -73.95], zoom: 11, states: ["NY"] },
+NYC: { label: "New York City", center: [40.73, -73.95], zoom: 11, states: ["NY"] },
 MIA: { label: "Miami", center: [25.7617, -80.1918], zoom: 11, states: ["FL"] },
 LA:  { label: "Los Angeles",  center: [34.0522, -118.2437], zoom: 10, states: ["CA"] },
 CHI: { label: "Chicago", center: [41.8781, -87.6298], zoom: 11, states: ["IL"] },
@@ -3846,50 +3867,61 @@ const content = `
          <a class="btn" href="#/">Home</a>
        </div>
 
+       <div class="heroSearchToggle" role="group" aria-label="Add mode">
+         <span class="tiny">Add:</span>
+         <button class="btn miniBtn btn--primary" id="addModeBoth" type="button">Landlord + Address</button>
+         <button class="btn miniBtn" id="addModeLandlord" type="button">Landlord only</button>
+         <button class="btn miniBtn" id="addModeAddress" type="button">Address only</button>
+       </div>
+
        <div class="twoCol">
          <div class="card" style="box-shadow:none;">
            <div class="pad">
-             <div class="field">
-               <label>Landlord / Company name <span style="color:#b91c1c">*</span></label>
-               <input class="input" id="ln" placeholder="e.g., Park Ave Management" />
+             <div id="addLandlordFields">
+               <div class="field">
+                 <label>Landlord / Company name <span style="color:#b91c1c">*</span></label>
+                 <input class="input" id="ln" placeholder="e.g., Park Ave Management" />
+               </div>
+
+               <div class="field">
+                 <label>Entity (optional)</label>
+                 <input class="input" id="le" placeholder="e.g., Park Ave Management LLC" />
+               </div>
              </div>
 
-             <div class="field">
-               <label>Entity (optional)</label>
-               <input class="input" id="le" placeholder="e.g., Park Ave Management LLC" />
-             </div>
+             <div class="hr" id="addLandlordDivider"></div>
 
-             <div class="hr"></div>
+             <div id="addAddressFields">
+               <div class="field">
+                 <label>Address <span style="color:#b91c1c">*</span></label>
+                 <input class="input" id="a1" placeholder="Street address" />
+               </div>
 
-             <div class="field">
-               <label>Address <span style="color:#b91c1c">*</span></label>
-               <input class="input" id="a1" placeholder="Street address" />
-             </div>
+               <div class="field">
+                 <label>Unit (optional)</label>
+                 <input class="input" id="unit" placeholder="Apt / Unit" />
+               </div>
 
-             <div class="field">
-               <label>Unit (optional)</label>
-               <input class="input" id="unit" placeholder="Apt / Unit" />
-             </div>
+               <div class="field">
+                 <label>Units in building (optional)</label>
+                 <input class="input" id="unitsList" placeholder="e.g., 1A, 1B, 2A" />
+                 <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
+               </div>
 
-             <div class="field">
-               <label>Units in building (optional)</label>
-               <input class="input" id="unitsList" placeholder="e.g., 1A, 1B, 2A" />
-               <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
-             </div>
+               <div class="field">
+                 <label>City <span style="color:#b91c1c">*</span></label>
+                 <input class="input" id="city" placeholder="City" />
+               </div>
 
-             <div class="field">
-               <label>City <span style="color:#b91c1c">*</span></label>
-               <input class="input" id="city" placeholder="City" />
-             </div>
-
-             <div class="field">
-               <label>State <span style="color:#b91c1c">*</span></label>
-               <input class="input" id="state" placeholder="NY" />
+               <div class="field">
+                 <label>State <span style="color:#b91c1c">*</span></label>
+                 <input class="input" id="state" placeholder="NY" />
+               </div>
              </div>
 
              <button class="btn btn--primary btn--block" style="margin-top:12px;" id="addBtn" type="button">Add</button>
              <div class="tiny" style="margin-top:10px;">
-               After adding, you’ll land on the Address page so you can review the building.
+               After adding, you’ll land on the most relevant page.
              </div>
            </div>
          </div>
@@ -3916,6 +3948,38 @@ ensureRuntimeStyles();
 let picked = null;
 let addMap = null;
 let addMarker = null;
+let addMode = "both";
+
+const landlordFields = $("#addLandlordFields");
+const addressFields = $("#addAddressFields");
+const landlordDivider = $("#addLandlordDivider");
+const modeBoth = $("#addModeBoth");
+const modeLandlord = $("#addModeLandlord");
+const modeAddress = $("#addModeAddress");
+
+const syncAddMode = () => {
+if (landlordFields) landlordFields.style.display = addMode === "address" ? "none" : "";
+if (addressFields) addressFields.style.display = addMode === "landlord" ? "none" : "";
+if (landlordDivider)
+  landlordDivider.style.display = addMode === "both" ? "" : "none";
+modeBoth?.classList.toggle("btn--primary", addMode === "both");
+modeLandlord?.classList.toggle("btn--primary", addMode === "landlord");
+modeAddress?.classList.toggle("btn--primary", addMode === "address");
+};
+
+modeBoth?.addEventListener("click", () => {
+addMode = "both";
+syncAddMode();
+});
+modeLandlord?.addEventListener("click", () => {
+addMode = "landlord";
+syncAddMode();
+});
+modeAddress?.addEventListener("click", () => {
+addMode = "address";
+syncAddMode();
+});
+syncAddMode();
 
 const stateEl = $("#state");
 const syncAddMapToState = () => {
@@ -3967,16 +4031,26 @@ const city = $("#city")?.value ? $("#city").value.trim() : "";
 const state = $("#state")?.value ? $("#state").value.trim() : "";
 const rk = regionFromState(state);
 if (rk) setRegionKey(rk);
+const regionKey = rk || getRegionKey();
+const autoGeo = pseudoGeocodeAddress({ line1, city, state }, regionKey);
 
-if (!name || !line1 || !city || !state) {
-alert("Please fill required fields: Name, Address, City, State.");
-return;
+if (addMode === "landlord" && !name) {
+  alert("Please add a landlord name.");
+  return;
+}
+if (addMode === "address" && (!line1 || !city || !state)) {
+  alert("Please fill required address fields: Address, City, State.");
+  return;
+}
+if (addMode === "both" && (!name || !line1 || !city || !state)) {
+  alert("Please fill required fields: Name, Address, City, State.");
+  return;
 }
 
-const existing = findExactLandlord(name) || null;
-const landlordId = existing ? existing.id : idRand("l");
+const existing = name ? findExactLandlord(name) || null : null;
+const landlordId = existing ? existing.id : name ? idRand("l") : "";
 
-if (!existing) {
+if (name && !existing) {
 DB.landlords.unshift({
 id: landlordId,
 name,
@@ -4002,21 +4076,25 @@ notes: "Demo report. Production: public datasets + sources.",
 });
 }
 
-const propertyId = idRand("p");
-DB.properties.unshift({
-id: propertyId,
-landlordId,
-address: { line1, unit, city, state },
-borough: "", // ✅ removed from form entirely (kept field for backward compatibility)
-lat: picked && typeof picked.lat === "number" ? picked.lat : 40.73,
-lng: picked && typeof picked.lng === "number" ? picked.lng : -73.95,
-createdAt: Date.now(),
-});
-
-addUnitsForProperty(propertyId, unitsList);
+let propertyId = "";
+if (addMode === "address" || addMode === "both") {
+  propertyId = idRand("p");
+  DB.properties.unshift({
+    id: propertyId,
+    landlordId,
+    address: { line1, unit, city, state },
+    borough: "", // ✅ removed from form entirely (kept field for backward compatibility)
+    lat: picked && typeof picked.lat === "number" ? picked.lat : autoGeo.lat,
+    lng: picked && typeof picked.lng === "number" ? picked.lng : autoGeo.lng,
+    createdAt: Date.now(),
+  });
+  addUnitsForProperty(propertyId, unitsList);
+}
 
 persist();
-location.hash = `#/property/${propertyId}`;
+if (propertyId) return (location.hash = `#/property/${propertyId}`);
+if (landlordId) return (location.hash = `#/landlord/${landlordId}`);
+location.hash = "#/";
 });
 }
 
@@ -5425,6 +5503,10 @@ const city = $("#portalAddrCity")?.value ? $("#portalAddrCity").value.trim() : "
 const state = $("#portalAddrState")?.value ? $("#portalAddrState").value.trim() : "";
 const zip = $("#portalAddrZip")?.value ? $("#portalAddrZip").value.trim() : "";
 if (!line1 || !city || !state) return alert("Address, city, and state are required.");
+const rk = regionFromState(state);
+if (rk) setRegionKey(rk);
+const regionKey = rk || getRegionKey();
+const autoGeo = pseudoGeocodeAddress({ line1, city, state }, regionKey);
 const propertyId = idRand("p");
 DB.properties.unshift({
 id: propertyId,
@@ -5434,6 +5516,8 @@ buildingVerificationStatus: "none",
 buildingVerificationDocs: [],
 claimedByLandlordId: landlordRecord.id,
 claimedAt: Date.now(),
+lat: autoGeo.lat,
+lng: autoGeo.lng,
 createdAt: Date.now(),
 });
 addUnitsForProperty(propertyId, unitsList);
