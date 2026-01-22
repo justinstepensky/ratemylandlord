@@ -3821,7 +3821,9 @@ renderShell(`
 `);
 
 if (!isAnySignedIn()) {
+setTimeout(() => {
 openSignInGateModal();
+}, 0);
 }
 }
 
@@ -4066,6 +4068,9 @@ const renderFileChips = (list, wrapId, inputId) => {
 const wrap = document.getElementById(wrapId);
 const input = document.getElementById(inputId);
 if (!wrap) return;
+if (list.length > 5) {
+list.splice(5);
+}
 wrap.innerHTML = list
   .map(
     (f, i) =>
@@ -4088,7 +4093,11 @@ renderFileChips(list, wrapId, inputId);
 const verifyDocsInput = $("#verifyDocs");
 if (verifyDocsInput) {
 verifyDocsInput.addEventListener("change", () => {
-uploadState.verifyDocs = Array.from(verifyDocsInput.files || []);
+const files = Array.from(verifyDocsInput.files || []);
+if (files.length > 5) {
+alert("Upload up to 5 documents.");
+}
+uploadState.verifyDocs = files.slice(0, 5);
 renderFileChips(uploadState.verifyDocs, "verifyDocsChips", "verifyDocs");
 });
 }
@@ -4179,7 +4188,9 @@ const hasType =
   $("#docOther")?.checked;
 if (!hasType) return alert("Select at least one document type.");
 
-const files = Array.from((window.__casaPortalUploads && window.__casaPortalUploads.verifyDocs) || $("#verifyDocs")?.files || []);
+const files = Array.from(
+  (window.__casaPortalUploads && window.__casaPortalUploads.verifyDocs) || $("#verifyDocs")?.files || []
+).slice(0, 5);
 if (!files.length) return alert("Upload at least one document.");
 
 const types = [];
