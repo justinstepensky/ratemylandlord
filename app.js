@@ -3142,9 +3142,14 @@ const content = `
        <p class="heroSub">Search landlords, read tenant reviews, and add your building in minutes.</p>
 
        <div class="heroSearch">
-         <input class="input" id="homeQ" placeholder="Search landlord name, management company, or address..." />
-         <button class="btn btn--primary" id="homeSearch" type="button">Search</button>
+         <input class="input" id="homeQ" placeholder="Search landlord name or address..." />
+         <button class="btn btn--primary" id="homeSearch" type="button" disabled>Search</button>
          ${isAnySignedIn() ? `<a class="btn" href="#/add">Add a landlord</a>` : ""}
+       </div>
+       <div class="heroSearchToggle" role="group" aria-label="Search mode">
+         <span class="tiny">Search for:</span>
+         <button class="btn miniBtn" id="homeToggleLandlords" type="button">Landlords</button>
+         <button class="btn miniBtn" id="homeToggleProperties" type="button">Properties</button>
        </div>
 
        <div class="heroNote">
@@ -3206,14 +3211,34 @@ ensureRuntimeStyles();
 
 const homeSearch = $("#homeSearch");
 const homeQ = $("#homeQ");
+const homeLandToggle = $("#homeToggleLandlords");
+const homePropToggle = $("#homeToggleProperties");
+let homeSearchMode = "";
+
+const setHomeSearchMode = (mode) => {
+homeSearchMode = mode;
+if (homeSearch) homeSearch.disabled = !homeSearchMode;
+if (homeLandToggle) homeLandToggle.classList.toggle("btn--primary", mode === "landlords");
+if (homePropToggle) homePropToggle.classList.toggle("btn--primary", mode === "addresses");
+};
+
+homeLandToggle?.addEventListener("click", () => setHomeSearchMode("landlords"));
+homePropToggle?.addEventListener("click", () => setHomeSearchMode("addresses"));
 
 homeSearch?.addEventListener("click", () => {
+if (!homeSearchMode) {
+alert("Choose Landlords or Properties first.");
+return;
+}
 const q = homeQ && homeQ.value ? String(homeQ.value).trim() : "";
-const exactL = findExactLandlord(q);
-if (exactL) return (location.hash = `#/landlord/${exactL.id}`);
-const exactP = findExactProperty(q);
-if (exactP) return (location.hash = `#/property/${exactP.id}`);
-location.hash = `#/search?q=${encodeURIComponent(q)}`;
+if (homeSearchMode === "landlords") {
+  const exactL = findExactLandlord(q);
+  if (exactL) return (location.hash = `#/landlord/${exactL.id}`);
+} else {
+  const exactP = findExactProperty(q);
+  if (exactP) return (location.hash = `#/property/${exactP.id}`);
+}
+location.hash = `#/search?q=${encodeURIComponent(q)}&mode=${encodeURIComponent(homeSearchMode)}`;
 });
 
 homeQ?.addEventListener("keydown", (e) => {
@@ -3485,6 +3510,9 @@ const q = getQueryParam("q");
 let searchMode = "landlords";
 let alphaFilter = "all";
 let addressSort = "alpha";
+const modeParam = getQueryParam("mode");
+if (modeParam === "addresses" || modeParam === "properties") searchMode = "addresses";
+if (modeParam === "landlords") searchMode = "landlords";
 
 const content = `
    <section class="pageCard card">
@@ -3607,19 +3635,25 @@ function runSearchAndRender() {
 const query = qEl ? qEl.value.trim() : "";
 
 const nq = normalizeSearchText(query);
-const exactLandlords = !nq
-? []
-: DB.landlords.filter(
-(l) =>
-normalizeSearchText(l.name) === nq ||
-(l.entity && normalizeSearchText(l.entity) === nq)
-);
-if (exactLandlords.length === 1) return (location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`);
-
-const exactProps = !nq
-? []
-: DB.properties.filter((p) => normalizeSearchText((p.address && p.address.line1) || "") === nq);
-if (exactProps.length === 1) return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
+if (searchMode === "landlords") {
+  const exactLandlords = !nq
+    ? []
+    : DB.landlords.filter(
+        (l) =>
+          normalizeSearchText(l.name) === nq ||
+          (l.entity && normalizeSearchText(l.entity) === nq)
+      );
+  if (exactLandlords.length === 1) {
+    return (location.hash = `#/landlord/${encodeURIComponent(exactLandlords[0].id)}`);
+  }
+} else {
+  const exactProps = !nq
+    ? []
+    : DB.properties.filter((p) => normalizeSearchText((p.address && p.address.line1) || "") === nq);
+  if (exactProps.length === 1) {
+    return (location.hash = `#/property/${encodeURIComponent(exactProps[0].id)}`);
+  }
+}
 
 // Auto-switch region if user typed a recognized state code (NY/FL/CA/IL/MA)
 const typed = String(query || "").toUpperCase();
@@ -3705,7 +3739,7 @@ window.L.marker([p.lat, p.lng])
 
 doBtn?.addEventListener("click", () => {
 const query = qEl ? qEl.value.trim() : "";
-location.hash = `#/search?q=${encodeURIComponent(query)}`;
+location.hash = `#/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(searchMode)}`;
 });
 
 function renderAlphaFilter() {
@@ -4979,7 +5013,7 @@ const messageHTML = selectedThread
 : `<div class="muted">Select a thread to view messages.</div>`;
 
 const content = `
-  <section class="pageCard card">
+  <section class="pageCard card portalWrap">
     <div class="pad">
       <div class="topRow">
         <div>
@@ -5036,7 +5070,7 @@ const content = `
         tab === "profile"
           ? `
             <div class="twoCol">
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Profile</div>
                   <form id="portalProfileForm">
@@ -5059,7 +5093,7 @@ const content = `
                   </form>
                 </div>
               </div>
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Access</div>
                   <div class="tiny" style="margin-top:6px;">
@@ -5078,7 +5112,7 @@ const content = `
       ${
         tab === "properties"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">My properties</div>
                 <div class="list" style="margin-top:10px;">
@@ -5088,7 +5122,7 @@ const content = `
                           .map((p) => {
                             const claimed = isPropertyClaimedByLandlord(p, landlordRecord.id);
                             return `
-                              <div class="card bubble--gray" style="box-shadow:none;">
+                              <div class="card bubble--gray portalTile">
                                 <div class="pad">
                                   <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
                                   <div class="tiny" style="margin-top:6px;">
@@ -5117,7 +5151,7 @@ const content = `
               </div>
             </div>
 
-            <div class="card" style="box-shadow:none; margin-top:14px;">
+            <div class="card portalCard" style="margin-top:14px;">
               <div class="pad">
                 <div class="kicker">Add property</div>
                 <form id="portalAddPropertyForm">
@@ -5157,7 +5191,7 @@ const content = `
       ${
         tab === "verification"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">Verification</div>
                 <div class="tiny" style="margin-top:6px;">
@@ -5177,7 +5211,7 @@ const content = `
                       ? props
                           .map(
                             (p) => `
-                              <div class="card bubble--gray" style="box-shadow:none;">
+                              <div class="card bubble--gray portalTile">
                                 <div class="pad">
                                   <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
                                   <div class="tiny" style="margin-top:6px;">
@@ -5200,7 +5234,7 @@ const content = `
       ${
         tab === "notifications"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">Notification preferences</div>
                 <form id="portalNotifForm">
@@ -5507,7 +5541,7 @@ const tenantThreadHTML = selectedThread
 : `<div class="muted">Select a thread to view messages.</div>`;
 
 const content = `
-  <section class="pageCard card">
+  <section class="pageCard card portalWrap">
     <div class="pad">
       <div class="topRow">
         <div>
@@ -5540,7 +5574,7 @@ const content = `
         tab === "dashboard"
           ? `
             <div class="twoCol">
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Credibility</div>
                   <div class="tiny" style="margin-top:8px; line-height:1.6;">
@@ -5551,7 +5585,7 @@ const content = `
                   <div class="tiny" style="margin-top:6px;">Status: <b>${esc(verificationStatus)}</b></div>
                 </div>
               </div>
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Quick stats</div>
                   <div class="tiny" style="margin-top:8px;">
@@ -5587,7 +5621,7 @@ const content = `
       ${
         tab === "reviews"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">Your reviews</div>
                 <div class="list" style="margin-top:10px;">
@@ -5613,7 +5647,7 @@ const content = `
                                 ? r.editHistory[r.editHistory.length - 1].editedAt
                                 : null;
                             return `
-                              <div class="card bubble--gray" style="box-shadow:none;">
+                              <div class="card bubble--gray portalTile">
                                 <div class="pad">
                                   <div style="font-weight:900;">${esc(targetLabel)}</div>
                                   <div class="tiny" style="margin-top:6px;">
@@ -5648,7 +5682,7 @@ const content = `
         tab === "saved"
           ? `
             <div class="twoCol">
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Saved landlords</div>
                   <div class="list" style="margin-top:10px;">
@@ -5657,7 +5691,7 @@ const content = `
                         ? savedLandlords
                             .map(
                               (l) => `
-                                <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="card bubble--gray portalTile">
                                   <div class="pad">
                                     <div style="font-weight:900;">${esc(l.name)}</div>
                                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
@@ -5676,7 +5710,7 @@ const content = `
                   </div>
                 </div>
               </div>
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Saved properties</div>
                   <div class="list" style="margin-top:10px;">
@@ -5685,7 +5719,7 @@ const content = `
                         ? savedProperties
                             .map(
                               (p) => `
-                                <div class="card bubble--gray" style="box-shadow:none;">
+                                <div class="card bubble--gray portalTile">
                                   <div class="pad">
                                     <div style="font-weight:900;">${esc(buildFullAddress(p))}</div>
                                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
@@ -5712,7 +5746,7 @@ const content = `
       ${
         tab === "rentals"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">My rentals</div>
                 <div class="list" style="margin-top:10px;">
@@ -5722,7 +5756,7 @@ const content = `
                           .map((r) => {
                             const p = DB.properties.find((x) => x && x.id === r.propertyId);
                             return `
-                              <div class="card bubble--gray" style="box-shadow:none;">
+                              <div class="card bubble--gray portalTile">
                                 <div class="pad">
                                   <div style="font-weight:900;">${esc(p ? buildFullAddress(p) : "Property")}</div>
                                   <div class="tiny" style="margin-top:6px;">
@@ -5776,7 +5810,7 @@ const content = `
       ${
         tab === "issues"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">Issue tracker</div>
                 <div class="list" style="margin-top:10px;">
@@ -5786,7 +5820,7 @@ const content = `
                           .map((i) => {
                             const p = DB.properties.find((x) => x && x.id === i.propertyId);
                             return `
-                              <div class="card bubble--gray" style="box-shadow:none;">
+                              <div class="card bubble--gray portalTile">
                                 <div class="pad">
                                   <div style="font-weight:900;">${esc(i.title || "Issue")}</div>
                                   <div class="tiny" style="margin-top:6px;">
@@ -5837,7 +5871,7 @@ const content = `
       ${
         tab === "notifications"
           ? `
-            <div class="card" style="box-shadow:none;">
+            <div class="card portalCard">
               <div class="pad">
                 <div class="kicker">Notifications</div>
                 <form id="tenantNotifForm">
@@ -5867,7 +5901,7 @@ const content = `
         tab === "settings"
           ? `
             <div class="twoCol">
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Profile & privacy</div>
                   <form id="tenantSettingsForm">
@@ -5892,7 +5926,7 @@ const content = `
                   </form>
                 </div>
               </div>
-              <div class="card" style="box-shadow:none;">
+              <div class="card portalCard">
                 <div class="pad">
                   <div class="kicker">Tenant verification</div>
                   <div class="tiny" style="margin-top:6px;">Status: <b>${esc(verificationStatus)}</b></div>

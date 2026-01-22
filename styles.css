@@ -73,6 +73,12 @@ a{color:inherit}
   cursor:pointer;
   transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
 }
+.btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  transform:none;
+  box-shadow:none;
+}
 .btn:hover{background:rgba(255,255,255,.78);transform:translateY(-2px);box-shadow:0 14px 28px rgba(20,16,12,.12)}
 .btn--primary{
   background: rgba(21,17,14,.92);
@@ -295,6 +301,13 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   flex-wrap:wrap;
   margin-top:16px;
 }
+.heroSearchToggle{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:10px;
+}
 .heroNote{
   text-align:center;
   margin-top:10px;
@@ -503,6 +516,45 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 
 /* Portal */
 .portalGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.portalWrap .portalCard{
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(250,244,236,.88));
+  border:1px solid rgba(20,16,12,.12);
+  box-shadow: 0 18px 40px rgba(20,16,12,.12);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.portalWrap .portalCard:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 22px 48px rgba(20,16,12,.16);
+}
+.portalWrap .portalTile{
+  background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(244,238,230,.86));
+  border:1px solid rgba(20,16,12,.10);
+  box-shadow: 0 12px 26px rgba(20,16,12,.10);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.portalWrap .portalTile:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(20,16,12,.14);
+}
+.portalWrap .threadItem{
+  background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(248,242,234,.86));
+  border:1px solid rgba(20,16,12,.12);
+  box-shadow: 0 12px 26px rgba(20,16,12,.10);
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.portalWrap .threadItem:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(20,16,12,.14);
+}
+.portalWrap .threadItem.isActive{
+  border-color: rgba(21,17,14,.55);
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(250,245,238,.92));
+}
+.portalWrap .threadPane{
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(248,242,234,.90));
+  border:1px solid rgba(20,16,12,.12);
+  box-shadow: 0 14px 30px rgba(20,16,12,.12);
+}
 .howHero{
   padding:18px;
   border-radius:18px;
