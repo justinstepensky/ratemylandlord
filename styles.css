@@ -486,7 +486,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
 .threadHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .threadMessages{display:flex;flex-direction:column;gap:10px;margin-top:12px;max-height:360px;overflow:auto;padding-right:4px}
 .threadMessage{display:flex;flex-direction:column;gap:4px}
-.threadMessage--landlord{align-items:flex-end}
+.threadMessage--self{align-items:flex-end}
 .threadBubble{
   max-width:75%;
   padding:10px 12px;
@@ -494,7 +494,7 @@ label{display:block;font-weight:900;font-size:12px;color:rgba(21,17,14,.75);marg
   border:1px solid rgba(20,16,12,.10);
   background: rgba(255,255,255,.92);
 }
-.threadMessage--landlord .threadBubble{background: rgba(21,17,14,.92);color:#fff;border-color: rgba(21,17,14,.25)}
+.threadMessage--self .threadBubble{background: rgba(21,17,14,.92);color:#fff;border-color: rgba(21,17,14,.25)}
 
 /* Drawer */
 .drawerOverlay{

@@ -4599,13 +4599,13 @@ const messageHTML = selectedThread
       messages.length
         ? messages
             .map((m) => {
-              const isLandlord = m.senderType === "landlord";
+              const isSelf = m.senderType === "landlord";
+              const label = isSelf ? "" : m.senderEmail || "Tenant";
+              const meta = label ? `${label} • ${fmtDate(m.createdAt)}` : fmtDate(m.createdAt);
               return `
-                <div class="threadMessage ${isLandlord ? "threadMessage--landlord" : "threadMessage--tenant"}">
+                <div class="threadMessage ${isSelf ? "threadMessage--self" : ""}">
                   <div class="threadBubble">${esc(m.body || "")}</div>
-                  <div class="threadMeta">${esc(isLandlord ? "Landlord" : m.senderEmail)} • ${esc(
-                    fmtDate(m.createdAt)
-                  )}</div>
+                  <div class="threadMeta">${esc(meta)}</div>
                 </div>
               `.trim();
             })
@@ -5119,13 +5119,13 @@ const tenantThreadHTML = selectedThread
       messages.length
         ? messages
             .map((m) => {
-              const isLandlord = m.senderType === "landlord";
+              const isSelf = m.senderType === "tenant";
+              const label = isSelf ? "" : "Landlord";
+              const meta = label ? `${label} • ${fmtDate(m.createdAt)}` : fmtDate(m.createdAt);
               return `
-                <div class="threadMessage ${isLandlord ? "threadMessage--landlord" : "threadMessage--tenant"}">
+                <div class="threadMessage ${isSelf ? "threadMessage--self" : ""}">
                   <div class="threadBubble">${esc(m.body || "")}</div>
-                  <div class="threadMeta">${esc(isLandlord ? "Landlord" : "You")} • ${esc(
-                    fmtDate(m.createdAt)
-                  )}</div>
+                  <div class="threadMeta">${esc(meta)}</div>
                 </div>
               `.trim();
             })
