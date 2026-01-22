@@ -4633,7 +4633,10 @@ const content = `
           <div class="pageTitle">Welcome, ${esc(landlordRecord.name)}</div>
           <div class="pageSub">Inbox, properties, and verification tools.</div>
         </div>
-        <a class="btn" href="#/">Home</a>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <a class="btn" href="#/">Home</a>
+          <button class="btn" id="portalTopLogout" type="button">Sign out</button>
+        </div>
       </div>
 
       <div class="hr"></div>
@@ -4973,6 +4976,12 @@ persist();
 updateAccountLinks();
 route();
 });
+$("#portalTopLogout")?.addEventListener("click", () => {
+DB.currentLandlordUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
 
 document.querySelectorAll("[data-claim-property]").forEach((btn) => {
 btn.addEventListener("click", () => {
@@ -5144,7 +5153,10 @@ const content = `
           <div class="pageTitle">Welcome back</div>
           <div class="pageSub">Inbox, reviews, saved items, and documentation.</div>
         </div>
-        <a class="btn" href="#/">Home</a>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <a class="btn" href="#/">Home</a>
+          <button class="btn" id="tenantTopLogout" type="button">Sign out</button>
+        </div>
       </div>
 
       <div class="hr"></div>
@@ -5728,6 +5740,12 @@ alert("Settings updated.");
 });
 
 $("#tenantLogout")?.addEventListener("click", () => {
+DB.currentUserId = "";
+persist();
+updateAccountLinks();
+route();
+});
+$("#tenantTopLogout")?.addEventListener("click", () => {
 DB.currentUserId = "";
 persist();
 updateAccountLinks();
