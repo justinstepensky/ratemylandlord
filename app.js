@@ -3167,6 +3167,13 @@ style.textContent = `
      width:auto !important;
      flex:0 0 auto !important;
      margin:0 !important;
+
+     transition: transform .25s ease, box-shadow .25s ease !important;
+   }
+
+   .tileRow .tile:not(.tile--disabled):hover{
+     transform: translateY(-3px) !important;
+     box-shadow: 0 18px 34px rgba(20,16,12,.12) !important;
    }
 
    .tileRow .tile .tile__icon{
