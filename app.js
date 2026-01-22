@@ -3823,11 +3823,7 @@ renderShell(`
    </section>
 `);
 
-if (!isAnySignedIn()) {
-setTimeout(() => {
-openSignInGateModal();
-}, 0);
-}
+// No sign-in gate on How it works page.
 }
 
 function renderTrust() {
