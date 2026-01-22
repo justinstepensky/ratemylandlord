@@ -2860,6 +2860,11 @@ if (drawerPrimary) {
 drawerPrimary.textContent = label;
 drawerPrimary.setAttribute("href", href);
 }
+
+document.querySelectorAll("[data-account-link]").forEach((link) => {
+link.textContent = label;
+link.setAttribute("href", href);
+});
 }
 
 function renderShell(content) {
