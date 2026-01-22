@@ -5791,7 +5791,24 @@ return;
 }
 
 if (user) {
+if (typeof renderTenantPortal === "function") {
 renderTenantPortal();
+} else {
+renderShell(`
+    <section class="pageCard card">
+      <div class="pad">
+        <div class="topRow">
+          <div>
+            <div class="kicker">My account</div>
+            <div class="pageTitle">Tenant portal is loading</div>
+            <div class="pageSub">If this persists, refresh the page after the latest deploy.</div>
+          </div>
+          <a class="btn" href="#/">Home</a>
+        </div>
+      </div>
+    </section>
+  `);
+}
 return;
 }
 
