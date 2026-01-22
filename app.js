@@ -3902,11 +3902,6 @@ const content = `
                  <input class="input" id="unit" placeholder="Apt / Unit" />
                </div>
 
-               <div class="field">
-                 <label>Units in building (optional)</label>
-                 <input class="input" id="unitsList" placeholder="e.g., 1A, 1B, 2A" />
-                 <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
-               </div>
 
                <div class="field">
                  <label>City <span style="color:#b91c1c">*</span></label>
@@ -4026,7 +4021,6 @@ const entity = $("#le")?.value ? $("#le").value.trim() : "";
 
 const line1 = $("#a1")?.value ? $("#a1").value.trim() : "";
 const unit = $("#unit")?.value ? $("#unit").value.trim() : "";
-const unitsList = parseUnitsInput($("#unitsList")?.value);
 const city = $("#city")?.value ? $("#city").value.trim() : "";
 const state = $("#state")?.value ? $("#state").value.trim() : "";
 const rk = regionFromState(state);
@@ -4088,7 +4082,6 @@ if (addMode === "address" || addMode === "both") {
     lng: picked && typeof picked.lng === "number" ? picked.lng : autoGeo.lng,
     createdAt: Date.now(),
   });
-  addUnitsForProperty(propertyId, unitsList);
 }
 
 persist();
@@ -5270,11 +5263,6 @@ const content = `
                     <input class="input" id="portalAddrUnit" placeholder="Apt / Unit (optional)" />
                   </div>
                   <div class="field">
-                    <label>Units in building (optional)</label>
-                    <input class="input" id="portalUnitsList" placeholder="e.g., 1A, 1B, 2A" />
-                    <div class="tiny" style="margin-top:6px;">Comma or line separated.</div>
-                  </div>
-                  <div class="field">
                     <label>City</label>
                     <input class="input" id="portalAddrCity" placeholder="City" />
                   </div>
@@ -5498,7 +5486,6 @@ $("#portalAddPropertyForm")?.addEventListener("submit", (e) => {
 e.preventDefault();
 const line1 = $("#portalAddrLine1")?.value ? $("#portalAddrLine1").value.trim() : "";
 const unit = $("#portalAddrUnit")?.value ? $("#portalAddrUnit").value.trim() : "";
-const unitsList = parseUnitsInput($("#portalUnitsList")?.value);
 const city = $("#portalAddrCity")?.value ? $("#portalAddrCity").value.trim() : "";
 const state = $("#portalAddrState")?.value ? $("#portalAddrState").value.trim() : "";
 const zip = $("#portalAddrZip")?.value ? $("#portalAddrZip").value.trim() : "";
@@ -5520,7 +5507,6 @@ lat: autoGeo.lat,
 lng: autoGeo.lng,
 createdAt: Date.now(),
 });
-addUnitsForProperty(propertyId, unitsList);
 persist();
 route();
 });
