@@ -3100,7 +3100,11 @@ style.textContent = `
 
    @media (max-width: 980px){
      .splitRow--banner{
-       grid-template-columns: 1fr !important;
+       grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+       gap: 10px !important;
+     }
+     .splitRow--banner .homePaneCard{
+       min-height: 300px;
      }
    }
 
